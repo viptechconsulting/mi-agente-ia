@@ -1,6 +1,8 @@
 (function () {
   const script = document.currentScript;
   const API = script.getAttribute('data-api') || window.location.origin;
+  const COMPANY = script.getAttribute('data-company') || '';
+  const qs = COMPANY ? `?companyId=${encodeURIComponent(COMPANY)}` : '';
 
   const visitorId = localStorage.getItem('ai_visitor_id') || (() => {
     const id = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -104,7 +106,7 @@
   const input = form.querySelector('input');
   const sendBtn = form.querySelector('button');
 
-  fetch(`${API}/api/config/public`).then(r => r.json()).then(c => {
+  fetch(`${API}/api/config/public${qs}`).then(r => r.json()).then(c => {
     config = { ...config, ...c };
     applyTheme();
     header.textContent = config.businessName;
@@ -160,8 +162,8 @@
         <button data-r="1" style="background:none;border:1px solid #333;color:#888;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px">👍</button>
         <button data-r="-1" style="background:none;border:1px solid #333;color:#888;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px">👎</button>`;
       rate.querySelectorAll('button').forEach(b => b.onclick = () => {
-        fetch(`${API}/api/rate`, { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ conversationId, messageId, rating: +b.dataset.r }) });
+        fetch(`${API}/api/rate${qs}`, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ conversationId, messageId, rating: +b.dataset.r, companyId: COMPANY || undefined }) });
         rate.innerHTML = `<span style="color:${config.accentColor};font-size:11px">¡Gracias por tu feedback!</span>`;
       });
       messagesEl.appendChild(rate);
@@ -189,10 +191,10 @@
     sendBtn.disabled = true;
     const typing = showTyping();
     try {
-      const r = await fetch(`${API}/api/chat`, {
+      const r = await fetch(`${API}/api/chat${qs}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversationId, visitorId })
+        body: JSON.stringify({ message: text, conversationId, visitorId, companyId: COMPANY || undefined })
       });
       const data = await r.json();
       typing.remove();

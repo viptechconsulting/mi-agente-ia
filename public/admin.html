@@ -70,10 +70,21 @@
 </div>
 
 <div id="app" class="wrap" style="display:none">
-  <h1>Panel <span>Admin</span></h1>
-  <div class="sub">Configura tu agente de atención al cliente</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:20px;flex-wrap:wrap">
+    <div>
+      <h1 style="margin:0">Panel <span>Admin</span></h1>
+      <div class="sub" style="margin:4px 0 0">Multi-empresa</div>
+    </div>
+    <div style="min-width:240px">
+      <label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1.5px">Empresa activa</label>
+      <select id="companySelector" onchange="switchCompany(this.value)" style="margin-top:4px">
+        <option>Cargando...</option>
+      </select>
+    </div>
+  </div>
 
   <div class="tabs">
+    <button onclick="tab('companies')">Empresas</button>
     <button class="active" onclick="tab('dashboard')">Dashboard</button>
     <button onclick="tab('config')">Configuración</button>
     <button onclick="tab('persona')">Personalidad</button>
@@ -88,6 +99,23 @@
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('whatsapp')">WhatsApp</button>
     <button onclick="tab('embed')">Embeber</button>
+  </div>
+
+  <div id="tab-companies" class="tab">
+    <div class="card">
+      <h2>Crear nueva empresa</h2>
+      <div class="row">
+        <div><label>Nombre</label><input id="newCompanyName" placeholder="Ej. Mi Nueva Empresa"></div>
+        <div><label>Slug (opcional, para subdominio)</label><input id="newCompanySlug" placeholder="mi-empresa"></div>
+      </div>
+      <br>
+      <button onclick="createCompany()">+ Crear empresa</button>
+    </div>
+    <div class="card">
+      <h2>Empresas del sistema</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">Cada empresa tiene su propia configuración, conversaciones, base de conocimiento y métricas aisladas.</p>
+      <div id="companiesList"></div>
+    </div>
   </div>
 
   <div id="tab-dashboard" class="tab active">
@@ -490,16 +518,107 @@
 <div id="toast" class="toast"></div>
 
 <script>
-let config = {}, password = '';
+let config = {}, password = '', activeCompanyId = sessionStorage.getItem('ai_active_company') || 'default', companies = [];
+
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  if (typeof url === 'string' && url.startsWith('/api/')) {
+    opts.headers = { ...(opts.headers || {}) };
+    if (activeCompanyId && !opts.headers['x-company-id']) opts.headers['x-company-id'] = activeCompanyId;
+  }
+  return _origFetch(url, opts);
+};
+
+function loadCompaniesList() {
+  return fetch('/api/companies', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(rows => {
+      companies = rows;
+      const sel = document.getElementById('companySelector');
+      if (sel) {
+        sel.innerHTML = rows.map(c => `<option value="${c.id}" ${c.id===activeCompanyId?'selected':''}>${c.active?'':'⏸ '}${c.name}</option>`).join('');
+      }
+      if (!rows.find(c => c.id === activeCompanyId)) {
+        activeCompanyId = rows[0]?.id || 'default';
+        sessionStorage.setItem('ai_active_company', activeCompanyId);
+      }
+      renderCompaniesList();
+    });
+}
+
+function renderCompaniesList() {
+  const el = document.getElementById('companiesList');
+  if (!el) return;
+  el.innerHTML = companies.map(c => `
+    <div class="faq-item">
+      <div style="display:flex;gap:8px;position:absolute;top:10px;right:10px">
+        <button onclick="toggleCompany('${c.id}', ${c.active?0:1})" style="background:${c.active?'#2a2a0a':'#0a2a0a'};color:${c.active?'#fbbf24':'#4ade80'};border:1px solid #333;font-size:11px">${c.active?'Desactivar':'Activar'}</button>
+        ${c.id!=='default'?`<button onclick="deleteCompanyAdmin('${c.id}','${c.name}')" style="font-size:11px">Eliminar</button>`:''}
+      </div>
+      <div style="margin-right:180px">
+        <div style="font-weight:600;color:var(--gold);font-size:15px">${c.name} ${c.id===activeCompanyId?'<span style="color:#4ade80;font-size:11px;margin-left:8px">● ACTIVA</span>':''}</div>
+        <div style="color:#888;font-size:12px;margin-top:4px">slug: <code style="background:#1a1a1a;padding:2px 6px;border-radius:4px">${c.slug}</code> · creada ${new Date(c.created_at).toLocaleDateString()}</div>
+        <div style="color:#666;font-size:12px;margin-top:6px">Widget: <code style="background:#1a1a1a;padding:2px 6px;border-radius:4px;font-size:11px">&lt;script src="${location.origin}/widget.js" data-api="${location.origin}" data-company="${c.id}"&gt;&lt;/script&gt;</code></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function switchCompany(id) {
+  activeCompanyId = id;
+  sessionStorage.setItem('ai_active_company', id);
+  fetch('/api/config', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(c => { config = c; render(); toast('Empresa cambiada'); });
+}
+
+function createCompany() {
+  const name = document.getElementById('newCompanyName').value.trim();
+  const slug = document.getElementById('newCompanySlug').value.trim();
+  if (!name) return toast('Falta nombre');
+  fetch('/api/companies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ name, slug: slug || undefined })
+  }).then(r => r.json()).then(d => {
+    if (d.error) return toast('Error: '+d.error);
+    toast('Empresa creada ✓');
+    document.getElementById('newCompanyName').value = '';
+    document.getElementById('newCompanySlug').value = '';
+    loadCompaniesList();
+  });
+}
+
+function toggleCompany(id, active) {
+  fetch('/api/companies/'+id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ active: !!active })
+  }).then(() => loadCompaniesList());
+}
+
+function deleteCompanyAdmin(id, name) {
+  if (!confirm(`¿Eliminar "${name}" y TODOS sus datos (conversaciones, docs, métricas)? Esto es irreversible.`)) return;
+  fetch('/api/companies/'+id, { method: 'DELETE', headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(d => {
+      if (d.error) return toast('Error: '+d.error);
+      if (id === activeCompanyId) { activeCompanyId = 'default'; sessionStorage.setItem('ai_active_company','default'); }
+      toast('Empresa eliminada');
+      loadCompaniesList();
+    });
+}
 
 function login() {
   password = document.getElementById('pw').value;
-  fetch('/api/config', { headers: { 'x-admin-password': password } })
+  fetch('/api/companies', { headers: { 'x-admin-password': password } })
     .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-    .then(c => {
-      config = c;
+    .then(async rows => {
+      companies = rows;
+      if (!rows.find(c => c.id === activeCompanyId)) activeCompanyId = rows[0]?.id || 'default';
+      sessionStorage.setItem('ai_active_company', activeCompanyId);
+      const cfgRes = await fetch('/api/config', { headers: { 'x-admin-password': password } });
+      config = await cfgRes.json();
       document.getElementById('login').style.display = 'none';
       document.getElementById('app').style.display = 'block';
+      await loadCompaniesList();
       render();
     })
     .catch(() => toast('Contraseña incorrecta'));
@@ -767,6 +886,7 @@ function tab(name) {
   if (name === 'knowledge') loadDocs();
   if (name === 'dashboard') loadDashboard();
   if (name === 'training') loadTraining();
+  if (name === 'companies') loadCompaniesList();
 }
 
 function loadTraining() {

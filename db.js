@@ -1,15 +1,22 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-export const db = new Database(path.join(dataDir, 'agent.db'));
+const dbPath = path.join(dataDir, 'agent.db');
+export const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 
+export const configPath = path.join(dataDir, 'config.json');
+
+// ============================================================
+// BASE SCHEMA (single-company era, preserved)
+// ============================================================
 db.exec(`
   CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -26,7 +33,6 @@ db.exec(`
     FOREIGN KEY(conversation_id) REFERENCES conversations(id)
   );
   CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
-
   CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
@@ -57,16 +63,37 @@ db.exec(`
   );
 `);
 
-try { db.exec('ALTER TABLE conversations ADD COLUMN unresolved INTEGER DEFAULT 0'); } catch {}
-try { db.exec("ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'web'"); } catch {}
-try { db.exec('ALTER TABLE conversations ADD COLUMN lead_notified INTEGER DEFAULT 0'); } catch {}
-try { db.exec('ALTER TABLE conversations ADD COLUMN escalated_notified INTEGER DEFAULT 0'); } catch {}
-try { db.exec('ALTER TABLE conversations ADD COLUMN lead_email TEXT'); } catch {}
-try { db.exec('ALTER TABLE conversations ADD COLUMN lead_phone TEXT'); } catch {}
+// Single-company era additive ALTERs (safe, idempotent)
+const softAlter = (sql) => { try { db.exec(sql); } catch {} };
+softAlter('ALTER TABLE conversations ADD COLUMN unresolved INTEGER DEFAULT 0');
+softAlter("ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'web'");
+softAlter('ALTER TABLE conversations ADD COLUMN lead_notified INTEGER DEFAULT 0');
+softAlter('ALTER TABLE conversations ADD COLUMN escalated_notified INTEGER DEFAULT 0');
+softAlter('ALTER TABLE conversations ADD COLUMN lead_email TEXT');
+softAlter('ALTER TABLE conversations ADD COLUMN lead_phone TEXT');
 
-export const configPath = path.join(dataDir, 'config.json');
+// ============================================================
+// MULTI-COMPANY SCHEMA (new)
+// ============================================================
+db.exec(`
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    slug TEXT UNIQUE,
+    active INTEGER DEFAULT 1,
+    created_at INTEGER,
+    config TEXT
+  );
+`);
+// Add company_id to scoped tables (default='default' keeps legacy data intact)
+softAlter("ALTER TABLE conversations ADD COLUMN company_id TEXT DEFAULT 'default'");
+softAlter("ALTER TABLE documents ADD COLUMN company_id TEXT DEFAULT 'default'");
+softAlter("ALTER TABLE training_pairs ADD COLUMN company_id TEXT DEFAULT 'default'");
 
-const defaultConfig = {
+// ============================================================
+// DEFAULT CONFIG (shape of per-company config)
+// ============================================================
+export const defaultConfig = {
   businessName: 'Mi Negocio',
   description: 'Describe aquí tu negocio.',
   tone: 'profesional, cercano y claro',
@@ -127,20 +154,202 @@ const defaultConfig = {
   ]
 };
 
-export function loadConfig() {
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-    return defaultConfig;
+// ============================================================
+// MIGRATION: single-company -> multi-company (SAFE, one-time)
+// ============================================================
+function runMigration() {
+  const count = db.prepare('SELECT COUNT(*) as c FROM companies').get().c;
+  if (count > 0) return; // Already migrated
+
+  console.log('[migration] Starting single-company → multi-company migration...');
+
+  // 1. Backup everything
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupDir = path.join(dataDir, `backup-${stamp}`);
+  fs.mkdirSync(backupDir, { recursive: true });
+  try {
+    if (fs.existsSync(configPath)) fs.copyFileSync(configPath, path.join(backupDir, 'config.json'));
+    if (fs.existsSync(dbPath)) fs.copyFileSync(dbPath, path.join(backupDir, 'agent.db'));
+    const walPath = dbPath + '-wal', shmPath = dbPath + '-shm';
+    if (fs.existsSync(walPath)) fs.copyFileSync(walPath, path.join(backupDir, 'agent.db-wal'));
+    if (fs.existsSync(shmPath)) fs.copyFileSync(shmPath, path.join(backupDir, 'agent.db-shm'));
+    console.log(`[migration] Backup created at ${backupDir}`);
+  } catch (err) {
+    console.error('[migration] Backup failed:', err.message);
+    throw new Error('Aborting migration: backup failed. Data untouched.');
   }
-  return { ...defaultConfig, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
+
+  // 2. Load existing config.json as the first company
+  let legacyCfg = {};
+  if (fs.existsSync(configPath)) {
+    try { legacyCfg = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
+  }
+  const merged = { ...defaultConfig, ...legacyCfg };
+
+  // 3. Insert as 'default' company
+  db.prepare('INSERT INTO companies (id, name, slug, active, created_at, config) VALUES (?, ?, ?, 1, ?, ?)').run(
+    'default',
+    merged.businessName || 'Empresa Principal',
+    'default',
+    Date.now(),
+    JSON.stringify(merged)
+  );
+
+  // 4. Normalize legacy rows to company_id='default'
+  db.exec(`UPDATE conversations SET company_id='default' WHERE company_id IS NULL OR company_id=''`);
+  db.exec(`UPDATE documents SET company_id='default' WHERE company_id IS NULL OR company_id=''`);
+  db.exec(`UPDATE training_pairs SET company_id='default' WHERE company_id IS NULL OR company_id=''`);
+
+  // 5. Write migration marker + docs
+  fs.writeFileSync(path.join(dataDir, 'MIGRATION.md'), `# Multi-company migration
+
+Migrated on: ${new Date().toISOString()}
+Backup: ${backupDir}
+
+## What changed
+- New table: \`companies\` (id, name, slug, active, created_at, config JSON)
+- Added column \`company_id\` to: conversations, documents, training_pairs
+- Legacy data mapped to company_id='default'
+- Legacy config.json preserved as companies.config for the 'default' company
+- No data was deleted; config.json is kept as-is for safety
+
+## Multi-company resolution order
+1. Explicit companyId (admin header, widget attribute, ?companyId=, ?slug=)
+2. WhatsApp instance name → matched against company config.waInstance
+3. Host/subdomain → first segment matched against company.slug
+4. Fallback → 'default' company
+`);
+  console.log('[migration] ✓ Complete. Legacy data preserved as company "default".');
+}
+runMigration();
+
+// ============================================================
+// COMPANY HELPERS
+// ============================================================
+function uuid() { return crypto.randomUUID(); }
+
+export function listCompanies() {
+  return db.prepare('SELECT id, name, slug, active, created_at FROM companies ORDER BY created_at ASC').all();
 }
 
-export function saveConfig(cfg) {
-  const merged = { ...loadConfig(), ...cfg };
-  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2));
+export function getCompany(idOrSlug) {
+  if (!idOrSlug) return null;
+  const row = db.prepare('SELECT * FROM companies WHERE id = ? OR slug = ?').get(idOrSlug, idOrSlug);
+  if (!row) return null;
+  return {
+    id: row.id, name: row.name, slug: row.slug, active: !!row.active, created_at: row.created_at,
+    config: { ...defaultConfig, ...(row.config ? JSON.parse(row.config) : {}) }
+  };
+}
+
+export function findCompanyByWaInstance(instance) {
+  if (!instance) return null;
+  const rows = db.prepare('SELECT id, config FROM companies WHERE active = 1').all();
+  for (const r of rows) {
+    try {
+      const cfg = JSON.parse(r.config || '{}');
+      if (cfg.waInstance && cfg.waInstance === instance) return getCompany(r.id);
+    } catch {}
+  }
+  return null;
+}
+
+export function createCompany({ name, slug, id }) {
+  const cid = id || uuid();
+  const cleanSlug = (slug || name || cid).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || cid;
+  const cfg = { ...defaultConfig, businessName: name || 'Nueva empresa' };
+  try {
+    db.prepare('INSERT INTO companies (id, name, slug, active, created_at, config) VALUES (?, ?, ?, 1, ?, ?)').run(
+      cid, cfg.businessName, cleanSlug, Date.now(), JSON.stringify(cfg)
+    );
+  } catch (err) {
+    if (/UNIQUE/.test(err.message)) throw new Error('El slug ya existe');
+    throw err;
+  }
+  return getCompany(cid);
+}
+
+export function updateCompanyMeta(id, { name, slug, active }) {
+  const fields = [], vals = [];
+  if (name != null) { fields.push('name = ?'); vals.push(name); }
+  if (slug != null) { fields.push('slug = ?'); vals.push(slug); }
+  if (active != null) { fields.push('active = ?'); vals.push(active ? 1 : 0); }
+  if (!fields.length) return getCompany(id);
+  vals.push(id);
+  db.prepare(`UPDATE companies SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
+  return getCompany(id);
+}
+
+export function deleteCompany(id) {
+  if (id === 'default') throw new Error('No se puede eliminar la empresa por defecto');
+  // Also clean scoped data
+  db.prepare('DELETE FROM ratings WHERE conversation_id IN (SELECT id FROM conversations WHERE company_id = ?)').run(id);
+  db.prepare('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE company_id = ?)').run(id);
+  db.prepare('DELETE FROM conversations WHERE company_id = ?').run(id);
+  db.prepare('DELETE FROM chunks WHERE doc_id IN (SELECT id FROM documents WHERE company_id = ?)').run(id);
+  db.prepare('DELETE FROM documents WHERE company_id = ?').run(id);
+  db.prepare('DELETE FROM training_pairs WHERE company_id = ?').run(id);
+  db.prepare('DELETE FROM companies WHERE id = ?').run(id);
+}
+
+// ============================================================
+// PER-COMPANY CONFIG API
+// ============================================================
+export function loadConfig(companyId = 'default') {
+  const c = getCompany(companyId);
+  if (c) return c.config;
+  // Fallback (should not happen after migration)
+  return { ...defaultConfig };
+}
+
+export function saveConfig(companyId, partial) {
+  const c = getCompany(companyId);
+  if (!c) throw new Error('Empresa no encontrada');
+  const merged = { ...c.config, ...partial };
+  db.prepare('UPDATE companies SET name = ?, config = ? WHERE id = ?').run(
+    merged.businessName || c.name, JSON.stringify(merged), companyId
+  );
+  // Also keep legacy config.json in sync for default company (safety net, optional)
+  if (companyId === 'default') {
+    try { fs.writeFileSync(configPath, JSON.stringify(merged, null, 2)); } catch {}
+  }
   return merged;
 }
 
+// ============================================================
+// SECOND EXAMPLE COMPANY (seed once, only if none exists yet besides default)
+// ============================================================
+function seedSecondCompany() {
+  const c = db.prepare("SELECT COUNT(*) as c FROM companies WHERE id != 'default'").get().c;
+  if (c > 0) return;
+  try {
+    const cfg = {
+      ...defaultConfig,
+      businessName: 'Demo Wellness Clinic',
+      description: 'Clínica wellness de ejemplo — segunda empresa de prueba del sistema multi-tenant.',
+      agentName: 'Luna',
+      accentColor: '#7bb342',
+      bgColor: '#0a1a0a',
+      userBubbleColor: '#1a2a0a',
+      welcomeMessage: '¡Hola! Soy Luna, tu asistente de Demo Wellness. ¿Cómo te puedo ayudar?',
+      personality: 'Cálida, empática, enfocada en bienestar.',
+      quickReplies: [
+        { label: 'Reservar cita', message: 'Quiero reservar una cita' },
+        { label: 'Ver tratamientos', message: 'Qué tratamientos ofrecen?' }
+      ]
+    };
+    const id = uuid();
+    db.prepare('INSERT INTO companies (id, name, slug, active, created_at, config) VALUES (?, ?, ?, 1, ?, ?)').run(
+      id, cfg.businessName, 'demo-wellness', Date.now(), JSON.stringify(cfg)
+    );
+    console.log('[seed] Segunda empresa de ejemplo creada: demo-wellness');
+  } catch (err) { console.error('[seed] Failed:', err.message); }
+}
+seedSecondCompany();
+
+// ============================================================
+// PROMPT / OFFICE HOURS (unchanged logic)
+// ============================================================
 export function isOfficeOpen(cfg) {
   const oh = cfg.officeHours;
   if (!oh || !oh.enabled) return { open: true, schedule: oh };
