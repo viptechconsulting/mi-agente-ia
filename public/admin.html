@@ -68,6 +68,7 @@
 
   <div class="tabs">
     <button class="active" onclick="tab('config')">Configuración</button>
+    <button onclick="tab('persona')">Personalidad</button>
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
@@ -114,6 +115,45 @@
     </div>
 
     <button onclick="save()">Guardar cambios</button>
+  </div>
+
+  <div id="tab-persona" class="tab">
+    <div class="card">
+      <h2>Identidad del agente</h2>
+      <div class="row">
+        <div><label>Nombre del agente</label><input id="agentName" placeholder="Ej. Sofía, Max, Aura"></div>
+        <div>
+          <label>Idioma principal</label>
+          <select id="language">
+            <option value="español">Español</option>
+            <option value="inglés">Inglés</option>
+            <option value="portugués">Portugués</option>
+            <option value="francés">Francés</option>
+            <option value="italiano">Italiano</option>
+            <option value="alemán">Alemán</option>
+          </select>
+        </div>
+      </div>
+      <label>Personalidad</label>
+      <textarea id="personality" placeholder="Ej. Amable, resolutiva, con sentido del humor. Usa frases cortas. Nunca usa jerga técnica."></textarea>
+      <label>Tono de voz</label>
+      <input id="tone2" placeholder="Ej. profesional pero cercano, con toque juvenil">
+    </div>
+
+    <div class="card">
+      <h2>Ejemplos de tu tono (entrena al agente)</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 10px">Pega fragmentos reales tuyos: posts, emails, respuestas de WhatsApp. El agente imitará este estilo.</p>
+      <textarea id="voiceExamples" style="min-height:140px" placeholder="Ejemplo 1: 'Hey! Claro que sí, te mando el link ahora mismo 🚀'&#10;Ejemplo 2: 'Perfecto, quedamos entonces para el viernes. Cualquier cosa me avisas!'"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Respuestas predeterminadas</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 10px">El agente usará estas respuestas (o adaptaciones) en situaciones comunes.</p>
+      <div id="defaultsList"></div>
+      <button class="secondary" onclick="addDefault()">+ Añadir situación</button>
+      <br><br>
+      <button onclick="save()">Guardar todo</button>
+    </div>
   </div>
 
   <div id="tab-faqs" class="tab">
@@ -190,11 +230,13 @@ function login() {
 
 function render() {
   ['businessName','description','hours','contact','products','tone',
-   'welcomeMessage','systemPromptExtra','model','accentColor'].forEach(k => {
+   'welcomeMessage','systemPromptExtra','model','accentColor',
+   'agentName','personality','language','voiceExamples'].forEach(k => {
     const el = document.getElementById(k);
     if (el) el.value = config[k] || '';
   });
-  renderFaqs();
+  const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
+  renderFaqs(); renderDefaults();
   document.getElementById('embedCode').value =
     `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
 }
@@ -218,12 +260,34 @@ function renderFaqs() {
 function addFaq() { config.faqs = config.faqs || []; config.faqs.push({q:'',a:''}); renderFaqs(); }
 function removeFaq(i) { config.faqs.splice(i,1); renderFaqs(); }
 
+function renderDefaults() {
+  const list = document.getElementById('defaultsList');
+  if (!list) return;
+  list.innerHTML = '';
+  (config.defaultResponses || []).forEach((d, i) => {
+    const div = document.createElement('div');
+    div.className = 'faq-item';
+    div.innerHTML = `
+      <button onclick="removeDefault(${i})">Eliminar</button>
+      <label>Situación</label>
+      <input value="${(d.situation||'').replace(/"/g,'&quot;')}" onchange="config.defaultResponses[${i}].situation=this.value">
+      <label>Respuesta</label>
+      <textarea onchange="config.defaultResponses[${i}].response=this.value">${d.response||''}</textarea>`;
+    list.appendChild(div);
+  });
+}
+function addDefault() { config.defaultResponses = config.defaultResponses || []; config.defaultResponses.push({situation:'',response:''}); renderDefaults(); }
+function removeDefault(i) { config.defaultResponses.splice(i,1); renderDefaults(); }
+
 function save() {
   ['businessName','description','hours','contact','products','tone',
-   'welcomeMessage','systemPromptExtra','model','accentColor'].forEach(k => {
+   'welcomeMessage','systemPromptExtra','model','accentColor',
+   'agentName','personality','language','voiceExamples'].forEach(k => {
     const el = document.getElementById(k);
     if (el) config[k] = el.value;
   });
+  const t2 = document.getElementById('tone2');
+  if (t2 && t2.value) config.tone = t2.value;
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-password': password },

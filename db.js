@@ -54,7 +54,17 @@ const defaultConfig = {
   systemPromptExtra: '',
   welcomeMessage: '¡Hola! ¿En qué puedo ayudarte hoy?',
   accentColor: '#D4AF37',
-  model: 'claude-haiku-4-5-20251001'
+  model: 'claude-haiku-4-5-20251001',
+  agentName: 'Asistente',
+  personality: 'Amable, resolutivo y cercano. Usa frases cortas y directas.',
+  language: 'español',
+  voiceExamples: '',
+  defaultResponses: [
+    { situation: 'Saludo inicial', response: '¡Hola! Bienvenido/a. ¿En qué puedo ayudarte hoy?' },
+    { situation: 'No sé la respuesta', response: 'No tengo esa información a mano, pero puedo pasar tu consulta al equipo. ¿Me dejas tu contacto?' },
+    { situation: 'Despedida', response: '¡Gracias por escribirnos! Que tengas un gran día.' },
+    { situation: 'Cliente molesto', response: 'Entiendo tu frustración y lamento el inconveniente. Déjame ayudarte a resolverlo lo antes posible.' }
+  ]
 };
 
 export function loadConfig() {
@@ -73,21 +83,29 @@ export function saveConfig(cfg) {
 
 export function buildSystemPrompt(cfg) {
   const faqText = (cfg.faqs || []).map(f => `P: ${f.q}\nR: ${f.a}`).join('\n\n');
-  return `Eres el agente de atención al cliente de "${cfg.businessName}".
+  const defaults = (cfg.defaultResponses || []).map(d => `• ${d.situation}: "${d.response}"`).join('\n');
+  return `Eres "${cfg.agentName || 'Asistente'}", el agente de atención al cliente de "${cfg.businessName}".
 
+IDIOMA: Responde siempre en ${cfg.language || 'español'}.
+
+PERSONALIDAD:
+${cfg.personality || cfg.tone}
+
+TONO DE VOZ: ${cfg.tone}
+${cfg.voiceExamples ? `\nEJEMPLOS DE CÓMO HABLO (imita este estilo):\n${cfg.voiceExamples}\n` : ''}
 DESCRIPCIÓN DEL NEGOCIO:
 ${cfg.description}
-
-TONO: ${cfg.tone}
 
 ${cfg.products ? `PRODUCTOS/SERVICIOS:\n${cfg.products}\n` : ''}
 ${cfg.hours ? `HORARIO:\n${cfg.hours}\n` : ''}
 ${cfg.contact ? `CONTACTO:\n${cfg.contact}\n` : ''}
 ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}\n` : ''}
+${defaults ? `\nRESPUESTAS PREDETERMINADAS (úsalas o adáptalas al contexto):\n${defaults}\n` : ''}
 ${cfg.systemPromptExtra ? `\nINSTRUCCIONES ADICIONALES:\n${cfg.systemPromptExtra}` : ''}
 
 REGLAS:
 - Responde solo sobre el negocio. Si te preguntan algo ajeno, redirige amablemente.
-- Si no sabes algo, dilo y sugiere contactar al negocio directamente.
-- Sé breve y útil. No inventes datos que no estén arriba.`;
+- Si no sabes algo, usa la respuesta predeterminada "No sé la respuesta" adaptándola.
+- Mantén siempre la personalidad y tono definidos arriba.
+- No inventes datos que no estén en la información proporcionada.`;
 }
