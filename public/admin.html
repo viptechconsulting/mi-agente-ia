@@ -84,6 +84,7 @@
     <button onclick="tab('notifications')">Notificaciones</button>
     <button onclick="tab('reports')">Reportes</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
+    <button onclick="tab('training')">Entrenar</button>
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('whatsapp')">WhatsApp</button>
     <button onclick="tab('embed')">Embeber</button>
@@ -407,6 +408,20 @@
     <div class="card">
       <h2>Documentos cargados</h2>
       <div id="docList"></div>
+    </div>
+  </div>
+
+  <div id="tab-training" class="tab">
+    <div class="card">
+      <h2>Preguntas pendientes de entrenar</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        Aquí aparecen preguntas que el agente no supo responder (escalamientos) o que recibieron 👎. Enséñale la respuesta correcta y la usará la próxima vez.
+      </p>
+      <div id="pendingList"></div>
+    </div>
+    <div class="card">
+      <h2>Respuestas ya entrenadas</h2>
+      <div id="trainedList"></div>
     </div>
   </div>
 
@@ -743,6 +758,66 @@ function tab(name) {
   if (name === 'convs') loadConvs();
   if (name === 'knowledge') loadDocs();
   if (name === 'dashboard') loadDashboard();
+  if (name === 'training') loadTraining();
+}
+
+function loadTraining() {
+  fetch('/api/training/pending', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(rows => {
+      const el = document.getElementById('pendingList');
+      if (!rows.length) { el.innerHTML = '<p style="color:#4ade80">✓ No hay preguntas pendientes de entrenar</p>'; return; }
+      el.innerHTML = rows.map(r => `
+        <div class="faq-item">
+          <div style="display:flex;gap:8px;position:absolute;top:10px;right:10px">
+            <button onclick="ignoreTraining(${r.message_id})" style="background:#1a1a1a;color:#888;border:1px solid #333;font-size:11px">Ignorar</button>
+          </div>
+          <div style="margin-right:140px">
+            <div style="color:var(--gold);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${r.channel==='whatsapp'?'💬 WhatsApp':'🌐 Web'}${r.rating===-1?' · 👎':''}</div>
+            <div style="color:#ccc;margin-bottom:6px"><b>Cliente preguntó:</b><br>${(r.question||'').replace(/</g,'&lt;')}</div>
+            ${r.reply ? `<div style="color:#666;font-size:12px;margin-bottom:10px"><b>Agente respondió:</b><br>${r.reply.replace(/</g,'&lt;').slice(0,200)}</div>` : ''}
+          </div>
+          <label>Respuesta correcta (la que el agente debió haber dado)</label>
+          <textarea id="ans_${r.message_id}" placeholder="Escribe aquí la respuesta que enseñarás al agente..."></textarea>
+          <br><br>
+          <button onclick="teach(${r.message_id}, ${JSON.stringify(r.question).replace(/"/g,'&quot;')})">✓ Entrenar al agente</button>
+        </div>`).join('');
+    });
+
+  fetch('/api/training/list', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(rows => {
+      const el = document.getElementById('trainedList');
+      if (!rows.length) { el.innerHTML = '<p style="color:#666">Aún no has entrenado ninguna respuesta.</p>'; return; }
+      el.innerHTML = rows.map(r => `
+        <div class="faq-item">
+          <button onclick="deleteTraining(${r.id})">Eliminar</button>
+          <div style="color:var(--gold);font-weight:600;margin-bottom:6px">P: ${r.question.replace(/</g,'&lt;').slice(0,150)}</div>
+          <div style="color:#ccc;font-size:13px">R: ${r.answer.replace(/</g,'&lt;').slice(0,300)}</div>
+        </div>`).join('');
+    });
+}
+
+function teach(messageId, question) {
+  const answer = document.getElementById('ans_' + messageId).value.trim();
+  if (!answer) return toast('Escribe la respuesta correcta');
+  fetch('/api/training/teach', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ question, answer, messageId })
+  }).then(() => { toast('✓ Agente entrenado'); loadTraining(); });
+}
+
+function ignoreTraining(messageId) {
+  fetch('/api/training/ignore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ messageId })
+  }).then(() => loadTraining());
+}
+
+function deleteTraining(id) {
+  if (!confirm('¿Eliminar esta respuesta entrenada?')) return;
+  fetch('/api/training/' + id, { method: 'DELETE', headers: { 'x-admin-password': password } })
+    .then(() => { toast('Eliminada'); loadTraining(); });
 }
 
 let dashInterval;

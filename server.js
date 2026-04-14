@@ -411,6 +411,64 @@ app.get('/api/report/weekly.pdf', async (req, res) => {
   doc.end();
 });
 
+app.get('/api/training/pending', requireAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT m.id as message_id, m.content as question, m.conversation_id, c.channel,
+      (SELECT content FROM messages WHERE conversation_id = m.conversation_id AND role='assistant' AND id > m.id ORDER BY id LIMIT 1) as reply,
+      (SELECT rating FROM ratings WHERE message_id = (SELECT id FROM messages WHERE conversation_id = m.conversation_id AND role='assistant' AND id > m.id ORDER BY id LIMIT 1)) as rating
+    FROM messages m
+    JOIN conversations c ON c.id = m.conversation_id
+    WHERE m.role = 'user'
+      AND m.id NOT IN (SELECT message_id FROM training_pairs WHERE message_id IS NOT NULL)
+      AND (c.unresolved = 1 OR EXISTS (
+        SELECT 1 FROM ratings r
+        JOIN messages m2 ON m2.id = r.message_id
+        WHERE m2.conversation_id = m.conversation_id AND r.rating = -1
+      ))
+    ORDER BY m.id DESC LIMIT 50
+  `).all();
+  res.json(rows);
+});
+
+app.post('/api/training/teach', requireAdmin, (req, res) => {
+  const { question, answer, messageId } = req.body;
+  if (!question || !answer) return res.status(400).json({ error: 'Falta pregunta o respuesta' });
+  const info = db.prepare('INSERT INTO training_pairs (question, answer, message_id, created_at) VALUES (?, ?, ?, ?)').run(question, answer, messageId || null, Date.now());
+  const docTitle = `Entrenada: ${question.slice(0, 60)}`;
+  const doc = db.prepare('INSERT INTO documents (title, source, created_at) VALUES (?, ?, ?)').run(docTitle, 'training', Date.now());
+  db.prepare('INSERT INTO chunks (doc_id, title, content) VALUES (?, ?, ?)').run(doc.lastInsertRowid, docTitle, `Pregunta: ${question}\n\nRespuesta: ${answer}`);
+  if (messageId) {
+    const conv = db.prepare('SELECT conversation_id FROM messages WHERE id = ?').get(messageId);
+    if (conv) db.prepare('UPDATE conversations SET unresolved = 0 WHERE id = ?').run(conv.conversation_id);
+  }
+  res.json({ id: info.lastInsertRowid });
+});
+
+app.post('/api/training/ignore', requireAdmin, (req, res) => {
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: 'Falta messageId' });
+  db.prepare('INSERT INTO training_pairs (question, answer, message_id, created_at) VALUES (?, ?, ?, ?)').run('', '[ignorada]', messageId, Date.now());
+  res.json({ ok: true });
+});
+
+app.get('/api/training/list', requireAdmin, (req, res) => {
+  res.json(db.prepare('SELECT id, question, answer, created_at FROM training_pairs WHERE answer != ? AND answer != ? ORDER BY id DESC LIMIT 200').all('', '[ignorada]'));
+});
+
+app.delete('/api/training/:id', requireAdmin, (req, res) => {
+  const tp = db.prepare('SELECT * FROM training_pairs WHERE id = ?').get(req.params.id);
+  if (tp) {
+    const docTitle = `Entrenada: ${tp.question.slice(0, 60)}`;
+    const doc = db.prepare('SELECT id FROM documents WHERE title = ? AND source = ?').get(docTitle, 'training');
+    if (doc) {
+      db.prepare('DELETE FROM chunks WHERE doc_id = ?').run(doc.id);
+      db.prepare('DELETE FROM documents WHERE id = ?').run(doc.id);
+    }
+  }
+  db.prepare('DELETE FROM training_pairs WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.post('/api/conversations/:id/resolve', requireAdmin, (req, res) => {
   db.prepare('UPDATE conversations SET unresolved = 0 WHERE id = ?').run(req.params.id);
   res.json({ ok: true });

@@ -41,6 +41,14 @@ db.exec(`
     created_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_rating_conv ON ratings(conversation_id);
+  CREATE TABLE IF NOT EXISTS training_pairs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT,
+    answer TEXT,
+    message_id INTEGER,
+    created_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_training_msg ON training_pairs(message_id);
   CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
     doc_id UNINDEXED,
     title,
