@@ -97,6 +97,62 @@ app.post('/api/docs/pdf', requireAdmin, upload.single('file'), async (req, res) 
   }
 });
 
+app.post('/api/rate', (req, res) => {
+  const { conversationId, messageId, rating } = req.body;
+  if (!conversationId || ![1, -1].includes(rating)) return res.status(400).json({ error: 'Datos inválidos' });
+  db.prepare('INSERT INTO ratings (conversation_id, message_id, rating, created_at) VALUES (?, ?, ?, ?)')
+    .run(conversationId, messageId || null, rating, Date.now());
+  if (rating === -1) db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(conversationId);
+  res.json({ ok: true });
+});
+
+app.get('/api/dashboard', requireAdmin, (req, res) => {
+  const now = Date.now();
+  const dayAgo = now - 86400000;
+  const weekAgo = now - 7 * 86400000;
+
+  const stat = (sql, ...p) => db.prepare(sql).get(...p) || {};
+  const totalConvs = stat('SELECT COUNT(*) as c FROM conversations').c;
+  const convsToday = stat('SELECT COUNT(*) as c FROM conversations WHERE created_at > ?', dayAgo).c;
+  const convsWeek = stat('SELECT COUNT(*) as c FROM conversations WHERE created_at > ?', weekAgo).c;
+  const totalMsgs = stat('SELECT COUNT(*) as c FROM messages').c;
+  const userMsgs = stat('SELECT COUNT(*) as c FROM messages WHERE role = ?', 'user').c;
+  const up = stat("SELECT COUNT(*) as c FROM ratings WHERE rating = 1").c;
+  const down = stat("SELECT COUNT(*) as c FROM ratings WHERE rating = -1").c;
+  const satisfaction = (up + down) ? Math.round((up / (up + down)) * 100) : null;
+  const unresolved = stat('SELECT COUNT(*) as c FROM conversations WHERE unresolved = 1').c;
+
+  const topQuestions = db.prepare(`
+    SELECT LOWER(TRIM(content)) as q, COUNT(*) as count
+    FROM messages WHERE role = 'user' AND LENGTH(content) < 200
+    GROUP BY q ORDER BY count DESC LIMIT 10
+  `).all();
+
+  const unresolvedList = db.prepare(`
+    SELECT c.id, c.created_at, c.visitor_id,
+      (SELECT content FROM messages WHERE conversation_id = c.id AND role = 'user' ORDER BY id DESC LIMIT 1) as last_user_msg
+    FROM conversations c WHERE c.unresolved = 1
+    ORDER BY c.updated_at DESC LIMIT 20
+  `).all();
+
+  const activity = db.prepare(`
+    SELECT strftime('%Y-%m-%d', datetime(created_at/1000, 'unixepoch')) as day, COUNT(*) as c
+    FROM conversations WHERE created_at > ?
+    GROUP BY day ORDER BY day
+  `).all(weekAgo);
+
+  res.json({
+    totalConvs, convsToday, convsWeek, totalMsgs, userMsgs,
+    ratings: { up, down, satisfaction },
+    unresolved, unresolvedList, topQuestions, activity
+  });
+});
+
+app.post('/api/conversations/:id/resolve', requireAdmin, (req, res) => {
+  db.prepare('UPDATE conversations SET unresolved = 0 WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.delete('/api/docs/:id', requireAdmin, (req, res) => {
   const id = req.params.id;
   db.prepare('DELETE FROM chunks WHERE doc_id = ?').run(id);
@@ -136,8 +192,11 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const reply = response.content.map(c => c.text || '').join('').trim();
-    db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', reply, Date.now());
-    res.json({ conversationId: convId, reply });
+    const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', reply, Date.now());
+    if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
+      db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId);
+    }
+    res.json({ conversationId: convId, reply, messageId: info.lastInsertRowid });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

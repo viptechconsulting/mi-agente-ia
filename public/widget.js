@@ -95,11 +95,24 @@
     document.documentElement.style.setProperty('--ai-accent', config.accentColor);
   }
 
-  function addMsg(role, text) {
+  function addMsg(role, text, messageId) {
     const el = document.createElement('div');
     el.className = 'ai-msg ' + role;
     el.textContent = text;
     messagesEl.appendChild(el);
+    if (role === 'assistant' && messageId) {
+      const rate = document.createElement('div');
+      rate.style.cssText = 'display:flex;gap:6px;margin-top:4px;align-self:flex-start';
+      rate.innerHTML = `
+        <button data-r="1" style="background:none;border:1px solid #333;color:#888;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px">👍</button>
+        <button data-r="-1" style="background:none;border:1px solid #333;color:#888;padding:2px 8px;border-radius:6px;cursor:pointer;font-size:11px">👎</button>`;
+      rate.querySelectorAll('button').forEach(b => b.onclick = () => {
+        fetch(`${API}/api/rate`, { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ conversationId, messageId, rating: +b.dataset.r }) });
+        rate.innerHTML = `<span style="color:var(--ai-accent,#D4AF37);font-size:11px">¡Gracias por tu feedback!</span>`;
+      });
+      messagesEl.appendChild(rate);
+    }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return el;
   }
@@ -136,7 +149,7 @@
       else {
         conversationId = data.conversationId;
         sessionStorage.setItem('ai_conv_id', conversationId);
-        addMsg('assistant', data.reply);
+        addMsg('assistant', data.reply, data.messageId);
       }
     } catch (err) {
       typing.remove();

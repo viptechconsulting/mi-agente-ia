@@ -50,6 +50,13 @@
   .msg-log{background:#0c0c0c;padding:14px;border-radius:8px;margin-top:10px;
     max-height:400px;overflow-y:auto;font-size:13px;line-height:1.6}
   .msg-log .u{color:var(--gold)}.msg-log .a{color:#ccc}
+  .metric{background:#0c0c0c;border:1px solid #1a1a1a;border-radius:10px;padding:18px;text-align:center}
+  .metric .v{font-size:28px;font-weight:600;color:var(--gold);margin-bottom:4px}
+  .metric .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px}
+  .bar{height:24px;background:linear-gradient(90deg,var(--gold),var(--gold-dim));border-radius:4px;display:inline-block;vertical-align:middle}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+  .bar-row .label{flex:1;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar-row .count{color:var(--gold);font-weight:600;min-width:30px;text-align:right}
 </style>
 </head>
 <body>
@@ -67,7 +74,8 @@
   <div class="sub">Configura tu agente de atención al cliente</div>
 
   <div class="tabs">
-    <button class="active" onclick="tab('config')">Configuración</button>
+    <button class="active" onclick="tab('dashboard')">Dashboard</button>
+    <button onclick="tab('config')">Configuración</button>
     <button onclick="tab('persona')">Personalidad</button>
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
@@ -75,7 +83,26 @@
     <button onclick="tab('embed')">Embeber</button>
   </div>
 
-  <div id="tab-config" class="tab active">
+  <div id="tab-dashboard" class="tab active">
+    <div class="card">
+      <h2>Métricas <span style="float:right;font-size:10px;color:#555">● en vivo (auto-refresh)</span></h2>
+      <div class="metrics" id="metrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px"></div>
+    </div>
+    <div class="card">
+      <h2>Consultas sin resolver</h2>
+      <div id="unresolvedList"></div>
+    </div>
+    <div class="card">
+      <h2>Preguntas más frecuentes (desde chats reales)</h2>
+      <div id="topQuestions"></div>
+    </div>
+    <div class="card">
+      <h2>Actividad últimos 7 días</h2>
+      <div id="activityChart"></div>
+    </div>
+  </div>
+
+  <div id="tab-config" class="tab">
     <div class="card">
       <h2>Información del negocio</h2>
       <label>Nombre del negocio</label>
@@ -302,6 +329,74 @@ function tab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'convs') loadConvs();
   if (name === 'knowledge') loadDocs();
+  if (name === 'dashboard') loadDashboard();
+}
+
+let dashInterval;
+function loadDashboard() {
+  const fetchData = () => fetch('/api/dashboard', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(renderDashboard);
+  fetchData();
+  clearInterval(dashInterval);
+  dashInterval = setInterval(fetchData, 5000);
+}
+
+function renderDashboard(d) {
+  const sat = d.ratings.satisfaction;
+  const satColor = sat === null ? '#888' : sat >= 70 ? '#4ade80' : sat >= 40 ? '#fbbf24' : '#ef4444';
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric"><div class="v">${d.convsToday}</div><div class="l">Chats hoy</div></div>
+    <div class="metric"><div class="v">${d.convsWeek}</div><div class="l">Chats (7 días)</div></div>
+    <div class="metric"><div class="v">${d.totalConvs}</div><div class="l">Total chats</div></div>
+    <div class="metric"><div class="v">${d.userMsgs}</div><div class="l">Mensajes usuarios</div></div>
+    <div class="metric"><div class="v" style="color:${satColor}">${sat===null?'—':sat+'%'}</div><div class="l">Satisfacción</div></div>
+    <div class="metric"><div class="v">👍 ${d.ratings.up} · 👎 ${d.ratings.down}</div><div class="l">Valoraciones</div></div>
+    <div class="metric"><div class="v" style="color:${d.unresolved?'#ef4444':'#4ade80'}">${d.unresolved}</div><div class="l">Sin resolver</div></div>
+  `;
+
+  const ul = document.getElementById('unresolvedList');
+  ul.innerHTML = d.unresolvedList.length
+    ? d.unresolvedList.map(c => `
+      <div class="faq-item">
+        <button onclick="resolveConv('${c.id}')" style="background:#0a2a0a;color:#4ade80;border:1px solid #1a4a1a">Marcar resuelto</button>
+        <div style="color:#ccc;margin-bottom:6px"><b>Última pregunta:</b> ${(c.last_user_msg||'').replace(/</g,'&lt;').slice(0,200)}</div>
+        <div style="color:#666;font-size:11px">${new Date(c.created_at).toLocaleString()} · ${c.visitor_id}</div>
+        <a href="#" onclick="viewConv('${c.id}');return false" style="color:var(--gold);font-size:12px">Ver conversación →</a>
+      </div>`).join('')
+    : '<p style="color:#4ade80">✓ Todas las consultas atendidas</p>';
+
+  const max = Math.max(1, ...d.topQuestions.map(q => q.count));
+  document.getElementById('topQuestions').innerHTML = d.topQuestions.length
+    ? d.topQuestions.map(q => `
+      <div class="bar-row">
+        <div class="label">${q.q.replace(/</g,'&lt;').slice(0,80)}</div>
+        <div class="bar" style="width:${(q.count/max)*200}px"></div>
+        <div class="count">${q.count}</div>
+      </div>`).join('')
+    : '<p style="color:#666">Aún no hay datos.</p>';
+
+  const maxA = Math.max(1, ...d.activity.map(a => a.c));
+  document.getElementById('activityChart').innerHTML = d.activity.length
+    ? d.activity.map(a => `
+      <div class="bar-row">
+        <div class="label" style="flex:0 0 100px">${a.day}</div>
+        <div class="bar" style="width:${(a.c/maxA)*300}px"></div>
+        <div class="count">${a.c}</div>
+      </div>`).join('')
+    : '<p style="color:#666">Sin actividad aún.</p>';
+}
+
+function resolveConv(id) {
+  fetch('/api/conversations/'+id+'/resolve', { method:'POST', headers: { 'x-admin-password': password } })
+    .then(() => { loadDashboard(); toast('Marcado como resuelto'); });
+}
+
+function viewConv(id) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tabs button')[3].classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-convs').classList.add('active');
+  loadConvs(); loadMessages(id);
 }
 
 function loadDocs() {

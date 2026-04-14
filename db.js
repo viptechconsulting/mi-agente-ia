@@ -33,6 +33,14 @@ db.exec(`
     source TEXT,
     created_at INTEGER
   );
+  CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT,
+    message_id INTEGER,
+    rating INTEGER,
+    created_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_rating_conv ON ratings(conversation_id);
   CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
     doc_id UNINDEXED,
     title,
@@ -40,6 +48,8 @@ db.exec(`
     tokenize='unicode61 remove_diacritics 2'
   );
 `);
+
+try { db.exec('ALTER TABLE conversations ADD COLUMN unresolved INTEGER DEFAULT 0'); } catch {}
 
 export const configPath = path.join(dataDir, 'config.json');
 
