@@ -81,6 +81,7 @@
     <button onclick="tab('quick')">Respuestas rápidas</button>
     <button onclick="tab('hours')">Horarios</button>
     <button onclick="tab('appearance')">Apariencia</button>
+    <button onclick="tab('notifications')">Notificaciones</button>
     <button onclick="tab('reports')">Reportes</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
@@ -319,6 +320,48 @@
     </div>
   </div>
 
+  <div id="tab-notifications" class="tab">
+    <div class="card">
+      <h2>Notificaciones por email</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        Recibirás un email cuando el agente capture un lead (email/teléfono del cliente) o cuando escale una conversación que no pudo resolver.
+      </p>
+      <label>Tu email de destino</label>
+      <input type="email" id="notifyEmail" placeholder="tu@email.com">
+      <div style="display:flex;gap:20px;margin-top:14px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="notifyOnLead" style="width:auto"> Avisarme cuando capture leads
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="notifyOnEscalation" style="width:auto"> Avisarme de escalamientos
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Servidor SMTP</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        Configura tu SMTP. Opciones comunes: Gmail (smtp.gmail.com:587 con App Password), SendGrid, Mailgun, Resend SMTP, etc.
+      </p>
+      <div class="row">
+        <div><label>Host</label><input id="smtpHost" placeholder="smtp.gmail.com"></div>
+        <div><label>Puerto</label><input id="smtpPort" type="number" placeholder="587"></div>
+      </div>
+      <div class="row">
+        <div><label>Usuario</label><input id="smtpUser" placeholder="tu@gmail.com"></div>
+        <div><label>Contraseña / App Password</label><input id="smtpPass" type="password" placeholder="••••••••"></div>
+      </div>
+      <label>Remitente (From)</label>
+      <input id="smtpFrom" placeholder="Agente IA &lt;notificaciones@tudominio.com&gt;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:10px">
+        <input type="checkbox" id="smtpSecure" style="width:auto"> Conexión SSL/TLS directa (puerto 465)
+      </label>
+      <br>
+      <button onclick="save()">Guardar</button>
+      <button class="secondary" onclick="testEmail()" style="margin-left:8px">Enviar email de prueba</button>
+    </div>
+  </div>
+
   <div id="tab-reports" class="tab">
     <div class="card">
       <h2>Reporte automático</h2>
@@ -444,12 +487,16 @@ function render() {
    'welcomeMessage','systemPromptExtra','model','accentColor',
    'agentName','personality','language','voiceExamples',
    'waBaseUrl','waInstance','waApiKey',
-   'bgColor','userBubbleColor'].forEach(k => {
+   'bgColor','userBubbleColor',
+   'notifyEmail','smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom'].forEach(k => {
     const el = document.getElementById(k);
     if (el) el.value = config[k] || '';
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
   const ad = document.getElementById('autoDetectLanguage'); if (ad) ad.checked = config.autoDetectLanguage !== false;
+  ['notifyOnLead','notifyOnEscalation','smtpSecure'].forEach(k => {
+    const el = document.getElementById(k); if (el) el.checked = !!config[k];
+  });
   const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
   renderFaqs(); renderDefaults(); renderQuick(); renderHours(); renderAppearance();
   document.getElementById('embedCode').value =
@@ -493,6 +540,11 @@ function renderDefaults() {
 }
 function addDefault() { config.defaultResponses = config.defaultResponses || []; config.defaultResponses.push({situation:'',response:''}); renderDefaults(); }
 function removeDefault(i) { config.defaultResponses.splice(i,1); renderDefaults(); }
+
+function testEmail() {
+  fetch('/api/notify/test', { method:'POST', headers:{'x-admin-password': password}})
+    .then(r => r.json()).then(d => toast(d.error ? 'Error: '+d.error : 'Email enviado ✓'));
+}
 
 function downloadReport() {
   const days = document.getElementById('reportDays').value;
@@ -655,7 +707,8 @@ function save() {
    'welcomeMessage','systemPromptExtra','model','accentColor',
    'agentName','personality','language','voiceExamples',
    'waBaseUrl','waInstance','waApiKey',
-   'bgColor','userBubbleColor'].forEach(k => {
+   'bgColor','userBubbleColor',
+   'notifyEmail','smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom'].forEach(k => {
     const el = document.getElementById(k);
     if (el) config[k] = el.value;
   });
@@ -665,6 +718,9 @@ function save() {
   if (t2 && t2.value) config.tone = t2.value;
   const ad = document.getElementById('autoDetectLanguage');
   if (ad) config.autoDetectLanguage = ad.checked;
+  ['notifyOnLead','notifyOnEscalation','smtpSecure'].forEach(k => {
+    const el = document.getElementById(k); if (el) config[k] = el.checked;
+  });
   const en = document.getElementById('ohEnabled');
   if (en) {
     config.officeHours = config.officeHours || {};

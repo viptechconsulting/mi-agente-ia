@@ -9,6 +9,7 @@ import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import Anthropic from '@anthropic-ai/sdk';
 import PDFDocument from 'pdfkit';
+import nodemailer from 'nodemailer';
 import { db, loadConfig, saveConfig, buildSystemPrompt } from './db.js';
 
 const require = createRequire(import.meta.url);
@@ -181,6 +182,74 @@ app.get('/api/dashboard', requireAdmin, (req, res) => {
     unresolved, unresolvedList, topQuestions, activity
   });
 });
+
+function getMailer(cfg) {
+  if (!cfg.smtpHost || !cfg.notifyEmail) return null;
+  return nodemailer.createTransport({
+    host: cfg.smtpHost,
+    port: parseInt(cfg.smtpPort) || 587,
+    secure: !!cfg.smtpSecure,
+    auth: cfg.smtpUser ? { user: cfg.smtpUser, pass: cfg.smtpPass } : undefined
+  });
+}
+
+async function sendNotification({ type, conversationId, extra }) {
+  const cfg = loadConfig();
+  const mailer = getMailer(cfg);
+  if (!mailer) return;
+  if (type === 'lead' && !cfg.notifyOnLead) return;
+  if (type === 'escalation' && !cfg.notifyOnEscalation) return;
+
+  const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) || {};
+  const msgs = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id').all(conversationId);
+  const channel = conv.channel === 'whatsapp' ? '💬 WhatsApp' : '🌐 Web';
+  const accent = cfg.accentColor || '#D4AF37';
+
+  const subject = type === 'lead'
+    ? `🎯 Nuevo lead capturado — ${cfg.businessName || 'Agente'}`
+    : `🚨 Conversación escalada — ${cfg.businessName || 'Agente'}`;
+
+  const transcript = msgs.map(m => {
+    const who = m.role === 'user' ? 'Cliente' : 'Agente';
+    const color = m.role === 'user' ? accent : '#888';
+    const bg = m.role === 'user' ? '#fff8e0' : '#f4f4f4';
+    return `<tr><td style="padding:10px 14px;border-left:3px solid ${color};background:${bg};border-radius:4px"><b style="color:${color}">${who}:</b><br>${(m.content||'').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</td></tr>`;
+  }).join('<tr><td style="height:8px"></td></tr>');
+
+  const leadInfo = (conv.lead_email || conv.lead_phone)
+    ? `<tr><td style="padding:14px;background:#0a0a0a;border-radius:8px;color:#fff">
+        <div style="color:${accent};font-size:11px;letter-spacing:2px;margin-bottom:8px">DATOS DEL CLIENTE</div>
+        ${conv.lead_email ? `<div>📧 <b>${conv.lead_email}</b></div>` : ''}
+        ${conv.lead_phone ? `<div>📞 <b>${conv.lead_phone}</b></div>` : ''}
+        <div style="color:#888;font-size:12px;margin-top:6px">${conv.visitor_id || ''}</div>
+      </td></tr><tr><td style="height:14px"></td></tr>` : '';
+
+  const html = `
+  <div style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:0 auto;background:#fafafa;padding:24px">
+    <div style="background:#0a0a0a;color:#fff;padding:22px;border-radius:10px;border-left:4px solid ${accent}">
+      <div style="color:${accent};font-size:11px;letter-spacing:2px">${type === 'lead' ? 'NUEVO LEAD' : 'ESCALAMIENTO'}</div>
+      <h1 style="margin:8px 0 4px;font-size:22px;font-weight:600">${cfg.businessName || 'Agente'}</h1>
+      <div style="color:#aaa;font-size:13px">${channel} · ${new Date().toLocaleString('es-MX')}</div>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
+      ${leadInfo}
+      <tr><td style="color:#666;font-size:12px;letter-spacing:1px;padding:0 0 8px">TRANSCRIPCIÓN</td></tr>
+      ${transcript}
+    </table>
+    <div style="text-align:center;margin-top:20px;color:#888;font-size:11px">
+      Notificación automática del agente de IA · <a href="${process.env.PUBLIC_URL || ''}/admin.html" style="color:${accent}">Ver en panel</a>
+    </div>
+  </div>`;
+
+  try {
+    await mailer.sendMail({
+      from: cfg.smtpFrom || cfg.smtpUser,
+      to: cfg.notifyEmail,
+      subject,
+      html
+    });
+  } catch (err) { console.error('Email send failed:', err.message); }
+}
 
 function extractContacts(text) {
   const emails = [...(text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || [])];
@@ -373,6 +442,25 @@ async function processMessage({ message, conversationId, visitorId, channel }) {
 
   db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'user', message, now);
 
+  const contacts = extractContacts(message);
+  const conv = db.prepare('SELECT lead_email, lead_phone, lead_notified FROM conversations WHERE id = ?').get(convId);
+  let newLead = false;
+  if (contacts.emails[0] && !conv.lead_email) {
+    db.prepare('UPDATE conversations SET lead_email = ? WHERE id = ?').run(contacts.emails[0], convId);
+    newLead = true;
+  }
+  if (contacts.phones[0] && !conv.lead_phone) {
+    const clean = contacts.phones[0].replace(/\D/g,'');
+    if (clean.length >= 8) {
+      db.prepare('UPDATE conversations SET lead_phone = ? WHERE id = ?').run(contacts.phones[0], convId);
+      newLead = true;
+    }
+  }
+  if (newLead && !conv.lead_notified) {
+    db.prepare('UPDATE conversations SET lead_notified = 1 WHERE id = ?').run(convId);
+    setImmediate(() => sendNotification({ type: 'lead', conversationId: convId }));
+  }
+
   const history = db.prepare('SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id').all(convId);
   const knowledge = searchKnowledge(message, 5);
   const knowledgeText = knowledge.length
@@ -389,10 +477,30 @@ async function processMessage({ message, conversationId, visitorId, channel }) {
   const reply = response.content.map(c => c.text || '').join('').trim();
   const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', reply, Date.now());
   if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
+    const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId);
     db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId);
+    if (!c.escalated_notified) {
+      db.prepare('UPDATE conversations SET escalated_notified = 1 WHERE id = ?').run(convId);
+      setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId }));
+    }
   }
   return { conversationId: convId, reply, messageId: info.lastInsertRowid };
 }
+
+app.post('/api/notify/test', requireAdmin, async (req, res) => {
+  const cfg = loadConfig();
+  const mailer = getMailer(cfg);
+  if (!mailer) return res.status(400).json({ error: 'SMTP no configurado' });
+  try {
+    await mailer.sendMail({
+      from: cfg.smtpFrom || cfg.smtpUser,
+      to: cfg.notifyEmail,
+      subject: `Test — ${cfg.businessName || 'Agente IA'}`,
+      html: `<div style="font-family:Arial"><h2 style="color:${cfg.accentColor}">✓ Email configurado correctamente</h2><p>Este es un email de prueba desde tu agente de atención al cliente.</p></div>`
+    });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.post('/api/chat', async (req, res) => {
   try {

@@ -51,6 +51,10 @@ db.exec(`
 
 try { db.exec('ALTER TABLE conversations ADD COLUMN unresolved INTEGER DEFAULT 0'); } catch {}
 try { db.exec("ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'web'"); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN lead_notified INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN escalated_notified INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN lead_email TEXT'); } catch {}
+try { db.exec('ALTER TABLE conversations ADD COLUMN lead_phone TEXT'); } catch {}
 
 export const configPath = path.join(dataDir, 'config.json');
 
@@ -70,6 +74,15 @@ const defaultConfig = {
   logoUrl: '',
   avatarUrl: '',
   widgetPosition: 'right',
+  notifyEmail: '',
+  notifyOnLead: true,
+  notifyOnEscalation: true,
+  smtpHost: '',
+  smtpPort: 587,
+  smtpUser: '',
+  smtpPass: '',
+  smtpFrom: '',
+  smtpSecure: false,
   model: 'claude-haiku-4-5-20251001',
   waBaseUrl: '',
   waInstance: '',
