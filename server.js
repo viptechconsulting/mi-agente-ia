@@ -53,7 +53,12 @@ function searchKnowledge(query, limit = 5) {
 
 app.get('/api/config/public', (req, res) => {
   const cfg = loadConfig();
-  res.json({ businessName: cfg.businessName, welcomeMessage: cfg.welcomeMessage, accentColor: cfg.accentColor });
+  res.json({
+    businessName: cfg.businessName,
+    welcomeMessage: cfg.welcomeMessage,
+    accentColor: cfg.accentColor,
+    quickReplies: cfg.quickReplies || []
+  });
 });
 
 app.get('/api/config', requireAdmin, (req, res) => res.json(loadConfig()));

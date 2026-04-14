@@ -78,6 +78,7 @@
     <button onclick="tab('config')">Configuración</button>
     <button onclick="tab('persona')">Personalidad</button>
     <button onclick="tab('faqs')">FAQs</button>
+    <button onclick="tab('quick')">Respuestas rápidas</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('whatsapp')">WhatsApp</button>
@@ -194,6 +195,19 @@
     </div>
   </div>
 
+  <div id="tab-quick" class="tab">
+    <div class="card">
+      <h2>Botones rápidos al iniciar chat</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        El cliente verá estos botones debajo del mensaje de bienvenida. Al clickearlos envían el mensaje configurado automáticamente.
+      </p>
+      <div id="quickList"></div>
+      <button class="secondary" onclick="addQuick()">+ Añadir botón</button>
+      <br><br>
+      <button onclick="save()">Guardar</button>
+    </div>
+  </div>
+
   <div id="tab-knowledge" class="tab">
     <div class="card">
       <h2>Subir PDF</h2>
@@ -301,7 +315,7 @@ function render() {
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
   const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
-  renderFaqs(); renderDefaults();
+  renderFaqs(); renderDefaults(); renderQuick();
   document.getElementById('embedCode').value =
     `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
 }
@@ -343,6 +357,25 @@ function renderDefaults() {
 }
 function addDefault() { config.defaultResponses = config.defaultResponses || []; config.defaultResponses.push({situation:'',response:''}); renderDefaults(); }
 function removeDefault(i) { config.defaultResponses.splice(i,1); renderDefaults(); }
+
+function renderQuick() {
+  const list = document.getElementById('quickList');
+  if (!list) return;
+  list.innerHTML = '';
+  (config.quickReplies || []).forEach((q, i) => {
+    const div = document.createElement('div');
+    div.className = 'faq-item';
+    div.innerHTML = `
+      <button onclick="removeQuick(${i})">Eliminar</button>
+      <label>Etiqueta (texto del botón)</label>
+      <input value="${(q.label||'').replace(/"/g,'&quot;')}" onchange="config.quickReplies[${i}].label=this.value">
+      <label>Mensaje que se envía al clickear</label>
+      <input value="${(q.message||'').replace(/"/g,'&quot;')}" onchange="config.quickReplies[${i}].message=this.value">`;
+    list.appendChild(div);
+  });
+}
+function addQuick() { config.quickReplies = config.quickReplies || []; config.quickReplies.push({label:'',message:''}); renderQuick(); }
+function removeQuick(i) { config.quickReplies.splice(i,1); renderQuick(); }
 
 function save() {
   ['businessName','description','hours','contact','products','tone',

@@ -15,8 +15,29 @@
     config = { ...config, ...c };
     applyTheme();
     header.textContent = config.businessName;
-    if (!messagesEl.children.length) addMsg('assistant', config.welcomeMessage);
+    if (!messagesEl.children.length) {
+      addMsg('assistant', config.welcomeMessage);
+      renderQuickReplies();
+    }
   }).catch(() => {});
+
+  function renderQuickReplies() {
+    if (!config.quickReplies || !config.quickReplies.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'ai-quick';
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:4px 2px;align-self:flex-start;max-width:100%';
+    config.quickReplies.forEach(q => {
+      const b = document.createElement('button');
+      b.textContent = q.label;
+      b.style.cssText = 'background:#161616;border:1px solid rgba(212,175,55,.3);color:var(--ai-accent,#D4AF37);padding:6px 12px;border-radius:16px;cursor:pointer;font-size:12px;transition:all .2s';
+      b.onmouseover = () => b.style.background = 'rgba(212,175,55,.1)';
+      b.onmouseout = () => b.style.background = '#161616';
+      b.onclick = () => { wrap.remove(); sendMessage(q.message); };
+      wrap.appendChild(b);
+    });
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
 
   const style = document.createElement('style');
   style.textContent = `
@@ -129,12 +150,10 @@
   launcher.onclick = () => panel.classList.toggle('open');
   panel.querySelector('.ai-close').onclick = () => panel.classList.remove('open');
 
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
+  async function sendMessage(text) {
     if (!text) return;
+    document.querySelectorAll('.ai-quick').forEach(n => n.remove());
     addMsg('user', text);
-    input.value = '';
     sendBtn.disabled = true;
     const typing = showTyping();
     try {
@@ -157,5 +176,12 @@
     }
     sendBtn.disabled = false;
     input.focus();
+  }
+
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    input.value = '';
+    sendMessage(text);
   };
 })();

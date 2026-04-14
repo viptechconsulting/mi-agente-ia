@@ -69,6 +69,11 @@ const defaultConfig = {
   waBaseUrl: '',
   waInstance: '',
   waApiKey: '',
+  quickReplies: [
+    { label: 'Ver precios', message: 'Quiero ver los precios' },
+    { label: 'Agendar llamada', message: 'Quisiera agendar una llamada' },
+    { label: 'Ver FAQ', message: 'Muéstrame las preguntas frecuentes' }
+  ],
   agentName: 'Asistente',
   personality: 'Amable, resolutivo y cercano. Usa frases cortas y directas.',
   language: 'español',
