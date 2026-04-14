@@ -69,6 +69,20 @@ const defaultConfig = {
   waBaseUrl: '',
   waInstance: '',
   waApiKey: '',
+  officeHours: {
+    enabled: false,
+    timezone: 'America/Mexico_City',
+    offlineMessage: 'En este momento nuestro equipo humano no está disponible. Puedo intentar ayudarte yo, o si prefieres puedes dejarnos tu nombre, contacto y mensaje y te contactaremos en cuanto volvamos.',
+    schedule: [
+      { day: 1, enabled: true, open: '09:00', close: '18:00' },
+      { day: 2, enabled: true, open: '09:00', close: '18:00' },
+      { day: 3, enabled: true, open: '09:00', close: '18:00' },
+      { day: 4, enabled: true, open: '09:00', close: '18:00' },
+      { day: 5, enabled: true, open: '09:00', close: '18:00' },
+      { day: 6, enabled: false, open: '10:00', close: '14:00' },
+      { day: 0, enabled: false, open: '10:00', close: '14:00' }
+    ]
+  },
   quickReplies: [
     { label: 'Ver precios', message: 'Quiero ver los precios' },
     { label: 'Agendar llamada', message: 'Quisiera agendar una llamada' },
@@ -100,9 +114,35 @@ export function saveConfig(cfg) {
   return merged;
 }
 
+export function isOfficeOpen(cfg) {
+  const oh = cfg.officeHours;
+  if (!oh || !oh.enabled) return { open: true, schedule: oh };
+  try {
+    const tz = oh.timezone || 'UTC';
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+    const wd = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }[parts.find(p=>p.type==='weekday').value];
+    const hh = parts.find(p=>p.type==='hour').value;
+    const mm = parts.find(p=>p.type==='minute').value;
+    const nowMin = parseInt(hh)*60 + parseInt(mm);
+    const day = (oh.schedule || []).find(d => d.day === wd);
+    if (!day || !day.enabled) return { open: false, schedule: oh };
+    const [oH,oM] = day.open.split(':').map(Number);
+    const [cH,cM] = day.close.split(':').map(Number);
+    const openMin = oH*60+oM, closeMin = cH*60+cM;
+    return { open: nowMin >= openMin && nowMin < closeMin, schedule: oh };
+  } catch { return { open: true, schedule: oh }; }
+}
+
 export function buildSystemPrompt(cfg) {
   const faqText = (cfg.faqs || []).map(f => `P: ${f.q}\nR: ${f.a}`).join('\n\n');
   const defaults = (cfg.defaultResponses || []).map(d => `• ${d.situation}: "${d.response}"`).join('\n');
+  const office = isOfficeOpen(cfg);
+  const officeBlock = cfg.officeHours?.enabled
+    ? (office.open
+        ? '\nESTADO ACTUAL: Dentro de horario de atención. El equipo humano está disponible si se requiere escalamiento.'
+        : `\nESTADO ACTUAL: FUERA DE HORARIO DE ATENCIÓN.\n- Avisa amablemente al inicio que el equipo humano no está disponible ahora mismo.\n- Usa este mensaje como referencia: "${cfg.officeHours.offlineMessage}"\n- Si el cliente quiere hablar con un humano o necesita ayuda que no puedes resolver, ofrece tomar sus datos (nombre, contacto: email o teléfono, y el mensaje/motivo) para que el equipo lo contacte cuando regrese.\n- Confirma los datos recibidos antes de cerrar.`)
+    : '';
   return `Eres "${cfg.agentName || 'Asistente'}", el agente de atención al cliente de "${cfg.businessName}".
 
 IDIOMA: Responde siempre en ${cfg.language || 'español'}.
@@ -120,6 +160,7 @@ ${cfg.hours ? `HORARIO:\n${cfg.hours}\n` : ''}
 ${cfg.contact ? `CONTACTO:\n${cfg.contact}\n` : ''}
 ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}\n` : ''}
 ${defaults ? `\nRESPUESTAS PREDETERMINADAS (úsalas o adáptalas al contexto):\n${defaults}\n` : ''}
+${officeBlock}
 ${cfg.systemPromptExtra ? `\nINSTRUCCIONES ADICIONALES:\n${cfg.systemPromptExtra}` : ''}
 
 REGLAS:

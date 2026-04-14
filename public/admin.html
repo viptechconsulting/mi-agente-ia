@@ -79,6 +79,7 @@
     <button onclick="tab('persona')">Personalidad</button>
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('quick')">Respuestas rápidas</button>
+    <button onclick="tab('hours')">Horarios</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('whatsapp')">WhatsApp</button>
@@ -208,6 +209,41 @@
     </div>
   </div>
 
+  <div id="tab-hours" class="tab">
+    <div class="card">
+      <h2>Horarios de atención</h2>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="ohEnabled" style="width:auto"> Activar horarios de atención
+      </label>
+      <div class="row">
+        <div>
+          <label>Zona horaria</label>
+          <select id="ohTimezone">
+            <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
+            <option value="America/Bogota">Bogotá (GMT-5)</option>
+            <option value="America/Lima">Lima (GMT-5)</option>
+            <option value="America/New_York">Nueva York (GMT-5/-4)</option>
+            <option value="America/Los_Angeles">Los Ángeles (GMT-8/-7)</option>
+            <option value="America/Buenos_Aires">Buenos Aires (GMT-3)</option>
+            <option value="America/Santiago">Santiago (GMT-4/-3)</option>
+            <option value="Europe/Madrid">Madrid (GMT+1/+2)</option>
+            <option value="Europe/London">Londres (GMT+0/+1)</option>
+          </select>
+        </div>
+      </div>
+      <label>Días y horarios</label>
+      <div id="scheduleList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Mensaje fuera de horario</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 10px">El agente usará (o adaptará) este mensaje cuando un cliente escriba fuera de horario.</p>
+      <textarea id="ohOfflineMessage" style="min-height:100px"></textarea>
+      <br><br>
+      <button onclick="save()">Guardar horarios</button>
+    </div>
+  </div>
+
   <div id="tab-knowledge" class="tab">
     <div class="card">
       <h2>Subir PDF</h2>
@@ -315,7 +351,7 @@ function render() {
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
   const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
-  renderFaqs(); renderDefaults(); renderQuick();
+  renderFaqs(); renderDefaults(); renderQuick(); renderHours();
   document.getElementById('embedCode').value =
     `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
 }
@@ -377,6 +413,39 @@ function renderQuick() {
 function addQuick() { config.quickReplies = config.quickReplies || []; config.quickReplies.push({label:'',message:''}); renderQuick(); }
 function removeQuick(i) { config.quickReplies.splice(i,1); renderQuick(); }
 
+const DAY_NAMES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function renderHours() {
+  const oh = config.officeHours || {};
+  const en = document.getElementById('ohEnabled'); if (en) en.checked = !!oh.enabled;
+  const tz = document.getElementById('ohTimezone'); if (tz && oh.timezone) tz.value = oh.timezone;
+  const msg = document.getElementById('ohOfflineMessage'); if (msg) msg.value = oh.offlineMessage || '';
+  const list = document.getElementById('scheduleList');
+  if (!list) return;
+  const schedule = oh.schedule || [];
+  const order = [1,2,3,4,5,6,0];
+  list.innerHTML = order.map(d => {
+    const day = schedule.find(s => s.day === d) || { day: d, enabled: false, open: '09:00', close: '18:00' };
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:8px;margin-bottom:6px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:0 0 130px;margin:0">
+          <input type="checkbox" ${day.enabled?'checked':''} style="width:auto" onchange="setDay(${d},'enabled',this.checked)">
+          <span style="color:#ccc">${DAY_NAMES[d]}</span>
+        </label>
+        <input type="time" value="${day.open}" onchange="setDay(${d},'open',this.value)" style="flex:0 0 120px">
+        <span style="color:#888">a</span>
+        <input type="time" value="${day.close}" onchange="setDay(${d},'close',this.value)" style="flex:0 0 120px">
+      </div>`;
+  }).join('');
+}
+
+function setDay(d, key, val) {
+  config.officeHours = config.officeHours || { schedule: [] };
+  config.officeHours.schedule = config.officeHours.schedule || [];
+  let day = config.officeHours.schedule.find(s => s.day === d);
+  if (!day) { day = { day: d, enabled: false, open: '09:00', close: '18:00' }; config.officeHours.schedule.push(day); }
+  day[key] = val;
+}
+
 function save() {
   ['businessName','description','hours','contact','products','tone',
    'welcomeMessage','systemPromptExtra','model','accentColor',
@@ -387,6 +456,13 @@ function save() {
   });
   const t2 = document.getElementById('tone2');
   if (t2 && t2.value) config.tone = t2.value;
+  const en = document.getElementById('ohEnabled');
+  if (en) {
+    config.officeHours = config.officeHours || {};
+    config.officeHours.enabled = en.checked;
+    const tz = document.getElementById('ohTimezone'); if (tz) config.officeHours.timezone = tz.value;
+    const msg = document.getElementById('ohOfflineMessage'); if (msg) config.officeHours.offlineMessage = msg.value;
+  }
   fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
