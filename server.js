@@ -562,8 +562,27 @@ app.post('/api/notify/test', requireAdmin, async (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, conversationId, visitorId } = req.body;
+    const { message, conversationId, visitorId, demo, history } = req.body;
     if (!message) return res.status(400).json({ error: 'Falta mensaje' });
+
+    if (demo) {
+      const cfg = loadConfig();
+      const msgs = Array.isArray(history) ? [...history] : [];
+      msgs.push({ role: 'user', content: message });
+      const knowledge = searchKnowledge(message, 5);
+      const knowledgeText = knowledge.length
+        ? `\n\nINFORMACIÓN RELEVANTE DE LA BASE DE CONOCIMIENTO:\n${knowledge.map(k => `[${k.title}]\n${k.content}`).join('\n---\n')}\n\nUSA esta información para responder con precisión.`
+        : '';
+      const resp = await client.messages.create({
+        model: cfg.model || 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO — Esta es una prueba del dueño del negocio]',
+        messages: msgs
+      });
+      const reply = resp.content.map(c => c.text || '').join('').trim();
+      return res.json({ reply, history: [...msgs, { role: 'assistant', content: reply }] });
+    }
+
     const result = await processMessage({ message, conversationId, visitorId, channel: 'web' });
     res.json(result);
   } catch (err) {

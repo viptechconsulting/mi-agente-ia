@@ -91,6 +91,14 @@
   </div>
 
   <div id="tab-dashboard" class="tab active">
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:16px">
+      <div>
+        <h2 style="margin:0">Modo demo</h2>
+        <p style="color:#888;font-size:13px;margin:4px 0 0">Prueba tu agente como si fueras un cliente. Las conversaciones demo NO se guardan ni afectan las métricas.</p>
+      </div>
+      <button onclick="openDemo()" style="white-space:nowrap">🎭 Probar como cliente</button>
+    </div>
+
     <div class="card">
       <h2>Métricas <span style="float:right;font-size:10px;color:#555">● en vivo (auto-refresh)</span></h2>
       <div class="metrics" id="metrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px"></div>
@@ -819,6 +827,72 @@ function deleteTraining(id) {
   fetch('/api/training/' + id, { method: 'DELETE', headers: { 'x-admin-password': password } })
     .then(() => { toast('Eliminada'); loadTraining(); });
 }
+
+let demoHistory = [];
+
+function openDemo() {
+  document.getElementById('demoModal').style.display = 'flex';
+  resetDemo();
+}
+function closeDemo() { document.getElementById('demoModal').style.display = 'none'; }
+function resetDemo() {
+  demoHistory = [];
+  const el = document.getElementById('demoMessages');
+  el.innerHTML = '';
+  const welcome = config.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte?';
+  addDemoMsg('assistant', welcome);
+  (config.quickReplies || []).forEach(q => {
+    const b = document.createElement('button');
+    b.textContent = q.label;
+    b.className = 'demo-quick';
+    b.style.cssText = 'background:#161616;border:1px solid rgba(212,175,55,.3);color:var(--gold);padding:6px 12px;border-radius:16px;cursor:pointer;font-size:12px;margin-right:6px';
+    b.onclick = () => { document.querySelectorAll('.demo-quick').forEach(x=>x.remove()); sendDemo(q.message); };
+    el.appendChild(b);
+  });
+}
+function addDemoMsg(role, text) {
+  const el = document.getElementById('demoMessages');
+  const d = document.createElement('div');
+  d.style.cssText = role === 'user'
+    ? 'align-self:flex-end;background:linear-gradient(135deg,#2a2205,#1a1503);color:#f5e9b8;border:1px solid rgba(212,175,55,.3);padding:10px 14px;border-radius:12px;max-width:85%;font-size:14px;white-space:pre-wrap'
+    : 'align-self:flex-start;background:#161616;border:1px solid #222;color:#e8e8e8;padding:10px 14px;border-radius:12px;max-width:85%;font-size:14px;white-space:pre-wrap';
+  d.textContent = text;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  return d;
+}
+async function sendDemo(text) {
+  if (!text) return;
+  addDemoMsg('user', text);
+  const typing = addDemoMsg('assistant', '···');
+  typing.style.opacity = '.5';
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, demo: true, history: demoHistory })
+    });
+    const data = await r.json();
+    typing.remove();
+    if (data.error) addDemoMsg('assistant', 'Error: ' + data.error);
+    else {
+      demoHistory = data.history;
+      addDemoMsg('assistant', data.reply);
+    }
+  } catch (err) {
+    typing.remove();
+    addDemoMsg('assistant', 'Error de conexión');
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('demoForm');
+  if (form) form.onsubmit = (e) => {
+    e.preventDefault();
+    const inp = document.getElementById('demoInput');
+    const t = inp.value.trim(); inp.value = '';
+    sendDemo(t);
+  };
+});
 
 let dashInterval;
 function loadDashboard() {
