@@ -4,17 +4,18 @@
 <meta charset="UTF-8">
 <title>Demo — Agente IA</title>
 <style>
-  body{margin:0;background:#0a0a0a;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  :root{--green:#27F59B;--green-dim:#1ac77a;--blue:#3BA5FF;--bg:#0B0F14;--card:#151922;--border:#252A38;--muted:#9FB0C8;--text:#F5F7FA}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,sans-serif;
     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  .card{max-width:640px;text-align:center;border:1px solid rgba(212,175,55,.2);
-    border-radius:16px;padding:48px;background:linear-gradient(135deg,#111,#0a0a0a)}
+  .card{max-width:640px;text-align:center;border:1px solid var(--border);
+    border-radius:16px;padding:48px;background:linear-gradient(135deg,var(--card),#0e1219)}
   h1{margin:0 0 12px;font-weight:300;font-size:32px;letter-spacing:.5px}
-  h1 span{background:linear-gradient(135deg,#D4AF37,#a8862a);-webkit-background-clip:text;
+  h1 span{background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;
     -webkit-text-fill-color:transparent;font-weight:600}
-  p{color:#aaa;line-height:1.6}
-  code{background:#1a1a1a;padding:12px;border-radius:8px;display:block;color:#D4AF37;
-    font-size:12px;margin-top:20px;text-align:left;border:1px solid #222;overflow-x:auto}
-  a{color:#D4AF37;text-decoration:none}
+  p{color:var(--muted);line-height:1.6}
+  code{background:#0e1219;padding:12px;border-radius:8px;display:block;color:var(--green);
+    font-size:12px;margin-top:20px;text-align:left;border:1px solid var(--border);overflow-x:auto}
+  a{color:var(--green);text-decoration:none}
 </style>
 </head>
 <body>
