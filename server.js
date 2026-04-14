@@ -13,7 +13,8 @@ import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
-  listCompanies, getCompany, createCompany, updateCompanyMeta, deleteCompany, findCompanyByWaInstance
+  listCompanies, getCompany, getCompanyByToken, createCompany, updateCompanyMeta, deleteCompany,
+  findCompanyByWaInstance, regenerateShareToken, seedSampleContent
 } from './db.js';
 
 const require = createRequire(import.meta.url);
@@ -36,6 +37,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 // COMPANY RESOLUTION
 // ============================================================
 function resolveCompany(req) {
+  // 0) Share token (public demo)
+  const token = req.query.token || req.body?.token;
+  if (token) {
+    const c = getCompanyByToken(token);
+    if (c) return c;
+  }
   // 1) Explicit
   const explicit = req.headers['x-company-id'] || req.query.companyId || req.query.slug || req.body?.companyId;
   if (explicit) {
@@ -62,6 +69,7 @@ function withCompany(req, res, next) {
   const c = resolveCompany(req);
   if (!c) return res.status(404).json({ error: 'Empresa no encontrada' });
   if (!c.active) return res.status(403).json({ error: 'Empresa desactivada' });
+  if (c.expires_at && Date.now() > c.expires_at) return res.status(403).json({ error: 'Esta demo ha expirado' });
   req.company = c;
   next();
 }
@@ -130,13 +138,100 @@ app.get('/api/config/public', withCompany, (req, res) => {
 // ============================================================
 // COMPANIES (admin)
 // ============================================================
-app.get('/api/companies', requireAdmin, (req, res) => res.json(listCompanies()));
+app.get('/api/companies', requireAdmin, (req, res) => {
+  const opts = {};
+  if (req.query.demo === '1') opts.demoOnly = true;
+  if (req.query.demo === '0') opts.excludeDemo = true;
+  res.json(listCompanies(opts));
+});
 
 app.post('/api/companies', requireAdmin, (req, res) => {
   const { name, slug } = req.body;
   if (!name) return res.status(400).json({ error: 'Falta nombre' });
   try { res.json(createCompany({ name, slug })); }
   catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ============================================================
+// DEMOS (prospect demos, isolated from production)
+// ============================================================
+app.post('/api/demos', requireAdmin, (req, res) => {
+  const { name, parentCompanyId, expiresInDays, seedSample } = req.body;
+  if (!name) return res.status(400).json({ error: 'Falta nombre' });
+  try {
+    const expiresAt = expiresInDays ? Date.now() + expiresInDays * 86400000 : null;
+    const company = createCompany({
+      name,
+      demo: true,
+      parentCompanyId: parentCompanyId || null,
+      expiresAt
+    });
+    if (seedSample) seedSampleContent(company.id);
+    res.json(company);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/demos/:id/duplicate', requireAdmin, (req, res) => {
+  const src = getCompany(req.params.id);
+  if (!src) return res.status(404).json({ error: 'No encontrada' });
+  try {
+    const newDemo = createCompany({
+      name: (req.body.name || src.name) + ' (copia)',
+      demo: true,
+      parentCompanyId: src.id,
+      expiresAt: src.expires_at
+    });
+    // also copy the non-auto-copied config overrides (createCompany already copies config from parent)
+    res.json(newDemo);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/demos/:id/seed', requireAdmin, (req, res) => {
+  const c = getCompany(req.params.id);
+  if (!c || !c.demo) return res.status(404).json({ error: 'Demo no encontrada' });
+  seedSampleContent(c.id);
+  res.json({ ok: true });
+});
+
+app.post('/api/demos/:id/regenerate-token', requireAdmin, (req, res) => {
+  const c = getCompany(req.params.id);
+  if (!c) return res.status(404).json({ error: 'No encontrada' });
+  const tok = regenerateShareToken(c.id);
+  res.json({ share_token: tok });
+});
+
+// Public route: demo page by share token
+app.get('/demo/:token', (req, res) => {
+  const c = getCompanyByToken(req.params.token);
+  if (!c) return res.status(404).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8;background:#0B0F14;padding:40px">Demo no encontrada</h1><style>body{background:#0B0F14;margin:0}</style>');
+  if (!c.active) return res.status(403).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8">Demo desactivada</h1>');
+  if (c.expires_at && Date.now() > c.expires_at) return res.status(403).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8">Demo expirada</h1>');
+  res.sendFile(path.join(__dirname, 'public', 'demo.html'));
+});
+
+// Public config by token (used by the demo page widget)
+app.get('/api/demo/config/:token', (req, res) => {
+  const c = getCompanyByToken(req.params.token);
+  if (!c) return res.status(404).json({ error: 'Demo no encontrada' });
+  if (!c.active) return res.status(403).json({ error: 'Desactivada' });
+  if (c.expires_at && Date.now() > c.expires_at) return res.status(403).json({ error: 'Expirada' });
+  const cfg = c.config;
+  res.json({
+    companyId: c.id,
+    shareToken: c.share_token,
+    businessName: cfg.businessName,
+    description: cfg.description,
+    agentName: cfg.agentName,
+    welcomeMessage: cfg.welcomeMessage,
+    accentColor: cfg.accentColor,
+    bgColor: cfg.bgColor,
+    userBubbleColor: cfg.userBubbleColor,
+    logoUrl: cfg.logoUrl,
+    avatarUrl: cfg.avatarUrl,
+    widgetPosition: cfg.widgetPosition,
+    quickReplies: cfg.quickReplies || [],
+    expiresAt: c.expires_at
+  });
 });
 
 app.patch('/api/companies/:id', requireAdmin, (req, res) => {

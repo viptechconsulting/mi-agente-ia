@@ -85,6 +85,7 @@
 
   <div class="tabs">
     <button onclick="tab('companies')">Empresas</button>
+    <button onclick="tab('demos')">Demos</button>
     <button class="active" onclick="tab('dashboard')">Dashboard</button>
     <button onclick="tab('config')">Configuración</button>
     <button onclick="tab('persona')">Personalidad</button>
@@ -115,6 +116,40 @@
       <h2>Empresas del sistema</h2>
       <p style="color:#888;font-size:13px;margin:0 0 16px">Cada empresa tiene su propia configuración, conversaciones, base de conocimiento y métricas aisladas.</p>
       <div id="companiesList"></div>
+    </div>
+  </div>
+
+  <div id="tab-demos" class="tab">
+    <div class="card">
+      <h2>Crear demo para prospecto</h2>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 16px">
+        Cada demo es un entorno aislado con su propio branding, FAQ, conversaciones y métricas. Genera un link único compartible con tu prospecto.
+      </p>
+      <label>Nombre del demo / prospecto</label>
+      <input id="demoName" placeholder="Ej. Demo — Clínica Dental ABC">
+      <div class="row">
+        <div>
+          <label>Clonar configuración desde</label>
+          <select id="demoParent">
+            <option value="">— Empresa vacía (plantilla)</option>
+          </select>
+        </div>
+        <div>
+          <label>Expira en (días, vacío = no expira)</label>
+          <input id="demoExpiry" type="number" placeholder="14">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:12px">
+        <input type="checkbox" id="demoSeed" checked style="width:auto">
+        <span>Precargar FAQs y conversaciones de ejemplo</span>
+      </label>
+      <br>
+      <button onclick="createDemo()">🎭 Crear demo</button>
+    </div>
+
+    <div class="card">
+      <h2>Demos existentes</h2>
+      <div id="demosList"></div>
     </div>
   </div>
 
@@ -530,7 +565,7 @@ window.fetch = function(url, opts = {}) {
 };
 
 function loadCompaniesList() {
-  return fetch('/api/companies', { headers: { 'x-admin-password': password } })
+  return fetch('/api/companies?demo=0', { headers: { 'x-admin-password': password } })
     .then(r => r.json()).then(rows => {
       companies = rows;
       const sel = document.getElementById('companySelector');
@@ -887,7 +922,86 @@ function tab(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'training') loadTraining();
   if (name === 'companies') loadCompaniesList();
+  if (name === 'demos') loadDemos();
 }
+
+function loadDemos() {
+  // Populate parent dropdown with non-demo companies
+  fetch('/api/companies?demo=0', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(prod => {
+      const sel = document.getElementById('demoParent');
+      if (sel) sel.innerHTML = '<option value="">— Empresa vacía (plantilla)</option>' + prod.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    });
+  fetch('/api/companies?demo=1', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(demos => {
+      const el = document.getElementById('demosList');
+      if (!demos.length) { el.innerHTML = '<p style="color:#666">Aún no has creado demos.</p>'; return; }
+      el.innerHTML = demos.map(d => {
+        const link = `${location.origin}/demo/${d.share_token}`;
+        const expired = d.expires_at && Date.now() > d.expires_at;
+        const daysLeft = d.expires_at ? Math.ceil((d.expires_at - Date.now()) / 86400000) : null;
+        return `
+        <div class="faq-item">
+          <div style="display:flex;gap:6px;position:absolute;top:10px;right:10px;flex-wrap:wrap;max-width:50%;justify-content:flex-end">
+            <button onclick="copyLink('${link}')" style="background:var(--card);color:var(--green);border:1px solid var(--border);font-size:11px">📋 Copiar link</button>
+            <button onclick="openDemoPreview('${link}')" style="background:var(--card);color:var(--green);border:1px solid var(--border);font-size:11px">👁 Abrir</button>
+            <button onclick="switchCompany('${d.id}')" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:11px">Editar</button>
+            <button onclick="duplicateDemo('${d.id}')" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:11px">Duplicar</button>
+            <button onclick="toggleCompany('${d.id}', ${d.active?0:1})" style="background:${d.active?'#2a2a0a':'#0a2a0a'};color:${d.active?'#fbbf24':'#4ade80'};border:1px solid var(--border);font-size:11px">${d.active?'Desactivar':'Activar'}</button>
+            <button onclick="deleteCompanyAdmin('${d.id}','${d.name}')" style="font-size:11px">Eliminar</button>
+          </div>
+          <div style="margin-right:280px;margin-bottom:12px">
+            <div style="font-weight:600;color:var(--green);font-size:15px">
+              ${d.name}
+              ${!d.active?'<span style="color:#fbbf24;font-size:10px;margin-left:8px">INACTIVA</span>':''}
+              ${expired?'<span style="color:#ef4444;font-size:10px;margin-left:8px">EXPIRADA</span>':''}
+            </div>
+            <div style="color:var(--muted);font-size:12px;margin-top:4px">
+              Creada ${new Date(d.created_at).toLocaleDateString()}
+              ${d.expires_at?` · ${expired?'expiró':'expira en '+daysLeft+' días'}`:' · sin expiración'}
+              ${d.parent_company_id?' · clonada de empresa existente':''}
+            </div>
+          </div>
+          <label>Link compartible</label>
+          <input readonly value="${link}" style="font-family:monospace;font-size:12px" onclick="this.select()">
+        </div>`;
+      }).join('');
+    });
+}
+
+function createDemo() {
+  const name = document.getElementById('demoName').value.trim();
+  const parentCompanyId = document.getElementById('demoParent').value || null;
+  const expiresInDays = parseInt(document.getElementById('demoExpiry').value) || null;
+  const seedSample = document.getElementById('demoSeed').checked;
+  if (!name) return toast('Falta nombre');
+  fetch('/api/demos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ name, parentCompanyId, expiresInDays, seedSample })
+  }).then(r => r.json()).then(d => {
+    if (d.error) return toast('Error: '+d.error);
+    toast('Demo creado ✓');
+    document.getElementById('demoName').value = '';
+    document.getElementById('demoExpiry').value = '';
+    loadDemos();
+    loadCompaniesList();
+  });
+}
+
+function duplicateDemo(id) {
+  fetch(`/api/demos/${id}/duplicate`, { method: 'POST', headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(d => {
+      if (d.error) return toast('Error: '+d.error);
+      toast('Duplicado ✓'); loadDemos();
+    });
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url).then(() => toast('Link copiado ✓'));
+}
+
+function openDemoPreview(url) { window.open(url, '_blank'); }
 
 function loadTraining() {
   fetch('/api/training/pending', { headers: { 'x-admin-password': password } })

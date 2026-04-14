@@ -89,6 +89,10 @@ db.exec(`
 softAlter("ALTER TABLE conversations ADD COLUMN company_id TEXT DEFAULT 'default'");
 softAlter("ALTER TABLE documents ADD COLUMN company_id TEXT DEFAULT 'default'");
 softAlter("ALTER TABLE training_pairs ADD COLUMN company_id TEXT DEFAULT 'default'");
+softAlter('ALTER TABLE companies ADD COLUMN demo INTEGER DEFAULT 0');
+softAlter('ALTER TABLE companies ADD COLUMN share_token TEXT');
+softAlter('ALTER TABLE companies ADD COLUMN expires_at INTEGER');
+softAlter('ALTER TABLE companies ADD COLUMN parent_company_id TEXT');
 
 // ============================================================
 // DEFAULT CONFIG (shape of per-company config)
@@ -228,18 +232,31 @@ runMigration();
 // ============================================================
 function uuid() { return crypto.randomUUID(); }
 
-export function listCompanies() {
-  return db.prepare('SELECT id, name, slug, active, created_at FROM companies ORDER BY created_at ASC').all();
+export function listCompanies(opts = {}) {
+  const where = opts.demoOnly ? 'WHERE demo = 1' : (opts.excludeDemo ? 'WHERE demo = 0' : '');
+  return db.prepare(`SELECT id, name, slug, active, created_at, demo, share_token, expires_at, parent_company_id FROM companies ${where} ORDER BY created_at DESC`).all();
+}
+
+function rowToCompany(row) {
+  if (!row) return null;
+  return {
+    id: row.id, name: row.name, slug: row.slug,
+    active: !!row.active, created_at: row.created_at,
+    demo: !!row.demo, share_token: row.share_token,
+    expires_at: row.expires_at, parent_company_id: row.parent_company_id,
+    config: { ...defaultConfig, ...(row.config ? JSON.parse(row.config) : {}) }
+  };
 }
 
 export function getCompany(idOrSlug) {
   if (!idOrSlug) return null;
-  const row = db.prepare('SELECT * FROM companies WHERE id = ? OR slug = ?').get(idOrSlug, idOrSlug);
-  if (!row) return null;
-  return {
-    id: row.id, name: row.name, slug: row.slug, active: !!row.active, created_at: row.created_at,
-    config: { ...defaultConfig, ...(row.config ? JSON.parse(row.config) : {}) }
-  };
+  const row = db.prepare('SELECT * FROM companies WHERE id = ? OR slug = ? OR share_token = ?').get(idOrSlug, idOrSlug, idOrSlug);
+  return rowToCompany(row);
+}
+
+export function getCompanyByToken(token) {
+  if (!token) return null;
+  return rowToCompany(db.prepare('SELECT * FROM companies WHERE share_token = ?').get(token));
 }
 
 export function findCompanyByWaInstance(instance) {
@@ -254,30 +271,97 @@ export function findCompanyByWaInstance(instance) {
   return null;
 }
 
-export function createCompany({ name, slug, id }) {
+export function createCompany({ name, slug, id, demo = false, parentCompanyId, expiresAt, configOverride }) {
   const cid = id || uuid();
   const cleanSlug = (slug || name || cid).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || cid;
-  const cfg = { ...defaultConfig, businessName: name || 'Nueva empresa' };
+
+  let baseCfg = { ...defaultConfig, businessName: name || 'Nueva empresa' };
+  if (parentCompanyId) {
+    const parent = getCompany(parentCompanyId);
+    if (parent) baseCfg = { ...parent.config, businessName: name || parent.config.businessName + ' (demo)' };
+  }
+  if (configOverride) baseCfg = { ...baseCfg, ...configOverride };
+
+  const shareToken = demo ? crypto.randomBytes(18).toString('base64url') : null;
+
   try {
-    db.prepare('INSERT INTO companies (id, name, slug, active, created_at, config) VALUES (?, ?, ?, 1, ?, ?)').run(
-      cid, cfg.businessName, cleanSlug, Date.now(), JSON.stringify(cfg)
+    db.prepare('INSERT INTO companies (id, name, slug, active, created_at, config, demo, share_token, expires_at, parent_company_id) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)').run(
+      cid, baseCfg.businessName, cleanSlug, Date.now(), JSON.stringify(baseCfg),
+      demo ? 1 : 0, shareToken, expiresAt || null, parentCompanyId || null
     );
   } catch (err) {
     if (/UNIQUE/.test(err.message)) throw new Error('El slug ya existe');
     throw err;
   }
+
+  // If cloning from parent, also copy knowledge base documents
+  if (parentCompanyId && demo) {
+    const docs = db.prepare('SELECT id, title, source FROM documents WHERE company_id = ?').all(parentCompanyId);
+    docs.forEach(d => {
+      const chunks = db.prepare('SELECT content FROM chunks WHERE doc_id = ?').all(d.id);
+      if (!chunks.length) return;
+      const newDoc = db.prepare('INSERT INTO documents (title, source, created_at, company_id) VALUES (?, ?, ?, ?)').run(d.title, d.source, Date.now(), cid);
+      const ins = db.prepare('INSERT INTO chunks (doc_id, title, content) VALUES (?, ?, ?)');
+      chunks.forEach(c => ins.run(newDoc.lastInsertRowid, d.title, c.content));
+    });
+  }
+
   return getCompany(cid);
 }
 
-export function updateCompanyMeta(id, { name, slug, active }) {
+export function updateCompanyMeta(id, { name, slug, active, expires_at }) {
   const fields = [], vals = [];
   if (name != null) { fields.push('name = ?'); vals.push(name); }
   if (slug != null) { fields.push('slug = ?'); vals.push(slug); }
   if (active != null) { fields.push('active = ?'); vals.push(active ? 1 : 0); }
+  if (expires_at !== undefined) { fields.push('expires_at = ?'); vals.push(expires_at); }
   if (!fields.length) return getCompany(id);
   vals.push(id);
   db.prepare(`UPDATE companies SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
   return getCompany(id);
+}
+
+export function regenerateShareToken(id) {
+  const tok = crypto.randomBytes(18).toString('base64url');
+  db.prepare('UPDATE companies SET share_token = ? WHERE id = ?').run(tok, id);
+  return tok;
+}
+
+export function seedSampleContent(companyId) {
+  const cfg = loadConfig(companyId);
+  const sampleDocs = [
+    {
+      title: 'Preguntas frecuentes',
+      content: 'P: ¿Cuál es su horario de atención?\nR: Atendemos de lunes a viernes de 9am a 6pm.\n\nP: ¿Cómo puedo contactarlos?\nR: Puedes escribirnos por este chat, WhatsApp o email.\n\nP: ¿Tienen servicio a domicilio?\nR: Sí, ofrecemos envíos a toda la ciudad.'
+    },
+    {
+      title: 'Política de devoluciones',
+      content: 'Aceptamos devoluciones dentro de los 30 días posteriores a la compra. El producto debe estar en su empaque original y sin uso. Para iniciar una devolución, contacta a nuestro equipo.'
+    },
+    {
+      title: 'Proceso de contratación',
+      content: `Así funciona nuestro proceso con ${cfg.businessName}: 1) Nos cuentas lo que necesitas. 2) Te enviamos una propuesta personalizada. 3) Tras aceptar, iniciamos el servicio en 48 horas. 4) Seguimiento semanal para asegurar resultados.`
+    }
+  ];
+  const now = Date.now();
+  sampleDocs.forEach(d => {
+    const info = db.prepare('INSERT INTO documents (title, source, created_at, company_id) VALUES (?, ?, ?, ?)').run(d.title, 'sample', now, companyId);
+    const ins = db.prepare('INSERT INTO chunks (doc_id, title, content) VALUES (?, ?, ?)');
+    const size = 800, overlap = 100, clean = d.content.replace(/\s+/g, ' ').trim();
+    for (let i = 0; i < clean.length; i += size - overlap) ins.run(info.lastInsertRowid, d.title, clean.slice(i, i + size));
+  });
+
+  // Sample conversations for demo purposes
+  const sampleConvos = [
+    { user: '¿Cuál es su horario?', assistant: 'Atendemos de lunes a viernes de 9am a 6pm. ¿Hay algo más en lo que pueda ayudarte?' },
+    { user: '¿Hacen envíos?', assistant: 'Sí, enviamos a toda la ciudad. ¿Te gustaría más detalles?' }
+  ];
+  sampleConvos.forEach(c => {
+    const convId = uuid();
+    db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(convId, 'demo-visitor', 'web', now, now, companyId);
+    db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'user', c.user, now);
+    db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', c.assistant, now + 1);
+  });
 }
 
 export function deleteCompany(id) {
