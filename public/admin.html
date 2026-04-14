@@ -80,6 +80,7 @@
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('quick')">Respuestas rápidas</button>
     <button onclick="tab('hours')">Horarios</button>
+    <button onclick="tab('reports')">Reportes</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('whatsapp')">WhatsApp</button>
@@ -250,6 +251,29 @@
     </div>
   </div>
 
+  <div id="tab-reports" class="tab">
+    <div class="card">
+      <h2>Reporte automático</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        Genera un PDF con resumen del período: conversaciones, preguntas frecuentes, tasa de resolución, leads capturados (emails/teléfonos detectados) y sugerencias de mejora generadas por IA.
+      </p>
+      <label>Período</label>
+      <select id="reportDays">
+        <option value="7">Últimos 7 días (semanal)</option>
+        <option value="14">Últimos 14 días</option>
+        <option value="30">Últimos 30 días (mensual)</option>
+        <option value="90">Últimos 90 días</option>
+      </select>
+      <br><br>
+      <button onclick="downloadReport()">📄 Descargar PDF</button>
+      <button class="secondary" onclick="previewReport()" style="margin-left:8px">👁 Vista previa</button>
+    </div>
+    <div class="card" id="reportPreview" style="display:none">
+      <h2>Vista previa</h2>
+      <div id="reportContent"></div>
+    </div>
+  </div>
+
   <div id="tab-knowledge" class="tab">
     <div class="card">
       <h2>Subir PDF</h2>
@@ -400,6 +424,37 @@ function renderDefaults() {
 }
 function addDefault() { config.defaultResponses = config.defaultResponses || []; config.defaultResponses.push({situation:'',response:''}); renderDefaults(); }
 function removeDefault(i) { config.defaultResponses.splice(i,1); renderDefaults(); }
+
+function downloadReport() {
+  const days = document.getElementById('reportDays').value;
+  window.open(`/api/report/weekly.pdf?days=${days}&pw=${encodeURIComponent(password)}`, '_blank');
+}
+
+function previewReport() {
+  const days = document.getElementById('reportDays').value;
+  const preview = document.getElementById('reportPreview');
+  const content = document.getElementById('reportContent');
+  content.innerHTML = '<p style="color:#888">Generando... (puede tardar unos segundos por las sugerencias de IA)</p>';
+  preview.style.display = 'block';
+  fetch(`/api/report/weekly.json?days=${days}`, { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(d => {
+      content.innerHTML = `
+        <div style="color:#aaa;font-size:12px;margin-bottom:14px">${d.period} · ${d.generatedAt}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px">
+          <div class="metric"><div class="v">${d.totalConvs}</div><div class="l">Total chats</div></div>
+          <div class="metric"><div class="v">${d.resolutionRate===null?'—':d.resolutionRate+'%'}</div><div class="l">Resolución</div></div>
+          <div class="metric"><div class="v">${d.ratings.satisfaction===null?'—':d.ratings.satisfaction+'%'}</div><div class="l">Satisfacción</div></div>
+          <div class="metric"><div class="v">${d.leads.length}</div><div class="l">Leads</div></div>
+        </div>
+        <h3 style="color:var(--gold);font-size:13px;letter-spacing:1px">TOP PREGUNTAS</h3>
+        ${d.topQuestions.map((q,i) => `<div style="color:#ccc;font-size:13px;margin:4px 0">${i+1}. (${q.count}x) ${q.q.slice(0,120)}</div>`).join('') || '<div style="color:#666">—</div>'}
+        <h3 style="color:var(--gold);font-size:13px;letter-spacing:1px;margin-top:20px">LEADS CAPTURADOS</h3>
+        ${d.leads.length ? d.leads.map(l => `<div style="color:#ccc;font-size:13px">• ${l.type}: ${l.value}</div>`).join('') : '<div style="color:#666">Ninguno detectado</div>'}
+        <h3 style="color:var(--gold);font-size:13px;letter-spacing:1px;margin-top:20px">SUGERENCIAS DE MEJORA (IA)</h3>
+        ${d.suggestions.length ? d.suggestions.map(s => `<div style="color:#ccc;font-size:13px;margin:6px 0;padding-left:16px;border-left:2px solid var(--gold)">${s}</div>`).join('') : '<div style="color:#666">—</div>'}
+      `;
+    });
+}
 
 function renderQuick() {
   const list = document.getElementById('quickList');
