@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Admin — Agente IA</title>
+<style>
+  :root{--gold:#D4AF37;--gold-dim:#a8862a}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0a;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+    min-height:100vh}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 24px}
+  h1{font-weight:300;font-size:28px;margin:0 0 4px}
+  h1 span{background:linear-gradient(135deg,var(--gold),var(--gold-dim));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:600}
+  .sub{color:#888;margin-bottom:32px;font-size:14px}
+  .card{background:linear-gradient(135deg,#111,#0a0a0a);border:1px solid rgba(212,175,55,.15);
+    border-radius:14px;padding:28px;margin-bottom:20px}
+  .card h2{margin:0 0 18px;font-size:15px;text-transform:uppercase;letter-spacing:2px;
+    color:var(--gold);font-weight:500}
+  label{display:block;font-size:12px;color:#aaa;margin:14px 0 6px;letter-spacing:.5px;
+    text-transform:uppercase}
+  input,textarea,select{width:100%;background:#161616;border:1px solid #222;color:#e8e8e8;
+    padding:11px 14px;border-radius:8px;font-size:14px;outline:none;font-family:inherit;
+    transition:border-color .2s}
+  input:focus,textarea:focus,select:focus{border-color:var(--gold)}
+  textarea{min-height:90px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  button{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#0a0a0a;
+    border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:600;
+    font-size:13px;letter-spacing:.5px;text-transform:uppercase;transition:opacity .2s}
+  button:hover{opacity:.9}
+  button.secondary{background:#1a1a1a;color:var(--gold);border:1px solid rgba(212,175,55,.3)}
+  .faq-item{background:#0c0c0c;border:1px solid #1a1a1a;border-radius:8px;padding:14px;
+    margin-bottom:10px;position:relative}
+  .faq-item button{position:absolute;top:10px;right:10px;background:#2a0a0a;color:#ff6b6b;
+    border:1px solid #4a1515;padding:4px 10px;font-size:11px}
+  .login{max-width:360px;margin:120px auto}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;
+    border:1px solid var(--gold);color:var(--gold);padding:14px 20px;border-radius:10px;
+    transform:translateY(100px);transition:transform .3s;z-index:1000}
+  .toast.show{transform:none}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid #222}
+  .tabs button{background:none;color:#888;border:none;padding:12px 18px;cursor:pointer;
+    border-radius:0;text-transform:none;letter-spacing:0;font-size:14px}
+  .tabs button.active{color:var(--gold);border-bottom:2px solid var(--gold)}
+  .tab{display:none}.tab.active{display:block}
+  .conv{padding:14px;border:1px solid #1a1a1a;border-radius:8px;margin-bottom:8px;
+    cursor:pointer;font-size:13px;color:#aaa}
+  .conv:hover{border-color:var(--gold)}
+  .msg-log{background:#0c0c0c;padding:14px;border-radius:8px;margin-top:10px;
+    max-height:400px;overflow-y:auto;font-size:13px;line-height:1.6}
+  .msg-log .u{color:var(--gold)}.msg-log .a{color:#ccc}
+</style>
+</head>
+<body>
+
+<div id="login" class="login card">
+  <h2 style="color:var(--gold);text-align:center">🔒 Acceso Admin</h2>
+  <label>Contraseña</label>
+  <input type="password" id="pw" onkeydown="if(event.key==='Enter')login()">
+  <br><br>
+  <button onclick="login()" style="width:100%">Entrar</button>
+</div>
+
+<div id="app" class="wrap" style="display:none">
+  <h1>Panel <span>Admin</span></h1>
+  <div class="sub">Configura tu agente de atención al cliente</div>
+
+  <div class="tabs">
+    <button class="active" onclick="tab('config')">Configuración</button>
+    <button onclick="tab('faqs')">FAQs</button>
+    <button onclick="tab('convs')">Conversaciones</button>
+    <button onclick="tab('embed')">Embeber</button>
+  </div>
+
+  <div id="tab-config" class="tab active">
+    <div class="card">
+      <h2>Información del negocio</h2>
+      <label>Nombre del negocio</label>
+      <input id="businessName">
+      <label>Descripción</label>
+      <textarea id="description"></textarea>
+      <div class="row">
+        <div><label>Horario</label><input id="hours"></div>
+        <div><label>Contacto</label><input id="contact"></div>
+      </div>
+      <label>Productos / servicios</label>
+      <textarea id="products"></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Comportamiento del agente</h2>
+      <label>Tono</label>
+      <input id="tone">
+      <label>Mensaje de bienvenida</label>
+      <input id="welcomeMessage">
+      <label>Instrucciones adicionales (opcional)</label>
+      <textarea id="systemPromptExtra"></textarea>
+      <div class="row">
+        <div>
+          <label>Modelo Claude</label>
+          <select id="model">
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5 (rápido/barato)</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6 (balance)</option>
+            <option value="claude-opus-4-6">Opus 4.6 (máxima calidad)</option>
+          </select>
+        </div>
+        <div>
+          <label>Color de acento</label>
+          <input id="accentColor" type="color" value="#D4AF37" style="height:45px;padding:4px">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="save()">Guardar cambios</button>
+  </div>
+
+  <div id="tab-faqs" class="tab">
+    <div class="card">
+      <h2>Preguntas frecuentes</h2>
+      <div id="faqList"></div>
+      <button class="secondary" onclick="addFaq()">+ Añadir FAQ</button>
+      <br><br>
+      <button onclick="save()">Guardar FAQs</button>
+    </div>
+  </div>
+
+  <div id="tab-convs" class="tab">
+    <div class="card">
+      <h2>Conversaciones recientes</h2>
+      <div id="convList"></div>
+      <div id="msgLog"></div>
+    </div>
+  </div>
+
+  <div id="tab-embed" class="tab">
+    <div class="card">
+      <h2>Código para embeber</h2>
+      <p style="color:#aaa;font-size:14px">Pega este script antes de <code style="color:var(--gold)">&lt;/body&gt;</code> en cualquier web:</p>
+      <textarea readonly id="embedCode" style="min-height:80px;font-family:monospace;font-size:12px"></textarea>
+      <br><br>
+      <button class="secondary" onclick="copyEmbed()">Copiar código</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let config = {}, password = '';
+
+function login() {
+  password = document.getElementById('pw').value;
+  fetch('/api/config', { headers: { 'x-admin-password': password } })
+    .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(c => {
+      config = c;
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      render();
+    })
+    .catch(() => toast('Contraseña incorrecta'));
+}
+
+function render() {
+  ['businessName','description','hours','contact','products','tone',
+   'welcomeMessage','systemPromptExtra','model','accentColor'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) el.value = config[k] || '';
+  });
+  renderFaqs();
+  document.getElementById('embedCode').value =
+    `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
+}
+
+function renderFaqs() {
+  const list = document.getElementById('faqList');
+  list.innerHTML = '';
+  (config.faqs || []).forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'faq-item';
+    div.innerHTML = `
+      <button onclick="removeFaq(${i})">Eliminar</button>
+      <label>Pregunta</label>
+      <input value="${(f.q||'').replace(/"/g,'&quot;')}" onchange="config.faqs[${i}].q=this.value">
+      <label>Respuesta</label>
+      <textarea onchange="config.faqs[${i}].a=this.value">${f.a||''}</textarea>`;
+    list.appendChild(div);
+  });
+}
+
+function addFaq() { config.faqs = config.faqs || []; config.faqs.push({q:'',a:''}); renderFaqs(); }
+function removeFaq(i) { config.faqs.splice(i,1); renderFaqs(); }
+
+function save() {
+  ['businessName','description','hours','contact','products','tone',
+   'welcomeMessage','systemPromptExtra','model','accentColor'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) config[k] = el.value;
+  });
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify(config)
+  }).then(r => r.json()).then(c => { config = c; toast('Guardado ✓'); });
+}
+
+function tab(name) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'convs') loadConvs();
+}
+
+function loadConvs() {
+  fetch('/api/conversations', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(rows => {
+      const el = document.getElementById('convList');
+      el.innerHTML = rows.length ? '' : '<p style="color:#666">Aún no hay conversaciones.</p>';
+      rows.forEach(c => {
+        const d = document.createElement('div');
+        d.className = 'conv';
+        d.textContent = `${new Date(c.updated_at).toLocaleString()} — ${c.visitor_id}`;
+        d.onclick = () => loadMessages(c.id);
+        el.appendChild(d);
+      });
+    });
+}
+
+function loadMessages(id) {
+  fetch('/api/conversations/'+id, { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(msgs => {
+      const log = document.getElementById('msgLog');
+      log.className = 'msg-log';
+      log.innerHTML = msgs.map(m =>
+        `<div class="${m.role==='user'?'u':'a'}"><b>${m.role==='user'?'Cliente':'Agente'}:</b> ${
+          m.content.replace(/</g,'&lt;')}</div>`).join('<hr style="border-color:#222">');
+    });
+}
+
+function copyEmbed() {
+  const el = document.getElementById('embedCode');
+  el.select(); document.execCommand('copy');
+  toast('Copiado ✓');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>
