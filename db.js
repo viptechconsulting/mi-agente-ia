@@ -91,6 +91,7 @@ const defaultConfig = {
   agentName: 'Asistente',
   personality: 'Amable, resolutivo y cercano. Usa frases cortas y directas.',
   language: 'español',
+  autoDetectLanguage: true,
   voiceExamples: '',
   defaultResponses: [
     { situation: 'Saludo inicial', response: '¡Hola! Bienvenido/a. ¿En qué puedo ayudarte hoy?' },
@@ -145,7 +146,9 @@ export function buildSystemPrompt(cfg) {
     : '';
   return `Eres "${cfg.agentName || 'Asistente'}", el agente de atención al cliente de "${cfg.businessName}".
 
-IDIOMA: Responde siempre en ${cfg.language || 'español'}.
+IDIOMA: ${cfg.autoDetectLanguage
+  ? `Detecta automáticamente el idioma del último mensaje del usuario y responde SIEMPRE en ese mismo idioma. Soportas como mínimo: español, inglés (English), francés (français), portugués (português) y hebreo (עברית). Si el usuario cambia de idioma durante la conversación, tú también cambias. Si no estás seguro del idioma, usa ${cfg.language || 'español'} por defecto.`
+  : `Responde siempre en ${cfg.language || 'español'}.`}
 
 PERSONALIDAD:
 ${cfg.personality || cfg.tone}

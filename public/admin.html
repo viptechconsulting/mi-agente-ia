@@ -153,17 +153,23 @@
       <div class="row">
         <div><label>Nombre del agente</label><input id="agentName" placeholder="Ej. Sofía, Max, Aura"></div>
         <div>
-          <label>Idioma principal</label>
+          <label>Idioma por defecto</label>
           <select id="language">
             <option value="español">Español</option>
-            <option value="inglés">Inglés</option>
-            <option value="portugués">Portugués</option>
-            <option value="francés">Francés</option>
+            <option value="inglés">Inglés (English)</option>
+            <option value="portugués">Portugués (Português)</option>
+            <option value="francés">Francés (Français)</option>
+            <option value="hebreo">Hebreo (עברית)</option>
             <option value="italiano">Italiano</option>
-            <option value="alemán">Alemán</option>
+            <option value="alemán">Alemán (Deutsch)</option>
           </select>
         </div>
       </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:14px">
+        <input type="checkbox" id="autoDetectLanguage" style="width:auto">
+        <span>Detectar idioma automáticamente (responde en el idioma del cliente)</span>
+      </label>
+      <p style="color:#888;font-size:12px;margin:6px 0 0">Soporta: español, inglés, francés, portugués, hebreo y más.</p>
       <label>Personalidad</label>
       <textarea id="personality" placeholder="Ej. Amable, resolutiva, con sentido del humor. Usa frases cortas. Nunca usa jerga técnica."></textarea>
       <label>Tono de voz</label>
@@ -350,6 +356,7 @@ function render() {
     if (el) el.value = config[k] || '';
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
+  const ad = document.getElementById('autoDetectLanguage'); if (ad) ad.checked = config.autoDetectLanguage !== false;
   const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
   renderFaqs(); renderDefaults(); renderQuick(); renderHours();
   document.getElementById('embedCode').value =
@@ -456,6 +463,8 @@ function save() {
   });
   const t2 = document.getElementById('tone2');
   if (t2 && t2.value) config.tone = t2.value;
+  const ad = document.getElementById('autoDetectLanguage');
+  if (ad) config.autoDetectLanguage = ad.checked;
   const en = document.getElementById('ohEnabled');
   if (en) {
     config.officeHours = config.officeHours || {};
