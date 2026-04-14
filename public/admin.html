@@ -80,6 +80,7 @@
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('quick')">Respuestas rápidas</button>
     <button onclick="tab('hours')">Horarios</button>
+    <button onclick="tab('appearance')">Apariencia</button>
     <button onclick="tab('reports')">Reportes</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
@@ -251,6 +252,73 @@
     </div>
   </div>
 
+  <div id="tab-appearance" class="tab">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="card">
+          <h2>Colores</h2>
+          <div class="row">
+            <div><label>Acento (botones, bordes)</label><input type="color" id="accentColor2" oninput="syncAppearance()" style="height:45px"></div>
+            <div><label>Fondo del chat</label><input type="color" id="bgColor" oninput="syncAppearance()" style="height:45px"></div>
+          </div>
+          <label>Color burbuja usuario</label>
+          <input type="color" id="userBubbleColor" oninput="syncAppearance()" style="height:45px">
+        </div>
+
+        <div class="card">
+          <h2>Logo de la empresa</h2>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+            <img id="logoPreview" src="" style="width:50px;height:50px;border-radius:50%;object-fit:cover;background:#161616;border:1px solid #333">
+            <input type="file" accept="image/*" onchange="uploadImage(this,'logoUrl','logoPreview')">
+          </div>
+          <button class="secondary" onclick="clearImg('logoUrl','logoPreview')" style="font-size:11px;padding:6px 12px">Quitar logo</button>
+        </div>
+
+        <div class="card">
+          <h2>Avatar del agente</h2>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+            <img id="avatarPreview" src="" style="width:50px;height:50px;border-radius:50%;object-fit:cover;background:#161616;border:1px solid #333">
+            <input type="file" accept="image/*" onchange="uploadImage(this,'avatarUrl','avatarPreview')">
+          </div>
+          <button class="secondary" onclick="clearImg('avatarUrl','avatarPreview')" style="font-size:11px;padding:6px 12px">Quitar avatar</button>
+        </div>
+
+        <div class="card">
+          <h2>Posición del widget</h2>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:8px">
+            <input type="radio" name="pos" value="right" onchange="config.widgetPosition='right';renderAppearance()" style="width:auto"> Esquina inferior derecha
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input type="radio" name="pos" value="left" onchange="config.widgetPosition='left';renderAppearance()" style="width:auto"> Esquina inferior izquierda
+          </label>
+        </div>
+
+        <button onclick="save()">Guardar apariencia</button>
+      </div>
+
+      <div>
+        <div class="card" style="position:sticky;top:20px">
+          <h2>Preview en vivo</h2>
+          <div id="previewBox" style="position:relative;height:520px;background:#1a1a1a;border-radius:12px;overflow:hidden;border:1px solid #222">
+            <div style="position:absolute;top:0;left:0;right:0;padding:14px 18px;background:linear-gradient(180deg,#0f0f0f,transparent);color:#555;font-size:11px;letter-spacing:1px">SIMULACIÓN DE TU WEB</div>
+            <div id="previewLauncher" style="position:absolute;bottom:16px;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;overflow:hidden"></div>
+            <div id="previewPanel" style="position:absolute;bottom:80px;width:300px;height:380px;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;transition:all .3s;border:1px solid;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+              <div id="previewHeader" style="padding:10px 14px;border-bottom:1px solid;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#fff"></div>
+              <div style="flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+                <div id="previewAgentMsg" style="align-self:flex-start;padding:8px 12px;border-radius:10px;background:#161616;border:1px solid #222;color:#e8e8e8;font-size:12px;max-width:85%;display:flex;gap:6px;align-items:flex-start"></div>
+                <div style="align-self:flex-end;padding:8px 12px;border-radius:10px;color:#f5e9b8;font-size:12px;max-width:75%" id="previewUserMsg">Gracias!</div>
+              </div>
+              <div id="previewInput" style="padding:8px;border-top:1px solid;display:flex;gap:6px">
+                <div style="flex:1;background:#161616;border:1px solid #222;padding:6px 10px;border-radius:8px;color:#666;font-size:11px">Escribe tu mensaje...</div>
+                <div id="previewBtn" style="padding:6px 12px;border-radius:8px;font-weight:600;font-size:11px;color:#000">Enviar</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-reports" class="tab">
     <div class="card">
       <h2>Reporte automático</h2>
@@ -375,14 +443,15 @@ function render() {
   ['businessName','description','hours','contact','products','tone',
    'welcomeMessage','systemPromptExtra','model','accentColor',
    'agentName','personality','language','voiceExamples',
-   'waBaseUrl','waInstance','waApiKey'].forEach(k => {
+   'waBaseUrl','waInstance','waApiKey',
+   'bgColor','userBubbleColor'].forEach(k => {
     const el = document.getElementById(k);
     if (el) el.value = config[k] || '';
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
   const ad = document.getElementById('autoDetectLanguage'); if (ad) ad.checked = config.autoDetectLanguage !== false;
   const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
-  renderFaqs(); renderDefaults(); renderQuick(); renderHours();
+  renderFaqs(); renderDefaults(); renderQuick(); renderHours(); renderAppearance();
   document.getElementById('embedCode').value =
     `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
 }
@@ -500,6 +569,79 @@ function renderHours() {
   }).join('');
 }
 
+function renderAppearance() {
+  const ac2 = document.getElementById('accentColor2');
+  if (ac2) ac2.value = config.accentColor || '#D4AF37';
+  const bg = document.getElementById('bgColor'); if (bg) bg.value = config.bgColor || '#0a0a0a';
+  const ub = document.getElementById('userBubbleColor'); if (ub) ub.value = config.userBubbleColor || '#2a2205';
+  const logo = document.getElementById('logoPreview'); if (logo) logo.src = config.logoUrl || '';
+  const av = document.getElementById('avatarPreview'); if (av) av.src = config.avatarUrl || '';
+  document.querySelectorAll('input[name=pos]').forEach(r => r.checked = r.value === (config.widgetPosition || 'right'));
+  updatePreview();
+}
+
+function syncAppearance() {
+  config.accentColor = document.getElementById('accentColor2').value;
+  config.bgColor = document.getElementById('bgColor').value;
+  config.userBubbleColor = document.getElementById('userBubbleColor').value;
+  updatePreview();
+}
+
+function updatePreview() {
+  const ac = config.accentColor || '#D4AF37';
+  const bg = config.bgColor || '#0a0a0a';
+  const ub = config.userBubbleColor || '#2a2205';
+  const pos = config.widgetPosition || 'right';
+  const launcher = document.getElementById('previewLauncher');
+  const panel = document.getElementById('previewPanel');
+  if (!launcher) return;
+  launcher.style[pos==='right'?'right':'left'] = '16px';
+  launcher.style[pos==='right'?'left':'right'] = 'auto';
+  panel.style[pos==='right'?'right':'left'] = '16px';
+  panel.style[pos==='right'?'left':'right'] = 'auto';
+  launcher.style.background = `linear-gradient(135deg,#1a1a1a,${bg})`;
+  launcher.style.border = `1px solid ${ac}`;
+  launcher.style.boxShadow = `0 6px 20px ${ac}66`;
+  launcher.innerHTML = config.logoUrl
+    ? `<img src="${config.logoUrl}" style="width:100%;height:100%;object-fit:cover">`
+    : `<svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:${ac}"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.4A10 10 0 1 0 12 2z"/></svg>`;
+  panel.style.background = bg;
+  panel.style.borderColor = ac + '40';
+  const header = document.getElementById('previewHeader');
+  header.style.borderColor = ac + '26';
+  header.innerHTML = (config.logoUrl ? `<img src="${config.logoUrl}" style="width:22px;height:22px;border-radius:50%;object-fit:cover">` : '') +
+    `<span style="width:6px;height:6px;border-radius:50%;background:${ac};box-shadow:0 0 8px ${ac}"></span>` +
+    `<span>${config.businessName || 'Asistente'}</span>`;
+  const agentMsg = document.getElementById('previewAgentMsg');
+  agentMsg.innerHTML = (config.avatarUrl ? `<img src="${config.avatarUrl}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex:0 0 22px">` : '') +
+    `<span>${config.welcomeMessage || '¡Hola!'}</span>`;
+  const userMsg = document.getElementById('previewUserMsg');
+  userMsg.style.background = `linear-gradient(135deg,${ub},#1a1503)`;
+  userMsg.style.border = `1px solid ${ac}40`;
+  const btn = document.getElementById('previewBtn');
+  btn.style.background = `linear-gradient(135deg,${ac},${ac}bb)`;
+  const inp = document.getElementById('previewInput');
+  inp.style.borderColor = ac + '1f';
+}
+
+function uploadImage(input, key, previewId) {
+  const f = input.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  fetch('/api/upload/image', { method:'POST', headers:{'x-admin-password': password}, body: fd })
+    .then(r => r.json()).then(d => {
+      if (d.error) return toast('Error: ' + d.error);
+      config[key] = d.url;
+      document.getElementById(previewId).src = d.url;
+      updatePreview(); toast('Imagen subida ✓');
+    });
+}
+
+function clearImg(key, previewId) {
+  config[key] = '';
+  document.getElementById(previewId).src = '';
+  updatePreview();
+}
+
 function setDay(d, key, val) {
   config.officeHours = config.officeHours || { schedule: [] };
   config.officeHours.schedule = config.officeHours.schedule || [];
@@ -512,10 +654,13 @@ function save() {
   ['businessName','description','hours','contact','products','tone',
    'welcomeMessage','systemPromptExtra','model','accentColor',
    'agentName','personality','language','voiceExamples',
-   'waBaseUrl','waInstance','waApiKey'].forEach(k => {
+   'waBaseUrl','waInstance','waApiKey',
+   'bgColor','userBubbleColor'].forEach(k => {
     const el = document.getElementById(k);
     if (el) config[k] = el.value;
   });
+  const ac2 = document.getElementById('accentColor2');
+  if (ac2 && ac2.value) config.accentColor = ac2.value;
   const t2 = document.getElementById('tone2');
   if (t2 && t2.value) config.tone = t2.value;
   const ad = document.getElementById('autoDetectLanguage');

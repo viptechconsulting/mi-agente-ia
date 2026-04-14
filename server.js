@@ -16,6 +16,11 @@ const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+import fs from 'fs';
+const assetsDir = path.join(__dirname, 'data', 'assets');
+if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
+app.use('/assets', express.static(assetsDir, { maxAge: '1h' }));
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -58,8 +63,30 @@ app.get('/api/config/public', (req, res) => {
     businessName: cfg.businessName,
     welcomeMessage: cfg.welcomeMessage,
     accentColor: cfg.accentColor,
+    bgColor: cfg.bgColor,
+    userBubbleColor: cfg.userBubbleColor,
+    logoUrl: cfg.logoUrl,
+    avatarUrl: cfg.avatarUrl,
+    widgetPosition: cfg.widgetPosition,
     quickReplies: cfg.quickReplies || []
   });
+});
+
+const uploadImage = multer({
+  storage: multer.diskStorage({
+    destination: assetsDir,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g,'') || '.png';
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`);
+    }
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype))
+});
+
+app.post('/api/upload/image', requireAdmin, uploadImage.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Falta archivo' });
+  res.json({ url: `/assets/${req.file.filename}` });
 });
 
 app.get('/api/config', requireAdmin, (req, res) => res.json(loadConfig()));
