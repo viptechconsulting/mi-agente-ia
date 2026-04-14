@@ -26,6 +26,19 @@ db.exec(`
     FOREIGN KEY(conversation_id) REFERENCES conversations(id)
   );
   CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
+
+  CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    source TEXT,
+    created_at INTEGER
+  );
+  CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
+    doc_id UNINDEXED,
+    title,
+    content,
+    tokenize='unicode61 remove_diacritics 2'
+  );
 `);
 
 export const configPath = path.join(dataDir, 'config.json');

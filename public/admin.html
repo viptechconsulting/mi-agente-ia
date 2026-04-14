@@ -69,6 +69,7 @@
   <div class="tabs">
     <button class="active" onclick="tab('config')">Configuración</button>
     <button onclick="tab('faqs')">FAQs</button>
+    <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
     <button onclick="tab('embed')">Embeber</button>
   </div>
@@ -122,6 +123,31 @@
       <button class="secondary" onclick="addFaq()">+ Añadir FAQ</button>
       <br><br>
       <button onclick="save()">Guardar FAQs</button>
+    </div>
+  </div>
+
+  <div id="tab-knowledge" class="tab">
+    <div class="card">
+      <h2>Subir PDF</h2>
+      <label>Título (opcional)</label>
+      <input id="pdfTitle" placeholder="Ej. Catálogo de productos 2026">
+      <label>Archivo PDF</label>
+      <input id="pdfFile" type="file" accept="application/pdf">
+      <br><br>
+      <button onclick="uploadPdf()">Subir PDF</button>
+    </div>
+    <div class="card">
+      <h2>Añadir texto</h2>
+      <label>Título</label>
+      <input id="txtTitle" placeholder="Ej. Política de devoluciones">
+      <label>Contenido</label>
+      <textarea id="txtContent" style="min-height:160px" placeholder="Pega aquí el texto: descripciones, precios, políticas, etc."></textarea>
+      <br><br>
+      <button onclick="uploadText()">Añadir</button>
+    </div>
+    <div class="card">
+      <h2>Documentos cargados</h2>
+      <div id="docList"></div>
     </div>
   </div>
 
@@ -211,6 +237,60 @@ function tab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'convs') loadConvs();
+  if (name === 'knowledge') loadDocs();
+}
+
+function loadDocs() {
+  fetch('/api/docs', { headers: { 'x-admin-password': password } })
+    .then(r => r.json()).then(docs => {
+      const el = document.getElementById('docList');
+      if (!docs.length) { el.innerHTML = '<p style="color:#666">Aún no hay documentos.</p>'; return; }
+      el.innerHTML = docs.map(d => `
+        <div class="faq-item">
+          <button onclick="deleteDoc(${d.id})">Eliminar</button>
+          <div style="font-weight:600;color:var(--gold)">${d.title}</div>
+          <div style="color:#888;font-size:12px;margin-top:4px">
+            ${d.source.toUpperCase()} · ${d.chunks} fragmentos · ${new Date(d.created_at).toLocaleString()}
+          </div>
+        </div>`).join('');
+    });
+}
+
+function deleteDoc(id) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  fetch('/api/docs/'+id, { method: 'DELETE', headers: { 'x-admin-password': password } })
+    .then(() => { loadDocs(); toast('Eliminado'); });
+}
+
+function uploadText() {
+  const title = document.getElementById('txtTitle').value.trim();
+  const content = document.getElementById('txtContent').value.trim();
+  if (!title || !content) return toast('Falta título o contenido');
+  fetch('/api/docs/text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ title, content })
+  }).then(r => r.json()).then(() => {
+    document.getElementById('txtTitle').value = '';
+    document.getElementById('txtContent').value = '';
+    toast('Texto añadido ✓'); loadDocs();
+  });
+}
+
+function uploadPdf() {
+  const file = document.getElementById('pdfFile').files[0];
+  if (!file) return toast('Selecciona un PDF');
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', document.getElementById('pdfTitle').value || file.name);
+  toast('Procesando PDF...');
+  fetch('/api/docs/pdf', { method: 'POST', headers: { 'x-admin-password': password }, body: fd })
+    .then(r => r.json()).then(d => {
+      if (d.error) return toast('Error: '+d.error);
+      document.getElementById('pdfTitle').value = '';
+      document.getElementById('pdfFile').value = '';
+      toast(`PDF procesado: ${d.chunks} fragmentos ✓`); loadDocs();
+    });
 }
 
 function loadConvs() {
