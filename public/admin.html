@@ -80,6 +80,7 @@
     <button onclick="tab('faqs')">FAQs</button>
     <button onclick="tab('knowledge')">Conocimiento</button>
     <button onclick="tab('convs')">Conversaciones</button>
+    <button onclick="tab('whatsapp')">WhatsApp</button>
     <button onclick="tab('embed')">Embeber</button>
   </div>
 
@@ -226,6 +227,41 @@
     </div>
   </div>
 
+  <div id="tab-whatsapp" class="tab">
+    <div class="card">
+      <h2>Conexión WhatsApp (Evolution API)</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 16px">
+        Conecta WhatsApp usando <b>Evolution API</b> (ya corre en tu VPS). Crea una instancia en Evolution y pega los datos aquí.
+      </p>
+      <label>Base URL de Evolution</label>
+      <input id="waBaseUrl" placeholder="https://evolution.tudominio.com">
+      <div class="row">
+        <div><label>Instance Name</label><input id="waInstance" placeholder="lynkro"></div>
+        <div><label>API Key</label><input id="waApiKey" type="password" placeholder="tu apikey"></div>
+      </div>
+      <br>
+      <button onclick="save()">Guardar credenciales</button>
+    </div>
+
+    <div class="card">
+      <h2>Webhook</h2>
+      <p style="color:#888;font-size:13px;margin:0 0 10px">
+        En Evolution API → tu instance → <b>Webhook Settings</b> pega esta URL y activa el evento <code style="color:var(--gold)">messages.upsert</code>:
+      </p>
+      <input readonly id="waWebhook" style="font-family:monospace;font-size:12px" value="https://chat.lynkro.io/api/whatsapp/webhook">
+    </div>
+
+    <div class="card">
+      <h2>Probar envío</h2>
+      <div class="row">
+        <div><label>Número (con código país, sin +)</label><input id="waTestPhone" placeholder="5215551234567"></div>
+        <div><label>Mensaje</label><input id="waTestMsg" placeholder="Hola desde el agente"></div>
+      </div>
+      <br>
+      <button class="secondary" onclick="waTest()">Enviar prueba</button>
+    </div>
+  </div>
+
   <div id="tab-embed" class="tab">
     <div class="card">
       <h2>Código para embeber</h2>
@@ -258,11 +294,13 @@ function login() {
 function render() {
   ['businessName','description','hours','contact','products','tone',
    'welcomeMessage','systemPromptExtra','model','accentColor',
-   'agentName','personality','language','voiceExamples'].forEach(k => {
+   'agentName','personality','language','voiceExamples',
+   'waBaseUrl','waInstance','waApiKey'].forEach(k => {
     const el = document.getElementById(k);
     if (el) el.value = config[k] || '';
   });
   const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
+  const wh = document.getElementById('waWebhook'); if (wh) wh.value = `${location.origin}/api/whatsapp/webhook`;
   renderFaqs(); renderDefaults();
   document.getElementById('embedCode').value =
     `<script src="${location.origin}/widget.js" data-api="${location.origin}"><\/script>`;
@@ -309,7 +347,8 @@ function removeDefault(i) { config.defaultResponses.splice(i,1); renderDefaults(
 function save() {
   ['businessName','description','hours','contact','products','tone',
    'welcomeMessage','systemPromptExtra','model','accentColor',
-   'agentName','personality','language','voiceExamples'].forEach(k => {
+   'agentName','personality','language','voiceExamples',
+   'waBaseUrl','waInstance','waApiKey'].forEach(k => {
     const el = document.getElementById(k);
     if (el) config[k] = el.value;
   });
@@ -352,6 +391,7 @@ function renderDashboard(d) {
     <div class="metric"><div class="v" style="color:${satColor}">${sat===null?'—':sat+'%'}</div><div class="l">Satisfacción</div></div>
     <div class="metric"><div class="v">👍 ${d.ratings.up} · 👎 ${d.ratings.down}</div><div class="l">Valoraciones</div></div>
     <div class="metric"><div class="v" style="color:${d.unresolved?'#ef4444':'#4ade80'}">${d.unresolved}</div><div class="l">Sin resolver</div></div>
+    ${(d.byChannel||[]).map(ch => `<div class="metric"><div class="v">${ch.c}</div><div class="l">${ch.ch==='whatsapp'?'💬 WhatsApp':'🌐 Web'}</div></div>`).join('')}
   `;
 
   const ul = document.getElementById('unresolvedList');
@@ -460,11 +500,25 @@ function loadConvs() {
       rows.forEach(c => {
         const d = document.createElement('div');
         d.className = 'conv';
-        d.textContent = `${new Date(c.updated_at).toLocaleString()} — ${c.visitor_id}`;
+        const ch = c.channel || 'web';
+        const badge = ch === 'whatsapp' ? '💬 WA' : '🌐 Web';
+        const color = ch === 'whatsapp' ? '#25D366' : 'var(--gold)';
+        d.innerHTML = `<span style="color:${color};font-weight:600;margin-right:8px">${badge}</span>${new Date(c.updated_at).toLocaleString()} — ${c.visitor_id}`;
         d.onclick = () => loadMessages(c.id);
         el.appendChild(d);
       });
     });
+}
+
+function waTest() {
+  const phone = document.getElementById('waTestPhone').value.trim();
+  const text = document.getElementById('waTestMsg').value.trim() || 'Test ✓';
+  if (!phone) return toast('Falta número');
+  fetch('/api/whatsapp/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+    body: JSON.stringify({ phone, text })
+  }).then(() => toast('Enviado (revisa el WhatsApp)'));
 }
 
 function loadMessages(id) {

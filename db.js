@@ -50,6 +50,7 @@ db.exec(`
 `);
 
 try { db.exec('ALTER TABLE conversations ADD COLUMN unresolved INTEGER DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE conversations ADD COLUMN channel TEXT DEFAULT 'web'"); } catch {}
 
 export const configPath = path.join(dataDir, 'config.json');
 
@@ -65,6 +66,9 @@ const defaultConfig = {
   welcomeMessage: '¡Hola! ¿En qué puedo ayudarte hoy?',
   accentColor: '#D4AF37',
   model: 'claude-haiku-4-5-20251001',
+  waBaseUrl: '',
+  waInstance: '',
+  waApiKey: '',
   agentName: 'Asistente',
   personality: 'Amable, resolutivo y cercano. Usa frases cortas y directas.',
   language: 'español',
