@@ -1,3 +1,5 @@
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+
 const softAlter = (db, sql) => { try { db.exec(sql); } catch {} }
 
 export function applyCommerceSchema(db) {
@@ -151,4 +153,34 @@ export function setCommercePro(db, companyId, fields) {
   const setClauses = keys.map(k => `${k} = ?`).join(', ')
   const values = keys.map(k => fields[k])
   db.prepare(`UPDATE companies SET ${setClauses} WHERE id = ?`).run(...values, companyId)
+}
+
+// ── AES-256-GCM credential encryption ───────────────────────────────────────
+
+export function encryptCredential(plaintext) {
+  try {
+    const key = process.env.ENCRYPTION_KEY
+    if (!key) return null
+    const keyBuf = Buffer.from(key, 'hex')
+    const iv = randomBytes(12)
+    const cipher = createCipheriv('aes-256-gcm', keyBuf, iv)
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
+    return Buffer.concat([iv, tag, encrypted]).toString('base64')
+  } catch { return null }
+}
+
+export function decryptCredential(ciphertext) {
+  try {
+    const key = process.env.ENCRYPTION_KEY
+    if (!key || !ciphertext) return null
+    const buf = Buffer.from(ciphertext, 'base64')
+    const iv = buf.slice(0, 12)
+    const tag = buf.slice(12, 28)
+    const encrypted = buf.slice(28)
+    const keyBuf = Buffer.from(key, 'hex')
+    const decipher = createDecipheriv('aes-256-gcm', keyBuf, iv)
+    decipher.setAuthTag(tag)
+    return decipher.update(encrypted) + decipher.final('utf8')
+  } catch { return null }
 }
