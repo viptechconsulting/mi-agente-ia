@@ -253,6 +253,69 @@ commerceRouter.delete('/product-relations/:id', (req, res) => {
   res.json({ ok: true })
 })
 
+// ── GET /api/commerce/analytics ──────────────────────────────────────────────
+commerceRouter.get('/analytics', (req, res) => {
+  const accountId = req.company.id
+  const convCount = db.prepare(`
+    SELECT COUNT(*) as c FROM commerce_conversations
+    WHERE account_id = ? AND products_discussed IS NOT NULL AND products_discussed != '[]'
+  `).get(accountId).c
+
+  const topProducts = db.prepare(`
+    SELECT p.title, p.stock_status, COUNT(*) as count
+    FROM commerce_conversations cc, json_each(cc.products_discussed) je
+    JOIN commerce_products p ON p.id = je.value
+    WHERE cc.account_id = ?
+    GROUP BY je.value
+    ORDER BY count DESC
+    LIMIT 5
+  `).all(accountId)
+
+  const emailsSent = db.prepare('SELECT COUNT(*) as c FROM commerce_conversations WHERE account_id = ? AND recovery_email_sent = 1').get(accountId).c
+  const emailsConverted = db.prepare('SELECT COUNT(*) as c FROM commerce_conversations WHERE account_id = ? AND recovery_email_sent = 1 AND purchase_detected = 1').get(accountId).c
+  const conversionRate = emailsSent > 0 ? `${Math.round((emailsConverted / emailsSent) * 100)}%` : '—'
+
+  res.json({
+    products_discussed: convCount,
+    top_products: topProducts,
+    out_of_stock_requests: 0,
+    alternatives_shown: 0,
+    upsell_shown: 0,
+    recovery_emails_sent: emailsSent,
+    recovery_emails_converted: emailsConverted,
+    conversion_rate: conversionRate,
+    revenue_attributed: 0
+  })
+})
+
+// ── DELETE /api/commerce/stores/:storeId ─────────────────────────────────────
+commerceRouter.delete('/stores/:storeId', (req, res) => {
+  const store = db.prepare('SELECT id FROM commerce_stores WHERE id = ? AND account_id = ?')
+    .get(req.params.storeId, req.company.id)
+  if (!store) return res.status(404).json({ error: 'Tienda no encontrada' })
+  db.prepare('UPDATE commerce_products SET is_active = 0 WHERE store_id = ?').run(req.params.storeId)
+  db.prepare('DELETE FROM commerce_stores WHERE id = ?').run(req.params.storeId)
+  res.json({ ok: true })
+})
+
+// ── PUT /api/commerce/config ──────────────────────────────────────────────────
+commerceRouter.put('/config', (req, res) => {
+  const allowed = [
+    'recovery_coupon_enabled', 'recovery_coupon_discount_type', 'recovery_coupon_discount_value',
+    'recovery_coupon_expiration_hours', 'recovery_coupon_minimum_order_amount',
+    'recovery_coupon_usage_limit', 'recovery_delay_minutes'
+  ]
+  const incoming = req.body || {}
+  const company = db.prepare('SELECT config FROM companies WHERE id = ?').get(req.company.id)
+  const cfg = JSON.parse(company.config || '{}')
+  cfg.commerce = cfg.commerce || {}
+  for (const key of allowed) {
+    if (key in incoming) cfg.commerce[key] = incoming[key]
+  }
+  db.prepare('UPDATE companies SET config = ? WHERE id = ?').run(JSON.stringify(cfg), req.company.id)
+  res.json({ ok: true })
+})
+
 // ── Platform webhooks (separate router, no auth middleware) ───────────────────
 export const webhookRouter = express.Router()
 

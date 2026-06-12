@@ -264,3 +264,67 @@ describe('search_products tool contract', () => {
     db2.close()
   })
 })
+
+describe('commerce analytics endpoint logic', () => {
+  let db2
+  const analyticsAccountId = 'analytics-test-acct'
+
+  before(() => {
+    db2 = new Database(':memory:')
+    db2.exec(`CREATE TABLE IF NOT EXISTS companies (
+      id TEXT PRIMARY KEY, name TEXT, slug TEXT, active INTEGER DEFAULT 1,
+      config TEXT DEFAULT '{}', created_at INTEGER, expires_at INTEGER,
+      commerce_pro_enabled INTEGER DEFAULT 0, commerce_pro_status TEXT DEFAULT 'inactive',
+      commerce_pro_source TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT,
+      stripe_checkout_session_id TEXT, discovery_call_status TEXT DEFAULT 'not_required',
+      onboarding_status TEXT DEFAULT 'not_started'
+    )`)
+    db2.prepare('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)').run(analyticsAccountId, 'Analytics Test', 'analytics-test')
+    applyCommerceSchema(db2)
+    db2.prepare('INSERT INTO commerce_stores (id, account_id, platform, store_url, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('an-s1', analyticsAccountId, 'shopify', 'https://test.myshopify.com', Date.now())
+    db2.prepare("INSERT INTO commerce_products (id, account_id, store_id, title, stock_status, is_active, product_url) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run('prod-a', analyticsAccountId, 'an-s1', 'Shirt', 'instock', 1, 'https://t.com/a')
+    db2.prepare("INSERT INTO commerce_products (id, account_id, store_id, title, stock_status, is_active, product_url) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run('prod-b', analyticsAccountId, 'an-s1', 'Jeans', 'instock', 1, 'https://t.com/b')
+    const now = Date.now()
+    db2.prepare('INSERT INTO commerce_conversations (id, account_id, session_id, contact_id, products_discussed, purchase_detected, recovery_email_sent, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('cc-1', analyticsAccountId, 'sess-1', 'a@test.com', '["prod-a","prod-b"]', 0, 1, now, now)
+    db2.prepare('INSERT INTO commerce_conversations (id, account_id, session_id, contact_id, products_discussed, purchase_detected, recovery_email_sent, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run('cc-2', analyticsAccountId, 'sess-2', 'b@test.com', '["prod-a"]', 1, 1, now, now)
+  })
+
+  after(() => db2.close())
+
+  test('products_discussed counts conversations with products', () => {
+    const row = db2.prepare(`
+      SELECT COUNT(*) as c FROM commerce_conversations
+      WHERE account_id = ? AND products_discussed IS NOT NULL AND products_discussed != '[]'
+    `).get(analyticsAccountId)
+    assert.strictEqual(row.c, 2)
+  })
+
+  test('top_products uses json_each to count mentions', () => {
+    const rows = db2.prepare(`
+      SELECT p.title, p.stock_status, COUNT(*) as count
+      FROM commerce_conversations cc, json_each(cc.products_discussed) je
+      JOIN commerce_products p ON p.id = je.value
+      WHERE cc.account_id = ?
+      GROUP BY je.value
+      ORDER BY count DESC
+      LIMIT 5
+    `).all(analyticsAccountId)
+    assert.ok(rows.length >= 1)
+    assert.strictEqual(rows[0].title, 'Shirt')
+    assert.strictEqual(rows[0].count, 2)
+  })
+
+  test('recovery email conversion rate calculation', () => {
+    const sent = db2.prepare('SELECT COUNT(*) as c FROM commerce_conversations WHERE account_id = ? AND recovery_email_sent = 1').get(analyticsAccountId).c
+    const converted = db2.prepare('SELECT COUNT(*) as c FROM commerce_conversations WHERE account_id = ? AND recovery_email_sent = 1 AND purchase_detected = 1').get(analyticsAccountId).c
+    assert.strictEqual(sent, 2)
+    assert.strictEqual(converted, 1)
+    const rate = sent > 0 ? `${Math.round((converted / sent) * 100)}%` : '—'
+    assert.strictEqual(rate, '50%')
+  })
+})
