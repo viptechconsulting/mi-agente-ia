@@ -71,3 +71,39 @@ describe('stripe service', () => {
     assert.equal(result.stripeSubscriptionId, 'sub_456')
   })
 })
+
+// ── Unit tests for services/ghl-calendar.js ──────────────────────────────────
+
+describe('ghl-calendar service', () => {
+  test('extractEmailFromGHLPayload reads contact email', async () => {
+    const { extractEmailFromGHLPayload } = await import('../services/ghl-calendar.js')
+    const payload = {
+      contact: { email: 'john@example.com', firstName: 'John' },
+      appointmentId: 'appt_123',
+      calendarId: 'cal_abc',
+      status: 'confirmed'
+    }
+    assert.equal(extractEmailFromGHLPayload(payload), 'john@example.com')
+  })
+
+  test('extractEmailFromGHLPayload handles nested email formats', async () => {
+    const { extractEmailFromGHLPayload } = await import('../services/ghl-calendar.js')
+    const payload = { email: 'jane@example.com', type: 'AppointmentCreate' }
+    assert.equal(extractEmailFromGHLPayload(payload), 'jane@example.com')
+  })
+
+  test('extractEmailFromGHLPayload returns null when no email found', async () => {
+    const { extractEmailFromGHLPayload } = await import('../services/ghl-calendar.js')
+    assert.equal(extractEmailFromGHLPayload({ foo: 'bar' }), null)
+  })
+
+  test('verifyGHLSignature returns true for matching secret', async () => {
+    const { verifyGHLSignature } = await import('../services/ghl-calendar.js')
+    assert.equal(verifyGHLSignature('mysecret', 'mysecret'), true)
+  })
+
+  test('verifyGHLSignature returns false for wrong secret', async () => {
+    const { verifyGHLSignature } = await import('../services/ghl-calendar.js')
+    assert.equal(verifyGHLSignature('wrong', 'mysecret'), false)
+  })
+})
