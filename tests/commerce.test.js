@@ -1,5 +1,8 @@
-import { test, describe, before } from 'node:test'
+import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import Database from 'better-sqlite3'
+import { applyCommerceSchema } from '../db-commerce.js'
+import { searchProductsFTS, getAlternatives, getUpsell, getDownsell, validateProductRecommendation, buildSearchResponse, SEARCH_PRODUCTS_TOOL } from '../services/recommendations.js'
 
 describe('credential encryption', () => {
   before(() => {
@@ -147,5 +150,117 @@ describe('woocommerce service', () => {
     const body = Buffer.from('{"id":1}')
     const sig = createHmac('sha256', secret).update(body).digest('base64')
     assert.equal(verifyWooWebhook(body, sig, secret), true)
+  })
+})
+
+describe('recommendations service', () => {
+  let db
+  const accountId = 'test-account'
+  const storeId = 'store-1'
+
+  before(() => {
+    db = new Database(':memory:')
+    db.exec(`CREATE TABLE IF NOT EXISTS companies (
+      id TEXT PRIMARY KEY, name TEXT, slug TEXT, active INTEGER DEFAULT 1,
+      config TEXT DEFAULT '{}', created_at INTEGER, expires_at INTEGER,
+      commerce_pro_enabled INTEGER DEFAULT 0, commerce_pro_status TEXT DEFAULT 'inactive',
+      commerce_pro_source TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT,
+      stripe_checkout_session_id TEXT, discovery_call_status TEXT DEFAULT 'not_required',
+      onboarding_status TEXT DEFAULT 'not_started'
+    )`)
+    db.prepare('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)').run(accountId, 'Test', 'test')
+    applyCommerceSchema(db)
+    db.prepare('INSERT INTO commerce_stores (id, account_id, platform, store_url, created_at) VALUES (?, ?, ?, ?, ?)').run(storeId, accountId, 'shopify', 'https://test.myshopify.com', Date.now())
+    const insert = db.prepare(`INSERT INTO commerce_products
+      (id, account_id, store_id, title, description, category, price, stock_status, is_active, product_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`)
+    insert.run('p1', accountId, storeId, 'Blue T-Shirt', 'A nice blue shirt', 'Shirts', 25, 'instock', 'https://test.com/blue')
+    insert.run('p2', accountId, storeId, 'Red T-Shirt', 'A nice red shirt', 'Shirts', 30, 'instock', 'https://test.com/red')
+    insert.run('p3', accountId, storeId, 'Black Jeans', 'Slim fit jeans', 'Pants', 60, 'instock', 'https://test.com/jeans')
+    insert.run('p4', accountId, storeId, 'Sold Out Jacket', 'Winter jacket', 'Jackets', 100, 'outofstock', 'https://test.com/jacket')
+    const ftsInsert = db.prepare('INSERT INTO commerce_products_fts (product_id, account_id, title, description, category, tags) VALUES (?, ?, ?, ?, ?, ?)')
+    ftsInsert.run('p1', accountId, 'Blue T-Shirt', 'A nice blue shirt', 'Shirts', '')
+    ftsInsert.run('p2', accountId, 'Red T-Shirt', 'A nice red shirt', 'Shirts', '')
+    ftsInsert.run('p3', accountId, 'Black Jeans', 'Slim fit jeans', 'Pants', '')
+    ftsInsert.run('p4', accountId, 'Sold Out Jacket', 'Winter jacket', 'Jackets', '')
+  })
+
+  after(() => db.close())
+
+  test('searchProductsFTS returns matching instock products', () => {
+    const results = searchProductsFTS(db, accountId, 'shirt', 5)
+    assert.ok(results.length >= 1)
+    assert.ok(results.every(r => r.stock_status === 'instock'))
+    assert.ok(results.some(r => r.title.toLowerCase().includes('shirt')))
+  })
+
+  test('searchProductsFTS excludes inactive products', () => {
+    db.prepare("UPDATE commerce_products SET is_active = 0 WHERE id = 'p1'").run()
+    const results = searchProductsFTS(db, accountId, 'blue shirt', 5)
+    assert.ok(!results.some(r => r.id === 'p1'))
+    db.prepare("UPDATE commerce_products SET is_active = 1 WHERE id = 'p1'").run()
+  })
+
+  test('validateProductRecommendation returns true for valid product', () => {
+    assert.strictEqual(validateProductRecommendation({ product_url: 'https://x.com', stock_status: 'instock', allow_backorder: 0 }), true)
+  })
+
+  test('validateProductRecommendation returns false when no product_url', () => {
+    assert.strictEqual(validateProductRecommendation({ product_url: null, stock_status: 'instock', allow_backorder: 0 }), false)
+  })
+
+  test('validateProductRecommendation allows backorder products', () => {
+    assert.strictEqual(validateProductRecommendation({ product_url: 'https://x.com', stock_status: 'outofstock', allow_backorder: 1 }), true)
+  })
+
+  test('buildSearchResponse returns formatted products array', () => {
+    const result = buildSearchResponse(db, accountId, 'shirt', 'search', null)
+    assert.ok(Array.isArray(result.products))
+    assert.ok(result.products.length > 0)
+    assert.ok(result.products[0].title)
+    assert.ok(result.products[0].product_url)
+  })
+
+  test('getAlternatives falls back to FTS when no relations', () => {
+    const alts = getAlternatives(db, accountId, 'p1')
+    assert.ok(Array.isArray(alts))
+  })
+
+  test('getUpsell falls back to higher price in category', () => {
+    const upsells = getUpsell(db, accountId, 'p1')
+    assert.ok(Array.isArray(upsells))
+    if (upsells.length > 0) {
+      assert.ok(upsells[0].price > 25)
+    }
+  })
+})
+
+describe('search_products tool contract', () => {
+  test('SEARCH_PRODUCTS_TOOL has required schema fields', () => {
+    assert.strictEqual(SEARCH_PRODUCTS_TOOL.name, 'search_products')
+    assert.ok(SEARCH_PRODUCTS_TOOL.input_schema.properties.query)
+    assert.ok(SEARCH_PRODUCTS_TOOL.input_schema.properties.intent)
+    const intents = SEARCH_PRODUCTS_TOOL.input_schema.properties.intent.enum
+    assert.ok(intents.includes('search'))
+    assert.ok(intents.includes('alternative'))
+    assert.ok(intents.includes('upsell'))
+  })
+
+  test('buildSearchResponse returns empty products array when no match', () => {
+    const db2 = new Database(':memory:')
+    db2.exec(`CREATE TABLE IF NOT EXISTS companies (
+      id TEXT PRIMARY KEY, name TEXT, slug TEXT, active INTEGER DEFAULT 1,
+      config TEXT DEFAULT '{}', created_at INTEGER, expires_at INTEGER,
+      commerce_pro_enabled INTEGER DEFAULT 0, commerce_pro_status TEXT DEFAULT 'inactive',
+      commerce_pro_source TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT,
+      stripe_checkout_session_id TEXT, discovery_call_status TEXT DEFAULT 'not_required',
+      onboarding_status TEXT DEFAULT 'not_started'
+    )`)
+    db2.prepare('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)').run('acc', 'Test', 'test')
+    applyCommerceSchema(db2)
+    const result = buildSearchResponse(db2, 'acc', 'nonexistent xyz abc', 'search', null)
+    assert.ok(Array.isArray(result.products))
+    assert.strictEqual(result.products.length, 0)
+    db2.close()
   })
 })
