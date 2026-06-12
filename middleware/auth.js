@@ -55,6 +55,13 @@ function verifyPassword(pw, stored) {
   } catch { return false }
 }
 
+export function requireSuperAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (!req.isSuperAdmin) return res.status(403).json({ error: 'Solo el administrador principal puede realizar esta acción' })
+    next()
+  })
+}
+
 export function requireAdmin(req, res, next) {
   const pw    = (req.headers['x-admin-password'] || req.query.adminPassword || '')
   const email = (req.headers['x-admin-email']    || req.query.adminEmail    || '').toLowerCase().trim()
