@@ -1,7 +1,7 @@
 // routes/billing.js
 import express from 'express'
 import { db } from '../db.js'
-import { requireAdmin } from '../middleware/auth.js'
+import { requireAdmin, withCompany } from '../middleware/auth.js'
 import { setCommercePro } from '../db-commerce.js'
 import {
   buildCheckoutParams,
@@ -19,7 +19,7 @@ import {
 export const billingRouter = express.Router()
 
 // ── GET /api/billing/status ───────────────────────────────────────────────────
-billingRouter.get('/status', requireAdmin, (req, res) => {
+billingRouter.get('/status', requireAdmin, withCompany, (req, res) => {
   const row = db.prepare(`
     SELECT commerce_pro_enabled, commerce_pro_status, commerce_pro_source,
            stripe_customer_id, discovery_call_status, onboarding_status
@@ -29,7 +29,7 @@ billingRouter.get('/status', requireAdmin, (req, res) => {
 })
 
 // ── POST /api/billing/commerce-pro/upgrade ───────────────────────────────────
-billingRouter.post('/commerce-pro/upgrade', requireAdmin, async (req, res) => {
+billingRouter.post('/commerce-pro/upgrade', requireAdmin, withCompany, async (req, res) => {
   try {
     const company = req.company
     const cfg = JSON.parse(company.config || '{}')
@@ -181,7 +181,7 @@ async function handleStripeEvent(event) {
 }
 
 // ── POST /api/billing/customer-portal ────────────────────────────────────────
-billingRouter.post('/customer-portal', requireAdmin, async (req, res) => {
+billingRouter.post('/customer-portal', requireAdmin, withCompany, async (req, res) => {
   try {
     const company = req.company
     const stripeCustomerId = db.prepare(
