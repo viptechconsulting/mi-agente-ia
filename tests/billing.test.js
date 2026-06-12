@@ -107,3 +107,54 @@ describe('ghl-calendar service', () => {
     assert.equal(verifyGHLSignature('wrong', 'mysecret'), false)
   })
 })
+
+// ── requireCommercePro middleware ─────────────────────────────────────────────
+
+describe('requireCommercePro middleware', () => {
+  test('calls next() when commerce_pro is active', async () => {
+    const { requireCommercePro } = await import('../middleware/commerce.js')
+    let nextCalled = false
+    const req = { company: { commerce_pro_enabled: 1, commerce_pro_status: 'active' } }
+    const res = {}
+    requireCommercePro(req, res, () => { nextCalled = true })
+    assert.equal(nextCalled, true)
+  })
+
+  test('returns 403 when commerce_pro_enabled is 0', async () => {
+    const { requireCommercePro } = await import('../middleware/commerce.js')
+    const req = { company: { commerce_pro_enabled: 0, commerce_pro_status: 'inactive' } }
+    let statusCode, jsonBody
+    const res = {
+      status(code) { statusCode = code; return this },
+      json(body) { jsonBody = body }
+    }
+    requireCommercePro(req, res, () => { throw new Error('should not call next') })
+    assert.equal(statusCode, 403)
+    assert.ok(jsonBody.error)
+    assert.ok(jsonBody.upgrade_url)
+  })
+
+  test('returns 403 when status is past_due', async () => {
+    const { requireCommercePro } = await import('../middleware/commerce.js')
+    const req = { company: { commerce_pro_enabled: 1, commerce_pro_status: 'past_due' } }
+    let statusCode
+    const res = {
+      status(code) { statusCode = code; return this },
+      json() {}
+    }
+    requireCommercePro(req, res, () => { throw new Error('should not call next') })
+    assert.equal(statusCode, 403)
+  })
+
+  test('returns 403 when status is cancelled', async () => {
+    const { requireCommercePro } = await import('../middleware/commerce.js')
+    const req = { company: { commerce_pro_enabled: 1, commerce_pro_status: 'cancelled' } }
+    let statusCode
+    const res = {
+      status(code) { statusCode = code; return this },
+      json() {}
+    }
+    requireCommercePro(req, res, () => { throw new Error('should not call next') })
+    assert.equal(statusCode, 403)
+  })
+})
