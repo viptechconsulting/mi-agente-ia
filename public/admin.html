@@ -72,6 +72,9 @@
  .bar-row .label{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .bar-row .count{color:var(--gold);font-weight:600;min-width:30px;text-align:right}
  @media(max-width:800px){#sidebar{transform:translateX(-240px);transition:transform .3s}#sidebar.open{transform:none}#main{margin-left:0;padding:20px 16px}#menuToggle{display:flex!important}}
+.analytics-card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.an-val{font-size:28px;font-weight:700;color:#fff}
+.an-lbl{font-size:11px;color:#888;line-height:1.3}
 </style>
 </head>
 <body>
@@ -771,7 +774,109 @@
       <button id="btn-portal" onclick="openBillingPortal()" style="background:#2a2a2a;color:#fff;border:1px solid #3a3a3a;padding:10px 20px;border-radius:8px;cursor:pointer;display:none">Gestionar facturación</button>
     </div>
   </div>
- </div>
+
+ <!-- Commerce Pro sections — only visible when active -->
+ <div id="commerce-pro-sections" style="display:none">
+
+  <!-- STORES -->
+  <h3 style="margin:28px 0 14px;font-size:16px">Tiendas conectadas</h3>
+  <div id="stores-list" style="margin-bottom:16px"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+   <button onclick="showConnectForm()" style="background:#1e1e2e;color:#fff;border:1px solid #3a3a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">+ Conectar Shopify</button>
+   <button onclick="showConnectWooForm()" style="background:#1e1e2e;color:#fff;border:1px solid #3a3a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">+ Conectar WooCommerce</button>
+  </div>
+  <div id="connect-shopify-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:20px">
+   <h4 style="margin:0 0 14px;font-size:14px">Conectar Shopify</h4>
+   <input id="shopify-url" placeholder="https://tu-tienda.myshopify.com" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
+   <input id="shopify-token" placeholder="shpat_..." style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">
+   <div style="display:flex;gap:8px">
+    <button onclick="connectShopify()" style="background:#6c47ff;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Conectar</button>
+    <button onclick="document.getElementById('connect-shopify-form').style.display='none'" style="background:transparent;color:#aaa;border:1px solid #333;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
+   </div>
+  </div>
+  <div id="connect-woo-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:28px">
+   <h4 style="margin:0 0 14px;font-size:14px">Conectar WooCommerce</h4>
+   <input id="woo-url" placeholder="https://tu-tienda.com" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
+   <input id="woo-key" placeholder="ck_..." style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
+   <input id="woo-secret" placeholder="cs_..." style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">
+   <div style="display:flex;gap:8px">
+    <button onclick="connectWoo()" style="background:#6c47ff;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Conectar</button>
+    <button onclick="document.getElementById('connect-woo-form').style.display='none'" style="background:transparent;color:#aaa;border:1px solid #333;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
+   </div>
+  </div>
+
+  <!-- PRODUCT RELATIONS -->
+  <h3 style="margin:28px 0 14px;font-size:16px">Relaciones de productos</h3>
+  <div id="relations-list" style="margin-bottom:14px;font-size:13px"></div>
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;max-width:600px;margin-bottom:32px">
+   <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Origen (ID)</label>
+     <input id="rel-source" placeholder="ID producto" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px 10px;border-radius:6px;font-size:12px">
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Tipo</label>
+     <select id="rel-type" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px 10px;border-radius:6px;font-size:12px">
+      <option value="alternative">Alternativa</option>
+      <option value="upsell">Upsell</option>
+      <option value="downsell">Downsell</option>
+      <option value="cross_sell">Cross-sell</option>
+      <option value="bundle">Bundle</option>
+      <option value="replacement">Reemplazo</option>
+     </select>
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Destino (ID)</label>
+     <input id="rel-target" placeholder="ID producto" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px 10px;border-radius:6px;font-size:12px">
+    </div>
+    <button onclick="addRelation()" style="background:#6c47ff;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">+ Agregar</button>
+   </div>
+  </div>
+
+  <!-- RECOVERY SETTINGS -->
+  <h3 style="margin:28px 0 14px;font-size:16px">Configuración de recuperación</h3>
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:32px">
+   <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer">
+    <input type="checkbox" id="rec-coupon-enabled" style="width:16px;height:16px;accent-color:#6c47ff">
+    <span style="font-size:14px">Enviar cupón de descuento en emails de recuperación</span>
+   </label>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Tipo de descuento</label>
+     <select id="rec-discount-type" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+      <option value="percent">Porcentaje (%)</option>
+      <option value="fixed">Monto fijo</option>
+     </select>
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Valor del descuento</label>
+     <input type="number" id="rec-discount-value" min="1" max="100" value="10" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Expiración (horas)</label>
+     <input type="number" id="rec-expiration-hours" min="1" value="48" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Delay de envío (min)</label>
+     <input type="number" id="rec-delay-minutes" min="15" value="60" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+    </div>
+   </div>
+   <button onclick="saveRecoveryConfig()" style="background:#6c47ff;color:#fff;border:none;padding:9px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">Guardar configuración</button>
+  </div>
+
+  <!-- ANALYTICS -->
+  <h3 style="margin:28px 0 14px;font-size:16px">Analytics</h3>
+  <div id="analytics-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+   <div class="analytics-card" id="an-discussed"><span class="an-val">—</span><span class="an-lbl">Conversaciones con productos</span></div>
+   <div class="analytics-card" id="an-sent"><span class="an-val">—</span><span class="an-lbl">Emails de recuperación</span></div>
+   <div class="analytics-card" id="an-converted"><span class="an-val">—</span><span class="an-lbl">Recuperados</span></div>
+   <div class="analytics-card" id="an-rate"><span class="an-val">—</span><span class="an-lbl">Tasa de conversión</span></div>
+  </div>
+  <h4 style="font-size:13px;color:#aaa;margin:0 0 10px">Productos más consultados</h4>
+  <div id="top-products-list" style="margin-bottom:32px;font-size:13px"></div>
+
+ </div><!-- /#commerce-pro-sections -->
+ </div><!-- /#tab-billing -->
 </div>
 </main>
 </div>
@@ -2044,6 +2149,16 @@ async function loadBillingStatus() {
    : 'Activá Commerce Pro para conectar tu tienda Shopify o WooCommerce y habilitar el asistente de ventas.'
   btnUpgrade.style.display = (!data.commerce_pro_status || data.commerce_pro_status === 'inactive') ? 'inline-block' : 'none'
   btnPortal.style.display = data.stripe_customer_id ? 'inline-block' : 'none'
+  const sections = document.getElementById('commerce-pro-sections')
+  if (sections) {
+    sections.style.display = data.commerce_pro_status === 'active' ? 'block' : 'none'
+    if (data.commerce_pro_status === 'active') {
+      loadCommerceStores()
+      loadRelations()
+      loadCommerceConfig()
+      loadAnalytics()
+    }
+  }
  } catch(e) { console.error('billing status error', e) }
 }
 
@@ -2065,6 +2180,214 @@ async function openBillingPortal() {
  const { url, error } = await res.json()
  if (error) return alert('Error: ' + error)
  window.location.href = url
+}
+
+// ── Commerce Pro UI ────────────────────────────────────────────────────────
+
+function showConnectForm() {
+  document.getElementById('connect-shopify-form').style.display = 'block'
+  document.getElementById('connect-woo-form').style.display = 'none'
+}
+
+function showConnectWooForm() {
+  document.getElementById('connect-woo-form').style.display = 'block'
+  document.getElementById('connect-shopify-form').style.display = 'none'
+}
+
+async function connectShopify() {
+  const url = document.getElementById('shopify-url').value.trim()
+  const token = document.getElementById('shopify-token').value.trim()
+  if (!url || !token) return alert('Completá la URL y el token')
+  const res = await fetch('/api/commerce/stores/connect-shopify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
+    body: JSON.stringify({ store_url: url, access_token: token })
+  })
+  const data = await res.json()
+  if (data.error) return alert('Error: ' + data.error)
+  toast('Tienda conectada. Sincronizando catálogo...')
+  document.getElementById('connect-shopify-form').style.display = 'none'
+  loadCommerceStores()
+}
+
+async function connectWoo() {
+  const url = document.getElementById('woo-url').value.trim()
+  const key = document.getElementById('woo-key').value.trim()
+  const secret = document.getElementById('woo-secret').value.trim()
+  if (!url || !key || !secret) return alert('Completá todos los campos')
+  const res = await fetch('/api/commerce/stores/connect-woocommerce', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
+    body: JSON.stringify({ store_url: url, consumer_key: key, consumer_secret: secret })
+  })
+  const data = await res.json()
+  if (data.error) return alert('Error: ' + data.error)
+  toast('Tienda conectada. Sincronizando catálogo...')
+  document.getElementById('connect-woo-form').style.display = 'none'
+  loadCommerceStores()
+}
+
+async function loadCommerceStores() {
+  const list = document.getElementById('stores-list')
+  if (!list) return
+  try {
+    const res = await fetch('/api/commerce/stores', {
+      headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+    })
+    if (!res.ok) { list.innerHTML = '<p style="color:#888;font-size:13px">No disponible</p>'; return }
+    const stores = await res.json()
+    if (!stores.length) {
+      list.innerHTML = '<p style="color:#888;font-size:13px">No hay tiendas conectadas.</p>'
+      return
+    }
+    list.innerHTML = stores.map(s => `
+      <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <span style="background:${s.platform==='shopify'?'#96bf48':'#7f54b3'};color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:8px">${s.platform.toUpperCase()}</span>
+          <strong style="font-size:13px">${s.store_url}</strong>
+          <div style="font-size:11px;color:#888;margin-top:4px">${s.product_count||0} productos · ${s.sync_status} · ${s.last_sync_at?new Date(s.last_sync_at).toLocaleString('es-AR'):'nunca sincronizado'}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="syncStore('${s.id}')" style="background:#1e1e2e;color:#aaa;border:1px solid #333;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">↻ Sync</button>
+          <button onclick="disconnectStore('${s.id}')" style="background:transparent;color:#ef4444;border:1px solid #3a1414;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">Desconectar</button>
+        </div>
+      </div>
+    `).join('')
+  } catch(e) { list.innerHTML = '<p style="color:#ef4444;font-size:13px">Error cargando tiendas</p>' }
+}
+
+async function syncStore(storeId) {
+  await fetch(`/api/commerce/stores/${storeId}/sync`, {
+    method: 'POST',
+    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+  })
+  toast('Sincronización iniciada')
+  setTimeout(loadCommerceStores, 3000)
+}
+
+async function disconnectStore(storeId) {
+  if (!confirm('¿Desconectar esta tienda? Se desactivarán sus productos del catálogo.')) return
+  const res = await fetch(`/api/commerce/stores/${storeId}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+  })
+  const data = await res.json()
+  if (data.error) return alert('Error: ' + data.error)
+  toast('Tienda desconectada')
+  loadCommerceStores()
+}
+
+async function loadRelations() {
+  const list = document.getElementById('relations-list')
+  if (!list) return
+  try {
+    const res = await fetch('/api/commerce/product-relations', {
+      headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+    })
+    if (!res.ok) { list.innerHTML = ''; return }
+    const relations = await res.json()
+    if (!relations.length) {
+      list.innerHTML = '<p style="color:#888;font-size:13px;margin-bottom:10px">No hay relaciones definidas.</p>'
+      return
+    }
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
+      <thead><tr style="color:#888;text-align:left;border-bottom:1px solid #2a2a2a">
+        <th style="padding:6px 8px">Origen</th><th style="padding:6px 8px">Tipo</th><th style="padding:6px 8px">Destino</th><th style="padding:6px 8px"></th>
+      </tr></thead>
+      <tbody>${relations.map(r=>`<tr style="border-bottom:1px solid #1a1a1a">
+        <td style="padding:6px 8px;color:#ccc">${r.source_product_id}</td>
+        <td style="padding:6px 8px"><span style="background:#1e1e2e;color:#aaa;padding:2px 8px;border-radius:4px;font-size:11px">${r.relation_type}</span></td>
+        <td style="padding:6px 8px;color:#ccc">${r.target_product_id}</td>
+        <td style="padding:6px 8px;text-align:right"><button onclick="deleteRelation('${r.id}')" style="background:transparent;color:#ef4444;border:none;cursor:pointer;font-size:12px">✕</button></td>
+      </tr>`).join('')}</tbody>
+    </table>`
+  } catch(e) {}
+}
+
+async function addRelation() {
+  const source = document.getElementById('rel-source').value.trim()
+  const type = document.getElementById('rel-type').value
+  const target = document.getElementById('rel-target').value.trim()
+  if (!source || !target) return alert('Ingresá IDs de origen y destino')
+  await fetch('/api/commerce/product-relations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
+    body: JSON.stringify({ source_product_id: source, relation_type: type, target_product_id: target })
+  })
+  document.getElementById('rel-source').value = ''
+  document.getElementById('rel-target').value = ''
+  toast('Relación agregada')
+  loadRelations()
+}
+
+async function deleteRelation(id) {
+  await fetch(`/api/commerce/product-relations/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+  })
+  toast('Relación eliminada')
+  loadRelations()
+}
+
+async function loadCommerceConfig() {
+  try {
+    const res = await fetch('/api/config', {
+      headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+    })
+    if (!res.ok) return
+    const cfg = await res.json()
+    const c = cfg.commerce || {}
+    const el = id => document.getElementById(id)
+    if (el('rec-coupon-enabled')) el('rec-coupon-enabled').checked = !!c.recovery_coupon_enabled
+    if (el('rec-discount-type')) el('rec-discount-type').value = c.recovery_coupon_discount_type || 'percent'
+    if (el('rec-discount-value')) el('rec-discount-value').value = c.recovery_coupon_discount_value ?? 10
+    if (el('rec-expiration-hours')) el('rec-expiration-hours').value = c.recovery_coupon_expiration_hours ?? 48
+    if (el('rec-delay-minutes')) el('rec-delay-minutes').value = c.recovery_delay_minutes ?? 60
+  } catch(e) {}
+}
+
+async function saveRecoveryConfig() {
+  const payload = {
+    recovery_coupon_enabled: document.getElementById('rec-coupon-enabled').checked,
+    recovery_coupon_discount_type: document.getElementById('rec-discount-type').value,
+    recovery_coupon_discount_value: Number(document.getElementById('rec-discount-value').value),
+    recovery_coupon_expiration_hours: Number(document.getElementById('rec-expiration-hours').value),
+    recovery_delay_minutes: Number(document.getElementById('rec-delay-minutes').value)
+  }
+  const res = await fetch('/api/commerce/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
+    body: JSON.stringify(payload)
+  })
+  const data = await res.json()
+  if (data.error) return alert('Error: ' + data.error)
+  toast('Configuración guardada')
+}
+
+async function loadAnalytics() {
+  try {
+    const res = await fetch('/api/commerce/analytics', {
+      headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    const set = (id, val) => { const el = document.querySelector(`#${id} .an-val`); if (el) el.textContent = val }
+    set('an-discussed', data.products_discussed)
+    set('an-sent', data.recovery_emails_sent)
+    set('an-converted', data.recovery_emails_converted)
+    set('an-rate', data.conversion_rate)
+    const topList = document.getElementById('top-products-list')
+    if (topList && data.top_products?.length) {
+      topList.innerHTML = data.top_products.map(p =>
+        `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a1a;max-width:400px">
+          <span style="color:#ccc">${p.title}</span>
+          <span style="color:#888">${p.count} · <span style="color:${p.stock_status==='instock'?'#22c55e':'#ef4444'}">${p.stock_status}</span></span>
+         </div>`
+      ).join('')
+    } else if (topList) {
+      topList.innerHTML = '<p style="color:#888;font-size:13px">Sin datos aún.</p>'
+    }
+  } catch(e) {}
 }
 </script>
 </body>
