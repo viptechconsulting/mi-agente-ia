@@ -1,8 +1,9 @@
 // jobs/sync-scheduler.js
 // Runs a full catalog sync for all active Commerce Pro stores every 6 hours.
-import { db } from '../db.js'
+import { db, loadConfig } from '../db.js'
 import { decryptCredential } from '../db-commerce.js'
 import { syncStore } from '../routes/commerce.js'
+import { getEligibleConversations, sendRecoveryEmail } from '../services/recovery.js'
 
 const SIX_HOURS = 6 * 60 * 60 * 1000
 
@@ -41,3 +42,27 @@ async function runScheduledSync() {
 
 setInterval(runScheduledSync, SIX_HOURS)
 console.log('[sync-scheduler] Catalog sync scheduler started (every 6 hours)')
+
+async function runRecoveryJob() {
+  const eligible = getEligibleConversations(db)
+  if (!eligible.length) return
+
+  console.log(`[recovery-job] Processing ${eligible.length} eligible conversation(s)`)
+
+  for (const conv of eligible) {
+    try {
+      const cfg = loadConfig(conv.account_id)
+      const result = await sendRecoveryEmail(db, conv, cfg)
+      if (result.sent) {
+        console.log(`[recovery-job] Recovery email sent to ${result.email}`)
+      } else {
+        console.log(`[recovery-job] Skipped ${conv.id}: ${result.skipped}`)
+      }
+    } catch (err) {
+      console.error(`[recovery-job] Error for conversation ${conv.id}:`, err.message)
+    }
+  }
+}
+
+setInterval(runRecoveryJob, 15 * 60 * 1000)
+console.log('[sync-scheduler] Recovery job started (every 15 minutes)')

@@ -321,6 +321,11 @@ webhookRouter.post('/shopify-order',
           UPDATE commerce_conversations SET purchase_detected=1, updated_at=?
           WHERE contact_id=? AND purchase_detected=0
         `).run(Date.now(), order.email)
+        // Mark open coupons as used
+        db.prepare(`
+          UPDATE commerce_coupons SET status='used', updated_at=?
+          WHERE contact_id=? AND status IN ('created','sent')
+        `).run(Date.now(), order.email)
       }
     } catch (err) {
       console.error('[webhook] shopify-order error:', err.message)
@@ -343,6 +348,11 @@ webhookRouter.post('/woocommerce-order',
         db.prepare(`
           UPDATE commerce_conversations SET purchase_detected=1, updated_at=?
           WHERE contact_id=? AND purchase_detected=0
+        `).run(Date.now(), email)
+        // Mark open coupons as used
+        db.prepare(`
+          UPDATE commerce_coupons SET status='used', updated_at=?
+          WHERE contact_id=? AND status IN ('created','sent')
         `).run(Date.now(), email)
       }
     } catch (err) {
