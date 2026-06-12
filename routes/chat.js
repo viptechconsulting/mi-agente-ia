@@ -12,6 +12,7 @@ import {
   db, loadConfig, saveConfig, buildSystemPrompt,
   listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
 } from '../db.js'
+import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -204,14 +205,71 @@ export async function processMessage({ companyId, message, conversationId, visit
     : ''
 
   const pageCtx = pageUrl ? `\n\nCONTEXTO: El visitante está en ${pageTitle ? `"${pageTitle}" (` : ''}${pageUrl}${pageTitle ? ')' : ''}.` : ''
-  const response = await client.messages.create({
-    model: cfg.model || 'claude-haiku-4-5-20251001',
-    max_tokens: 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx,
-    messages: history.map(m => ({ role: m.role, content: m.content }))
-  })
 
-  const reply = response.content.map(c => c.text || '').join('').trim()
+  // Check Commerce Pro status
+  const commerceRow = db.prepare('SELECT commerce_pro_enabled, commerce_pro_status FROM companies WHERE id = ?').get(companyId)
+  const hasCommercePro = commerceRow?.commerce_pro_enabled === 1 && commerceRow?.commerce_pro_status === 'active'
+
+  const commerceSystemBlock = hasCommercePro
+    ? '\n\nTIENES ACCESO AL CATÁLOGO DE PRODUCTOS. Cuando el usuario pregunte por productos, precios, disponibilidad, alternativas o muestre intención de compra, usa la herramienta search_products para buscar en el catálogo. Siempre incluye la URL del producto en tus respuestas. Si un producto está agotado, ofrece alternativas.'
+    : ''
+
+  const callParams = {
+    model: cfg.model || 'claude-haiku-4-5-20251001',
+    max_tokens: hasCommercePro ? 800 : 350,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock,
+    messages: history.map(m => ({ role: m.role, content: m.content }))
+  }
+  if (hasCommercePro) callParams.tools = [SEARCH_PRODUCTS_TOOL]
+
+  let response = await client.messages.create(callParams)
+  const discussedProductIds = []
+
+  // Tool-use loop (max 3 iterations to prevent runaway)
+  let iterations = 0
+  while (response.stop_reason === 'tool_use' && iterations < 3) {
+    iterations++
+    const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
+    const toolResults = []
+
+    for (const block of toolUseBlocks) {
+      let resultContent
+      try {
+        const { query, intent, product_id } = block.input
+        const searchResult = buildSearchResponse(db, companyId, query, intent, product_id || null)
+        discussedProductIds.push(...searchResult.products.map(p => p.id))
+        resultContent = JSON.stringify(searchResult)
+      } catch (err) {
+        resultContent = JSON.stringify({ error: err.message, products: [] })
+      }
+      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultContent })
+    }
+
+    // Append assistant turn + tool results
+    callParams.messages = [
+      ...callParams.messages,
+      { role: 'assistant', content: response.content },
+      { role: 'user', content: toolResults }
+    ]
+    response = await client.messages.create(callParams)
+  }
+
+  const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+
+  // Track products discussed in this conversation
+  if (discussedProductIds.length > 0) {
+    const existing = db.prepare('SELECT id, products_discussed FROM commerce_conversations WHERE session_id = ? AND account_id = ?').get(convId, companyId)
+    const merged = [...new Set([...(existing ? JSON.parse(existing.products_discussed || '[]') : []), ...discussedProductIds])]
+    if (existing) {
+      db.prepare('UPDATE commerce_conversations SET products_discussed = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(merged), Date.now(), existing.id)
+    } else {
+      const lead = db.prepare('SELECT lead_email FROM conversations WHERE id = ?').get(convId)
+      db.prepare(`INSERT INTO commerce_conversations
+        (id, account_id, session_id, contact_id, channel, products_discussed, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(crypto.randomUUID(), companyId, convId, lead?.lead_email || null, 'web', JSON.stringify(merged), Date.now(), Date.now())
+    }
+  }
   const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', reply, Date.now())
   if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
     const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
