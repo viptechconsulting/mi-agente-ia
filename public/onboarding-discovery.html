@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda tu Discovery Call — Lynkro Commerce Pro</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f; color: #f0f0f0;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: #1a1a1a; border: 1px solid #2a2a2a;
+      border-radius: 16px; padding: 48px 40px;
+      max-width: 520px; width: 100%; text-align: center;
+    }
+    .check { font-size: 56px; margin-bottom: 24px; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
+    p { color: #aaa; line-height: 1.6; margin-bottom: 32px; }
+    .btn {
+      display: inline-block; background: #6c47ff; color: #fff;
+      padding: 14px 32px; border-radius: 8px; text-decoration: none;
+      font-weight: 600; font-size: 16px; transition: background 0.2s;
+    }
+    .btn:hover { background: #5a3adb; }
+    .note { margin-top: 20px; font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="check">✅</div>
+    <h1>¡Pago exitoso!</h1>
+    <p>
+      Tu acceso a <strong>Lynkro Commerce Pro</strong> está listo.<br>
+      El siguiente paso es agendar tu <strong>Discovery Call</strong> para que
+      nuestro equipo configure tu tienda, productos y estrategia de ventas.
+    </p>
+    <a id="booking-btn" class="btn" href="#" target="_blank" rel="noopener">
+      📅 Agendar Discovery Call
+    </a>
+    <p class="note">
+      Recibirás la confirmación por email. Si tenés alguna duda escribinos a
+      <a href="mailto:info@lynkro.io" style="color:#6c47ff">info@lynkro.io</a>.
+    </p>
+  </div>
+
+  <script>
+    const meta = document.querySelector('meta[name="booking-url"]')
+    const url = meta ? meta.content : 'https://app.gohighlevel.com/'
+    document.getElementById('booking-btn').href = url
+  </script>
+</body>
+</html>

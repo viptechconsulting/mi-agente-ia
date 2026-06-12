@@ -27,6 +27,20 @@ app.get('/admin.html', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
+
+// Public route: onboarding page for Discovery Call
+app.get('/onboarding-discovery.html', (req, res) => {
+  const bookingUrl = process.env.DISCOVERY_CALL_BOOKING_URL || ''
+  const file = fs.readFileSync(path.join(__dirname, 'public', 'onboarding-discovery.html'), 'utf8')
+  const injected = file.replace(
+    '<meta charset="UTF-8">',
+    `<meta charset="UTF-8">\n  <meta name="booking-url" content="${bookingUrl}">`
+  )
+  res.setHeader('Content-Type', 'text/html')
+  res.setHeader('Cache-Control', 'no-store')
+  res.send(injected)
+})
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================
