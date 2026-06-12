@@ -14,6 +14,8 @@ import { applyCommerceSchema } from './db-commerce.js';
 import { billingRouter } from './routes/billing.js';
 import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
+import { commerceRouter, webhookRouter } from './routes/commerce.js';
+import './jobs/sync-scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -61,6 +63,8 @@ applyCommerceSchema(db);
 // ============================================================
 // MOUNT ROUTERS
 // ============================================================
+app.use('/api/commerce/webhooks', webhookRouter);
+app.use('/api/commerce', commerceRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api', adminRouter);
 app.use('/api', chatRouter);
