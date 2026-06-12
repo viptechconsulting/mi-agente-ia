@@ -92,3 +92,60 @@ describe('shopify service', () => {
     assert.equal(verifyShopifyWebhook(Buffer.from('payload'), 'wrong', 'secret'), false)
   })
 })
+
+describe('woocommerce service', () => {
+  test('normalizeWooProduct maps fields correctly', async () => {
+    const { normalizeWooProduct } = await import('../services/woocommerce.js')
+    const product = {
+      id: 42,
+      name: 'WC Product',
+      description: '<p>Desc</p>',
+      short_description: 'Short',
+      regular_price: '49.99',
+      sale_price: '39.99',
+      sku: 'WC-SKU',
+      stock_status: 'instock',
+      stock_quantity: 5,
+      permalink: 'https://mysite.com/product/wc-product',
+      images: [{ src: 'https://img.com/wc.jpg' }],
+      categories: [{ name: 'Tops' }],
+      tags: [{ name: 'sale' }, { name: 'cotton' }],
+      attributes: [],
+      manage_stock: true,
+      backorders: 'no'
+    }
+    const result = normalizeWooProduct(product, 'store_id_2')
+    assert.equal(result.platform_product_id, '42')
+    assert.equal(result.title, 'WC Product')
+    assert.equal(result.price, 39.99)
+    assert.equal(result.compare_at_price, 49.99)
+    assert.equal(result.sku, 'WC-SKU')
+    assert.equal(result.stock_status, 'instock')
+    assert.equal(result.category, 'Tops')
+    assert.equal(result.image_url, 'https://img.com/wc.jpg')
+    assert.equal(result.store_id, 'store_id_2')
+    assert.equal(result.allow_backorder, 0)
+  })
+
+  test('normalizeWooProduct sets allow_backorder when backorders=yes', async () => {
+    const { normalizeWooProduct } = await import('../services/woocommerce.js')
+    const p = {
+      id: 1, name: 'P', description: '', short_description: '', regular_price: '10',
+      sale_price: '', sku: '', stock_status: 'onbackorder', stock_quantity: 0,
+      permalink: 'https://site.com/p', images: [], categories: [], tags: [],
+      attributes: [], manage_stock: false, backorders: 'yes'
+    }
+    const result = normalizeWooProduct(p, 's1')
+    assert.equal(result.allow_backorder, 1)
+    assert.equal(result.stock_status, 'backorder')
+  })
+
+  test('verifyWooWebhook returns true for correct signature', async () => {
+    const { verifyWooWebhook } = await import('../services/woocommerce.js')
+    const { createHmac } = await import('node:crypto')
+    const secret = 'woo-secret'
+    const body = Buffer.from('{"id":1}')
+    const sig = createHmac('sha256', secret).update(body).digest('base64')
+    assert.equal(verifyWooWebhook(body, sig, secret), true)
+  })
+})
