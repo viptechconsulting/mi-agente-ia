@@ -278,6 +278,29 @@ export async function createBooking(accessToken, { startAt, serviceVariationId, 
   return data.booking;
 }
 
+export async function updateBooking(accessToken, bookingId, { startAt, version }) {
+  const body = { booking: { start_at: startAt, version } }
+  const res = await fetch(`${BASE_URL}/v2/bookings/${bookingId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Square-Version': SQUARE_VERSION, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(`Square updateBooking failed: ${data.errors?.[0]?.detail || res.status}`)
+  return data.booking
+}
+
+export async function cancelBooking(accessToken, bookingId, version) {
+  const res = await fetch(`${BASE_URL}/v2/bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Square-Version': SQUARE_VERSION, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_version: version })
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(`Square cancelBooking failed: ${data.errors?.[0]?.detail || res.status}`)
+  return data.booking
+}
+
 export function normalizeCustomer(c) {
   const nameParts = [c.given_name, c.family_name].filter(Boolean);
   return {
