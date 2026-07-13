@@ -6,6 +6,7 @@ import { requireCommercePro } from '../middleware/commerce.js'
 import { encryptCredential, decryptCredential } from '../db-commerce.js'
 import { fetchShopifyProducts, normalizeShopifyProduct, verifyShopifyWebhook } from '../services/shopify.js'
 import { fetchWooProducts, normalizeWooProduct, verifyWooWebhook } from '../services/woocommerce.js'
+import { fetchSellibriProducts, normalizeSellibriProduct, verifySellibriWebhook } from '../services/sellibri.js'
 
 export const commerceRouter = express.Router()
 
@@ -82,12 +83,14 @@ function syncProductsToDb(accountId, storeId, products) {
 }
 
 // ── Exported sync function (used by scheduler) ────────────────────────────────
-export async function syncStore(storeId, accountId, platform, storeUrl, accessToken, consumerKey, consumerSecret) {
+export async function syncStore(storeId, accountId, platform, storeUrl, accessToken, consumerKey, consumerSecret, apiKey) {
   db.prepare("UPDATE commerce_stores SET sync_status='syncing' WHERE id=?").run(storeId)
   try {
     let products
     if (platform === 'shopify') {
       products = await fetchShopifyProducts(storeUrl, accessToken, storeId)
+    } else if (platform === 'sellibri') {
+      products = await fetchSellibriProducts(storeUrl, apiKey, storeId)
     } else {
       products = await fetchWooProducts(storeUrl, consumerKey, consumerSecret, storeId)
     }
@@ -160,6 +163,35 @@ commerceRouter.post('/stores/connect-woocommerce', async (req, res) => {
   }
 })
 
+// ── POST /api/commerce/stores/connect-sellibri ────────────────────────────────
+commerceRouter.post('/stores/connect-sellibri', async (req, res) => {
+  try {
+    const { store_url, api_key } = req.body || {}
+    if (!store_url || !api_key) {
+      return res.status(400).json({ error: 'store_url y api_key requeridos' })
+    }
+    const encKey = encryptCredential(api_key)
+    if (!encKey) return res.status(500).json({ error: 'ENCRYPTION_KEY no configurado' })
+
+    const accountId = req.company.id
+    const id = `${accountId}_sellibri_${Date.now()}`
+    const now = Date.now()
+    const url = store_url.replace(/\/$/, '')
+    db.prepare(`
+      INSERT INTO commerce_stores (id, account_id, platform, store_url, api_key_encrypted, sync_status, created_at, updated_at)
+      VALUES (?, ?, 'sellibri', ?, ?, 'idle', ?, ?)
+    `).run(id, accountId, url, encKey, now, now)
+
+    res.json({ ok: true, store_id: id })
+
+    syncStore(id, accountId, 'sellibri', url, null, null, null, api_key)
+      .catch(err => console.error('[commerce] initial sellibri sync error:', err.message))
+  } catch (err) {
+    console.error('[commerce] connect-sellibri:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── GET /api/commerce/stores ──────────────────────────────────────────────────
 commerceRouter.get('/stores', (req, res) => {
   const stores = db.prepare(`
@@ -180,10 +212,11 @@ commerceRouter.post('/stores/:storeId/sync', async (req, res) => {
     const accessToken = store.access_token_encrypted ? decryptCredential(store.access_token_encrypted) : null
     const consumerKey = store.consumer_key_encrypted ? decryptCredential(store.consumer_key_encrypted) : null
     const consumerSecret = store.consumer_secret_encrypted ? decryptCredential(store.consumer_secret_encrypted) : null
+    const apiKey = store.api_key_encrypted ? decryptCredential(store.api_key_encrypted) : null
 
     res.json({ ok: true, message: 'Sync iniciado' })
 
-    syncStore(store.id, req.company.id, store.platform, store.store_url, accessToken, consumerKey, consumerSecret)
+    syncStore(store.id, req.company.id, store.platform, store.store_url, accessToken, consumerKey, consumerSecret, apiKey)
       .catch(err => console.error('[commerce] sync error:', err.message))
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -262,7 +295,7 @@ commerceRouter.get('/analytics', (req, res) => {
   `).get(accountId).c
 
   const topProducts = db.prepare(`
-    SELECT p.title, p.stock_status, COUNT(*) as count
+    SELECT p.title, p.stock_status, p.price, p.currency, COUNT(*) as count
     FROM commerce_conversations cc, json_each(cc.products_discussed) je
     JOIN commerce_products p ON p.id = je.value
     WHERE cc.account_id = ?
@@ -286,6 +319,94 @@ commerceRouter.get('/analytics', (req, res) => {
     conversion_rate: conversionRate,
     revenue_attributed: 0
   })
+})
+
+// ── POST /api/commerce/product-relations/ai-suggest ──────────────────────────
+commerceRouter.post('/product-relations/ai-suggest', async (req, res) => {
+  const accountId = req.company.id
+
+  const products = db.prepare(`
+    SELECT id, title, description, short_description, category, price, currency, tags
+    FROM commerce_products
+    WHERE account_id = ? AND is_active = 1
+    ORDER BY title
+    LIMIT 100
+  `).all(accountId)
+
+  if (products.length < 2) {
+    return res.json({ suggestions: [] })
+  }
+
+  const productList = products.map(p =>
+    `ID: ${p.id} | Título: ${p.title} | Categoría: ${p.category || 'sin categoría'} | Precio: ${p.currency || ''} ${p.price}`
+  ).join('\n')
+
+  try {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: `Analiza estos productos de una tienda online e identifica relaciones útiles entre ellos para un asistente de ventas.
+
+Tipos de relaciones permitidas:
+- alternative: productos similares intercambiables (misma función, diferente precio/marca)
+- upsell: versión premium o superior del mismo producto
+- downsell: alternativa más económica
+- cross_sell: complementario que se usa junto (ej: funda + teléfono, base + serum)
+- bundle: se venden juntos frecuentemente como combo
+- replacement: reemplazo de un producto descontinuado o agotado
+
+Devuelve ÚNICAMENTE un JSON válido con este formato exacto:
+{"relations":[{"source_id":"...","target_id":"...","relation_type":"...","reason":"..."}]}
+
+Reglas:
+- Solo incluye relaciones genuinamente útiles para sugerir al cliente
+- Máximo 15 relaciones
+- El campo "reason" explica en 1 línea por qué tiene sentido esta relación
+- No incluyas el bloque de código, solo el JSON
+
+Productos:
+${productList}`
+        }]
+      })
+    })
+
+    if (!apiRes.ok) {
+      const errText = await apiRes.text()
+      throw new Error(`Anthropic API error ${apiRes.status}: ${errText}`)
+    }
+
+    const aiData = await apiRes.json()
+    const text = aiData.content?.[0]?.text || '{}'
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return res.json({ suggestions: [] })
+
+    const parsed = JSON.parse(jsonMatch[0])
+    const suggestions = (parsed.relations || []).filter(r =>
+      r.source_id && r.target_id && r.relation_type && r.source_id !== r.target_id
+    )
+
+    // Annotate with product titles for display
+    const productMap = Object.fromEntries(products.map(p => [p.id, p.title]))
+    const annotated = suggestions.map(r => ({
+      ...r,
+      source_title: productMap[r.source_id] || r.source_id,
+      target_title: productMap[r.target_id] || r.target_id
+    }))
+
+    res.json({ suggestions: annotated })
+  } catch (err) {
+    console.error('[commerce] ai-suggest error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // ── DELETE /api/commerce/stores/:storeId ─────────────────────────────────────
@@ -412,7 +533,6 @@ webhookRouter.post('/woocommerce-order',
           UPDATE commerce_conversations SET purchase_detected=1, updated_at=?
           WHERE contact_id=? AND purchase_detected=0
         `).run(Date.now(), email)
-        // Mark open coupons as used
         db.prepare(`
           UPDATE commerce_coupons SET status='used', updated_at=?
           WHERE contact_id=? AND status IN ('created','sent')
@@ -420,6 +540,57 @@ webhookRouter.post('/woocommerce-order',
       }
     } catch (err) {
       console.error('[webhook] woocommerce-order error:', err.message)
+    }
+    res.json({ ok: true })
+  }
+)
+
+webhookRouter.post('/sellibri',
+  express.raw({ type: 'application/json' }),
+  (req, res) => {
+    const sig = req.headers['x-sellibri-signature'] || ''
+    if (!verifySellibriWebhook(req.body, sig, process.env.SELLIBRI_WEBHOOK_SECRET || '')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    try {
+      const payload = JSON.parse(req.body.toString())
+      const topic = req.headers['x-sellibri-topic'] || ''
+      const storeHost = req.headers['x-sellibri-store'] || ''
+      const store = db.prepare("SELECT * FROM commerce_stores WHERE store_url LIKE ? AND platform='sellibri'")
+        .get(`%${storeHost}%`)
+      if (store && (topic === 'product_update' || topic === 'product_create')) {
+        const normalized = normalizeSellibriProduct(payload, store.store_url, store.id)
+        syncProductsToDb(store.account_id, store.id, [normalized])
+      }
+    } catch (err) {
+      console.error('[webhook] sellibri product error:', err.message)
+    }
+    res.json({ ok: true })
+  }
+)
+
+webhookRouter.post('/sellibri-order',
+  express.raw({ type: 'application/json' }),
+  (req, res) => {
+    const sig = req.headers['x-sellibri-signature'] || ''
+    if (!verifySellibriWebhook(req.body, sig, process.env.SELLIBRI_WEBHOOK_SECRET || '')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    try {
+      const order = JSON.parse(req.body.toString())
+      const email = order.user?.email || order.email
+      if (email) {
+        db.prepare(`
+          UPDATE commerce_conversations SET purchase_detected=1, updated_at=?
+          WHERE contact_id=? AND purchase_detected=0
+        `).run(Date.now(), email)
+        db.prepare(`
+          UPDATE commerce_coupons SET status='used', updated_at=?
+          WHERE contact_id=? AND status IN ('created','sent')
+        `).run(Date.now(), email)
+      }
+    } catch (err) {
+      console.error('[webhook] sellibri-order error:', err.message)
     }
     res.json({ ok: true })
   }

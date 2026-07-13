@@ -12,6 +12,7 @@ export function applyCommerceSchema(db) {
   softAlter(db, 'ALTER TABLE companies ADD COLUMN stripe_checkout_session_id TEXT')
   softAlter(db, "ALTER TABLE companies ADD COLUMN discovery_call_status TEXT DEFAULT 'not_required'")
   softAlter(db, "ALTER TABLE companies ADD COLUMN onboarding_status TEXT DEFAULT 'not_started'")
+  softAlter(db, 'ALTER TABLE commerce_stores ADD COLUMN api_key_encrypted TEXT')
 
   // ── commerce_stores ─────────────────────────────────────────────────────────
   db.exec(`

@@ -71,6 +71,7 @@ softAlter('ALTER TABLE conversations ADD COLUMN lead_notified INTEGER DEFAULT 0'
 softAlter('ALTER TABLE conversations ADD COLUMN escalated_notified INTEGER DEFAULT 0');
 softAlter('ALTER TABLE conversations ADD COLUMN lead_email TEXT');
 softAlter('ALTER TABLE conversations ADD COLUMN lead_phone TEXT');
+softAlter('ALTER TABLE conversations ADD COLUMN lead_name TEXT');
 
 // ============================================================
 // MULTI-COMPANY SCHEMA (new)
@@ -93,6 +94,11 @@ softAlter('ALTER TABLE companies ADD COLUMN demo INTEGER DEFAULT 0');
 softAlter('ALTER TABLE companies ADD COLUMN share_token TEXT');
 softAlter('ALTER TABLE companies ADD COLUMN expires_at INTEGER');
 softAlter('ALTER TABLE companies ADD COLUMN parent_company_id TEXT');
+softAlter('ALTER TABLE conversations ADD COLUMN human_mode INTEGER DEFAULT 0');
+softAlter('ALTER TABLE conversations ADD COLUMN retargeting_sent INTEGER DEFAULT 0');
+softAlter('ALTER TABLE conversations ADD COLUMN flow_state TEXT');
+softAlter('ALTER TABLE conversations ADD COLUMN web_alert_sent INTEGER DEFAULT 0');
+softAlter('ALTER TABLE conversations ADD COLUMN do_not_contact INTEGER DEFAULT 0');
 
 // ============================================================
 // DEFAULT CONFIG (shape of per-company config)
@@ -100,6 +106,7 @@ softAlter('ALTER TABLE companies ADD COLUMN parent_company_id TEXT');
 export const defaultConfig = {
   businessName: 'Mi Negocio',
   description: 'Describe aquí tu negocio.',
+  industry: 'general',
   tone: 'profesional, cercano y claro',
   products: '',
   hours: '',
@@ -123,6 +130,7 @@ export const defaultConfig = {
   smtpFrom: '',
   smtpSecure: false,
   model: 'claude-haiku-4-5-20251001',
+  plan: 'starter',
   waBaseUrl: '',
   waInstance: '',
   waApiKey: '',
@@ -145,16 +153,23 @@ export const defaultConfig = {
     { label: 'Agendar llamada', message: 'Quisiera agendar una llamada' },
     { label: 'Ver FAQ', message: 'Muéstrame las preguntas frecuentes' }
   ],
+  bookingUrl: '',
+  igAccessToken: '',
+  igVerifyToken: '',
+  igPageId: '',
+  igUsername: '',
+  metaAppId: '',
+  metaAppSecret: '',
   agentName: 'Asistente',
   personality: 'Amable, resolutivo y cercano. Usa frases cortas y directas.',
   language: 'español',
   autoDetectLanguage: true,
   voiceExamples: '',
   defaultResponses: [
-    { situation: 'Saludo inicial', response: '¡Hola! Bienvenido/a. ¿En qué puedo ayudarte hoy?' },
-    { situation: 'No sé la respuesta', response: 'No tengo esa información a mano, pero puedo pasar tu consulta al equipo. ¿Me dejas tu contacto?' },
-    { situation: 'Despedida', response: '¡Gracias por escribirnos! Que tengas un gran día.' },
-    { situation: 'Cliente molesto', response: 'Entiendo tu frustración y lamento el inconveniente. Déjame ayudarte a resolverlo lo antes posible.' }
+    { situation: 'Saludo inicial', response: 'Hola, con gusto te ayudo. ¿Qué necesitas?' },
+    { situation: 'No sé la respuesta', response: 'Eso no lo tengo, pero te puedo conectar con el equipo. ¿Me das tu contacto?' },
+    { situation: 'Despedida', response: 'Gracias por escribirnos. Que tengas un buen día.' },
+    { situation: 'Cliente molesto', response: 'Entiendo, lamento el inconveniente. Cuéntame qué pasó para ayudarte.' }
   ]
 };
 
@@ -234,7 +249,7 @@ function uuid() { return crypto.randomUUID(); }
 
 export function listCompanies(opts = {}) {
   const where = opts.demoOnly ? 'WHERE demo = 1' : (opts.excludeDemo ? 'WHERE demo = 0' : '');
-  return db.prepare(`SELECT id, name, slug, active, created_at, demo, share_token, expires_at, parent_company_id FROM companies ${where} ORDER BY created_at DESC`).all();
+  return db.prepare(`SELECT id, name, slug, active, created_at, demo, share_token, expires_at, parent_company_id, commerce_pro_enabled, commerce_pro_status FROM companies ${where} ORDER BY created_at DESC`).all();
 }
 
 function rowToCompany(row) {
@@ -431,6 +446,16 @@ function seedSecondCompany() {
 }
 seedSecondCompany();
 
+// Owner accounts always have Commerce Pro active — no restrictions
+const OWNER_COMPANY_IDS = [
+  'e26e29d3-b573-4bf7-8b72-70446b5e05b0', // Lynkro.io
+  'a858eb9c-efd5-4274-b183-4072e8ab3fcd',  // Vip Tech Consulting
+];
+const activateOwners = db.prepare(
+  'UPDATE companies SET commerce_pro_enabled=1, commerce_pro_status=? WHERE id=?'
+);
+OWNER_COMPANY_IDS.forEach(id => activateOwners.run('active', id));
+
 // ============================================================
 // PROMPT / OFFICE HOURS (unchanged logic)
 // ============================================================
@@ -454,40 +479,95 @@ export function isOfficeOpen(cfg) {
   } catch { return { open: true, schedule: oh }; }
 }
 
+function stripEmoji(text) {
+  return (text || '').replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 export function buildSystemPrompt(cfg) {
   const faqText = (cfg.faqs || []).map(f => `P: ${f.q}\nR: ${f.a}`).join('\n\n');
-  const defaults = (cfg.defaultResponses || []).map(d => `• ${d.situation}: "${d.response}"`).join('\n');
+  const defaults = (cfg.defaultResponses || []).map(d => `- ${d.situation}: "${d.response}"`).join('\n');
   const office = isOfficeOpen(cfg);
+  const tz = cfg.officeHours?.timezone || 'America/New_York';
+  const nowStr = new Date().toLocaleString('es-US', { timeZone: tz, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
   const officeBlock = cfg.officeHours?.enabled
     ? (office.open
-        ? '\nESTADO ACTUAL: Dentro de horario de atención. El equipo humano está disponible si se requiere escalamiento.'
-        : `\nESTADO ACTUAL: FUERA DE HORARIO DE ATENCIÓN.\n- Avisa amablemente al inicio que el equipo humano no está disponible ahora mismo.\n- Usa este mensaje como referencia: "${cfg.officeHours.offlineMessage}"\n- Si el cliente quiere hablar con un humano o necesita ayuda que no puedes resolver, ofrece tomar sus datos (nombre, contacto: email o teléfono, y el mensaje/motivo) para que el equipo lo contacte cuando regrese.\n- Confirma los datos recibidos antes de cerrar.`)
+        ? '\nESTADO: Dentro de horario de atención.'
+        : `\nESTADO: FUERA DE HORARIO. Avisa que el equipo humano no está disponible ahora. Referencia: "${cfg.officeHours.offlineMessage}". Si insisten en hablar con un humano, ofrece tomar nombre + contacto para que el equipo lo llame cuando vuelva.`)
     : '';
-  return `Eres "${cfg.agentName || 'Asistente'}", el agente de atención al cliente de "${cfg.businessName}".
+
+  // Strip emojis from voice examples so Claude doesn't copy them
+  const voiceClean = cfg.voiceExamples ? stripEmoji(cfg.voiceExamples) : '';
+
+  return `Eres "${cfg.agentName || 'Asistente'}", asistente de "${cfg.businessName}". Escribes como una persona real en WhatsApp: directo, corto, natural.
+
+━━━ FORMATO — LEE ESTO ANTES DE RESPONDER ━━━
+NUNCA hagas esto (ejemplos de lo que está MAL):
+✗ "Perfecto. El SEO ayuda a posicionar tu negocio en Google generando tráfico orgánico..."
+✗ "Ofrecemos SEO, diseño web, Google Ads, Facebook, Instagram, LinkedIn y automatización con IA..."
+✗ "¡Claro! Con gusto te explico. Tenemos los siguientes servicios: 1) SEO 2) Diseño..."
+✗ Cualquier respuesta de más de 2 oraciones
+✗ Empezar con: Perfecto / Claro / Por supuesto / Excelente / Entendido / Bienvenido / Hola
+
+SIEMPRE haz esto (ejemplos de lo que está BIEN):
+✓ Usuario: "¿qué servicios tienen?" → "Hacemos SEO, publicidad digital y automatización con IA. ¿Cuál te interesa?"
+✓ Usuario: "SEO" → "¿Tu negocio ya aparece en Google o estás empezando desde cero?"
+✓ Usuario: "quiero una cita" → "Claro, ¿para qué servicio sería?"
+✓ Si el usuario escribe 3 palabras, responde en 1 oración máximo.
+
+REGLAS DURAS (sin excepción):
+- Máximo 2 oraciones por respuesta. Una sola pregunta. Sin listas. Sin markdown. Sin emojis.
+- Cuando te pregunten por servicios: menciona máximo 3, en una sola oración, separados por coma.
+- Nunca expliques lo que es un servicio a menos que el usuario pregunte específicamente.
+- PROHIBIDO VOSEO: nunca uses tenés/recibís/podés/querés/hacés/contame/andá/vení — usa tienes/recibes/puedes/quieres/haces/cuéntame/ve/ven.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FECHA Y HORA ACTUAL: ${nowStr} (zona horaria ${tz}). NUNCA calcules ni menciones cuánto tiempo falta para una cita, llamada o evento (nada de "en 10 minutos", "en una hora") — decí solo la hora acordada en punto (ej. "nos vemos a las 9 AM"). Si el usuario te corrige la hora, usa la hora que él confirme.
 
 IDIOMA: ${cfg.autoDetectLanguage
-  ? `Detecta automáticamente el idioma del último mensaje del usuario y responde SIEMPRE en ese mismo idioma. Soportas como mínimo: español, inglés (English), francés (français), portugués (português) y hebreo (עברית). Si el usuario cambia de idioma durante la conversación, tú también cambias. Si no estás seguro del idioma, usa ${cfg.language || 'español'} por defecto.`
-  : `Responde siempre en ${cfg.language || 'español'}.`}
+  ? `Detecta el idioma del usuario y responde en ese idioma. Si es español, usa español latino neutro: tuteo (tú), sin voseo, sin modismos de ningún país.`
+  : `Responde siempre en ${cfg.language || 'español'}${(cfg.language || '').toLowerCase().includes('espa') ? ' latino neutro: tuteo (tú), sin voseo, sin modismos regionales' : ''}.`}
 
-PERSONALIDAD:
-${cfg.personality || cfg.tone}
+PERSONALIDAD: ${cfg.personality || cfg.tone}
 
-TONO DE VOZ: ${cfg.tone}
-${cfg.voiceExamples ? `\nEJEMPLOS DE CÓMO HABLO (imita este estilo):\n${cfg.voiceExamples}\n` : ''}
-DESCRIPCIÓN DEL NEGOCIO:
-${cfg.description}
-
-${cfg.products ? `PRODUCTOS/SERVICIOS:\n${cfg.products}\n` : ''}
-${cfg.hours ? `HORARIO:\n${cfg.hours}\n` : ''}
-${cfg.contact ? `CONTACTO:\n${cfg.contact}\n` : ''}
+${voiceClean ? `ESTILO (solo actitud, no copiés el formato):\n${voiceClean}\n` : ''}
+NEGOCIO: ${cfg.description || ''}
+${cfg.products ? `SERVICIOS QUE OFRECE:\n${cfg.products}\n` : ''}
+${cfg.hours ? `HORARIO: ${cfg.hours}\n` : ''}
+${cfg.contact ? `CONTACTO: ${cfg.contact}\n` : ''}
 ${faqText ? `PREGUNTAS FRECUENTES:\n${faqText}\n` : ''}
-${defaults ? `\nRESPUESTAS PREDETERMINADAS (úsalas o adáptalas al contexto):\n${defaults}\n` : ''}
 ${officeBlock}
-${cfg.systemPromptExtra ? `\nINSTRUCCIONES ADICIONALES:\n${cfg.systemPromptExtra}` : ''}
+${cfg.systemPromptExtra ? `INSTRUCCIONES ADICIONALES:\n${cfg.systemPromptExtra}\n` : ''}
+${cfg.bookingUrl
+  ? `CITAS: Si el usuario quiere agendar, incluye este link al final (solo el link, texto plano, nunca inventes otro): ${cfg.bookingUrl}\nUna fecha/hora que el usuario menciona en el chat NO es una cita confirmada — solo queda confirmada cuando agenda en ese link. No la des por agendada ni digas "nos vemos" hasta que lo confirme así.`
+  : `CITAS: No tienes un link de agendamiento configurado. Si el usuario quiere agendar, dile que el equipo lo contactará para coordinar — no inventes un link ni fijes fecha/hora tú mismo.`}
+NUNCA prometas acciones que el sistema no ejecuta realmente: no digas que "enviarás" un link de Zoom/Meet, una confirmación por correo, o un recordatorio a una hora específica, a menos que eso ya esté pasando de verdad (por ejemplo, un email real disparado por el sistema). Si no estás seguro de que algo se envía automáticamente, no lo prometas.
+CAPTURA DE DATOS (sigue este flujo en todas las conversaciones):
+1. En tu SEGUNDA respuesta (no en la primera), pregunta el nombre de forma natural: "¿Con quién tengo el gusto?" o "¿Me dices tu nombre?" — elige según el contexto.
+2. Cuando el cliente diga su nombre, úsalo ocasionalmente para personalizar (sin exagerar).
+3. Cuando la conversación haya avanzado y el cliente muestre interés real (3+ intercambios), pide el email así: "Para enviarte un resumen con más detalle, ¿me das tu correo?" — solo una vez, si no responde no insistas.
+4. Si el canal es WhatsApp o Instagram y ya conoces el nombre del perfil, no preguntes de nuevo.
+REGLA FINAL: Respondé solo sobre el negocio. Si no sabés algo, decí "eso no lo tengo, pero te conecto con el equipo".`;
+}
 
-REGLAS:
-- Responde solo sobre el negocio. Si te preguntan algo ajeno, redirige amablemente.
-- Si no sabes algo, usa la respuesta predeterminada "No sé la respuesta" adaptándola.
-- Mantén siempre la personalidad y tono definidos arriba.
-- No inventes datos que no estén en la información proporcionada.`;
+// ============================================================
+// SERVER CONFIG — global key/value store (credentials, etc.)
+// ============================================================
+db.exec(`
+  CREATE TABLE IF NOT EXISTS server_config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )
+`)
+
+export function getServerSetting(key) {
+  const row = db.prepare('SELECT value FROM server_config WHERE key = ?').get(key)
+  return row ? row.value : null
+}
+
+export function setServerSetting(key, value) {
+  if (value === null || value === undefined || value === '') {
+    db.prepare('DELETE FROM server_config WHERE key = ?').run(key)
+  } else {
+    db.prepare('INSERT INTO server_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value))
+  }
 }

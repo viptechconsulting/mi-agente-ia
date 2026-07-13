@@ -105,3 +105,36 @@ export async function createShopifyCoupon(storeUrl, accessToken, code, config) {
 
   return { platformCouponId: String(price_rule.id) }
 }
+
+export async function createSellibriCoupon(storeUrl, apiKey, config, leadEmail) {
+  const expiresInDays = config.recovery_coupon_expiration_hours
+    ? Math.ceil(config.recovery_coupon_expiration_hours / 24)
+    : 2
+
+  const body = {
+    percentage: config.recovery_coupon_discount_value ?? 10,
+    profile_email: leadEmail || '',
+    expires_in_days: expiresInDays,
+    prefix: 'LYNKRO',
+    single_use: true
+  }
+
+  const base = storeUrl.replace(/\/$/, '')
+  const res = await fetch(`${base}/api/v1/coupons`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey },
+    body: JSON.stringify(body)
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Sellibri coupon API error ${res.status}: ${text}`)
+  }
+
+  const data = await res.json()
+  const coupon = data.coupon || data
+  return {
+    platformCouponId: String(coupon.id || ''),
+    actualCouponCode: coupon.code || null
+  }
+}

@@ -6,80 +6,56 @@
 <link rel="icon" type="image/png" href="https://lynkro.io/logo1-removebg-preview.png">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
- :root{
-  --gold:#27F59B;--gold-dim:#1ac77a;--blue:#3BA5FF;
-  --bg:#0d1117;--card:#161b26;--border:#21263a;--muted:#7c8ca8;--text:#e4e9f2;
-  --sb:#0b0e18;--sb-text:#5c6a84;--sb-hover:rgba(255,255,255,.04);--sb-active:rgba(39,245,155,.08);
-  --input-bg:#111520;--card-from:#161b26;--card-to:#161b26;
-  --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.25)}
+ :root{--gold:#27F59B;--gold-dim:#1ac77a;--blue:#3BA5FF;
+  --bg:#0B0F14;--card:#151922;--border:#252A38;--muted:#9FB0C8;--text:#F5F7FA;
+  --sb:#0d1117;--sb-text:#8899b0;--sb-hover:rgba(255,255,255,.05);--sb-active:rgba(39,245,155,.1);
+  --input-bg:#0e1219;--card-from:#151922;--card-to:#0e1219}
  [data-theme="light"]{
-  --bg:#f3f6fb;--card:#ffffff;--border:#e4e9f0;--muted:#64748b;--text:#1a202c;
-  --sb:#1a2035;--sb-text:#8492a6;--sb-hover:rgba(255,255,255,.07);--sb-active:rgba(39,245,155,.12);
-  --input-bg:#f8fafc;--card-from:#ffffff;--card-to:#ffffff;
-  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.08)}
+  --bg:#f0f4f8;--card:#fff;--border:#e2e8f0;--muted:#64748b;--text:#1e293b;
+  --sb:#1e293b;--sb-text:#94a3b8;--sb-hover:rgba(255,255,255,.08);--sb-active:rgba(39,245,155,.18);
+  --input-bg:#f8fafc;--card-from:#fff;--card-to:#f8fafc}
  *{box-sizing:border-box;margin:0;padding:0}
  html,body{height:100%}
- body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-
- /* ── Scrollbar ── */
- ::-webkit-scrollbar{width:4px;height:4px}
- ::-webkit-scrollbar-track{background:transparent}
- ::-webkit-scrollbar-thumb{background:#252a3a;border-radius:4px}
-
+ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
  /* ── Sidebar ── */
- #sidebar{width:232px;min-height:100vh;background:var(--sb);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;overflow-y:auto;z-index:200}
- .sb-logo{padding:20px 18px 14px}
- .sb-logo h1{font-weight:600;font-size:17px;color:#fff;letter-spacing:-.4px}
- .sb-logo h1 span{color:var(--gold)}
- .sb-logo .sub{color:var(--sb-text);font-size:11px;margin-top:2px}
- .sb-co{padding:0 12px 10px}
- .sb-co label{font-size:10px;color:var(--sb-text);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;font-weight:600}
- .sb-co select{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:#9aabb8;padding:7px 10px;border-radius:8px;font-size:12px;outline:none;cursor:pointer}
- .sb-group{padding:4px 0 8px}
- .sb-label{font-size:10px;color:var(--sb-text);text-transform:uppercase;letter-spacing:1.2px;padding:12px 18px 5px;font-weight:700;opacity:.55}
- .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px 8px 14px;margin:1px 8px;cursor:pointer;color:var(--sb-text);font-size:13px;border-left:none;border-radius:8px;transition:all .15s;user-select:none;font-weight:400;letter-spacing:0;text-transform:none;background:none;border-top:none;border-right:none;border-bottom:none;width:calc(100% - 16px);text-align:left}
- .nav-item:hover{background:var(--sb-hover);color:#c8d4e4;opacity:1}
- .nav-item.active{background:var(--sb-active);color:var(--gold);font-weight:500}
- .nav-item.active .ic{color:var(--gold)}
- .nav-item .ic{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.7}
- .nav-item.active .ic{opacity:1}
+ #sidebar{width:240px;min-height:100vh;background:var(--sb);border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;overflow-y:auto;z-index:200}
+ #sidebar::-webkit-scrollbar{width:3px}#sidebar::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px}
+ .sb-logo{padding:22px 20px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+ .sb-logo h1{font-weight:300;font-size:20px;color:#fff;letter-spacing:-.3px}
+ .sb-logo h1 span{background:linear-gradient(135deg,var(--gold),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700}
+ .sb-logo .sub{color:var(--sb-text);font-size:11px;margin-top:3px}
+ .sb-co{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+ .sb-co label{font-size:9px;color:var(--sb-text);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;display:block}
+ .sb-co select{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#cdd6e3;padding:8px 10px;border-radius:7px;font-size:12px;outline:none}
+ .sb-group{padding:6px 0}
+ .sb-label{font-size:9px;color:var(--sb-text);text-transform:uppercase;letter-spacing:1.8px;padding:10px 20px 4px;font-weight:600;opacity:.7}
+ .nav-item{display:flex;align-items:center;gap:11px;padding:9px 20px;cursor:pointer;color:var(--sb-text);font-size:13px;border-left:3px solid transparent;transition:all .12s;user-select:none;font-weight:400;letter-spacing:0;text-transform:none;background:none;border-top:none;border-right:none;border-bottom:none;border-radius:0;width:100%;text-align:left}
+ .nav-item:hover{background:var(--sb-hover);color:#d0dae8;opacity:1}
+ .nav-item.active{background:var(--sb-active);color:var(--gold);border-left-color:var(--gold)}
+ .nav-item .ic{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
  .nav-item .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.75;flex-shrink:0}
- .sb-footer{margin-top:auto;padding:12px;border-top:1px solid var(--border)}
- .theme-btn{width:100%;background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--sb-text);padding:8px;border-radius:8px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;text-transform:none;letter-spacing:0;font-weight:400}
- .theme-btn:hover{background:rgba(255,255,255,.07);color:#c0cede;opacity:1}
-
+ .sb-footer{margin-top:auto;padding:14px 16px;border-top:1px solid rgba(255,255,255,.06)}
+ .theme-btn{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--sb-text);padding:9px;border-radius:8px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;text-transform:none;letter-spacing:0;font-weight:400}
+ .theme-btn:hover{background:rgba(255,255,255,.1);color:#fff;opacity:1}
  /* ── Main ── */
- #main{margin-left:232px;padding:32px 40px;min-height:100vh}
- .content-wrap{max-width:900px}
- h1{font-weight:600;font-size:22px;letter-spacing:-.3px}
- h1 span{color:var(--gold)}
- .sub{color:var(--muted);font-size:13px;margin-top:3px}
-
- /* ── Cards ── */
- .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px;box-shadow:var(--shadow)}
- .card h2{margin:0 0 16px;font-size:14px;font-weight:600;color:var(--text);letter-spacing:-.1px}
-
- /* ── Forms ── */
- label{display:block;font-size:12px;color:var(--muted);margin:14px 0 5px;font-weight:500;letter-spacing:0;text-transform:none}
- input,textarea,select{width:100%;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;transition:border-color .2s,box-shadow .2s}
- input:focus,textarea:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(39,245,155,.1)}
- textarea{min-height:88px;resize:vertical}
- .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-
- /* ── Buttons ── */
- button{background:var(--gold);color:#0a1208;border:none;padding:9px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;letter-spacing:-.1px;text-transform:none;transition:opacity .15s,box-shadow .15s;font-family:inherit}
- button:hover{opacity:.88;box-shadow:0 4px 14px rgba(39,245,155,.25)}
- button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
- button.secondary{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border);box-shadow:none}
- button.secondary:hover{background:rgba(255,255,255,.09);color:var(--text);box-shadow:none}
- [data-theme="light"] button.secondary{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
- button[style*="#2a0a0a"],button[style*="background:#0a2a0a"]{font-size:11px!important;padding:4px 10px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important}
-
- /* ── List items ── */
- .faq-item{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;position:relative}
- .faq-item>button{position:absolute;top:10px;right:10px;background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2);padding:4px 10px;font-size:11px;box-shadow:none}
- .faq-item>button:hover{background:rgba(239,68,68,.2);box-shadow:none;opacity:1}
-
+ #main{margin-left:240px;padding:36px 44px;min-height:100vh}
+ .content-wrap{max-width:880px}
+ h1{font-weight:300;font-size:26px}
+ h1 span{background:linear-gradient(135deg,var(--gold),var(--gold-dim));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700}
+ .sub{color:var(--muted);font-size:13px;margin-top:4px}
+ .card{background:linear-gradient(135deg,var(--card-from),var(--card-to));border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:20px}
+ .card h2{margin:0 0 18px;font-size:14px;text-transform:uppercase;letter-spacing:2px;color:var(--gold);font-weight:500}
+ label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;letter-spacing:.5px;text-transform:uppercase}
+ input,textarea,select{width:100%;background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-size:14px;outline:none;font-family:inherit;transition:border-color .2s}
+ input:focus,textarea:focus,select:focus{border-color:var(--gold)}
+ textarea{min-height:90px;resize:vertical}
+ .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+ button{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#0B0F14;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;letter-spacing:.5px;text-transform:uppercase;transition:opacity .2s}
+ button:hover{opacity:.9}
+ button.secondary{background:#1a1f2e;color:var(--gold);border:1px solid var(--border)}
+ [data-theme="light"] button.secondary{background:#e8edf3;color:var(--gold)}
+ .faq-item{background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;position:relative}
+ .faq-item button{position:absolute;top:10px;right:10px;background:#2a0a0a;color:#ff6b6b;border:1px solid #4a1515;padding:4px 10px;font-size:11px}
  /* ── Login page ── */
  #login{position:fixed;inset:0;z-index:500;display:grid;grid-template-columns:1fr 1fr;background:#0a0c12}
  @media(max-width:760px){#login{grid-template-columns:1fr}}
@@ -150,27 +126,26 @@
  .lf-privacy{text-align:center;margin-top:28px;font-size:12px;color:#94a3b8}
  .lf-privacy a{color:#27F59B;text-decoration:none}
  .login{width:100%;max-width:380px}
- .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);color:var(--text);padding:14px 20px;border-radius:10px;transform:translateY(100px);transition:transform .3s;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:13px}
+ .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--gold);color:var(--gold);padding:14px 20px;border-radius:10px;transform:translateY(100px);transition:transform .3s;z-index:1000}
  .toast.show{transform:none}
  .tab{display:none}.tab.active{display:block}
- .conv{padding:12px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:13px;color:var(--muted);transition:border-color .15s,background .15s}
- .conv:hover{border-color:rgba(39,245,155,.3);background:rgba(39,245,155,.03);color:var(--text)}
- .msg-log{background:var(--input-bg);padding:16px;border-radius:10px;margin-top:10px;max-height:400px;overflow-y:auto;font-size:13px;line-height:1.6;border:1px solid var(--border)}
- .msg-log .u{color:var(--gold);font-weight:500}.msg-log .a{color:var(--muted)}
- .metric{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;transition:border-color .15s}
- .metric:hover{border-color:rgba(39,245,155,.2)}
- .metric .v{font-size:26px;font-weight:700;color:var(--text);margin-bottom:3px;letter-spacing:-.5px}
- .metric .l{font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500}
- .bar{height:6px;background:var(--gold);border-radius:3px;display:inline-block;vertical-align:middle;opacity:.85}
- .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
- .bar-row .label{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
- .bar-row .count{color:var(--text);font-weight:600;min-width:30px;text-align:right;font-size:13px}
- @media(max-width:800px){#sidebar{transform:translateX(-232px);transition:transform .3s}#sidebar.open{transform:none}#main{margin-left:0;padding:20px 16px}#menuToggle{display:flex!important}}
+ .conv{padding:14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;font-size:13px;color:var(--muted)}
+ .conv:hover{border-color:var(--gold)}
+ .msg-log{background:var(--input-bg);padding:14px;border-radius:8px;margin-top:10px;max-height:400px;overflow-y:auto;font-size:13px;line-height:1.6}
+ .msg-log .u{color:var(--gold)}.msg-log .a{color:#c7d2e3}
+ .metric{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center}
+ .metric .v{font-size:28px;font-weight:600;color:var(--gold);margin-bottom:4px}
+ .metric .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+ .bar{height:24px;background:linear-gradient(90deg,var(--gold),var(--gold-dim));border-radius:4px;display:inline-block;vertical-align:middle}
+ .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+ .bar-row .label{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .bar-row .count{color:var(--gold);font-weight:600;min-width:30px;text-align:right}
+ @media(max-width:800px){#sidebar{transform:translateX(-240px);transition:transform .3s}#sidebar.open{transform:none}#main{margin-left:0;padding:20px 16px}#menuToggle{display:flex!important}}
  /* ── Admin lang toggle ── */
- .admin-lang-toggle{display:flex;gap:4px;margin-bottom:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:3px}
- .admin-lt-btn{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s;text-transform:none;letter-spacing:0}
- .admin-lt-btn.active{background:var(--card);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.3)}
- .admin-lt-btn:hover{opacity:1;color:var(--text)}
+ .admin-lang-toggle{display:flex;gap:4px;margin-bottom:10px}
+ .admin-lt-btn{flex:1;padding:7px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--sb-text);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;text-transform:none;letter-spacing:0}
+ .admin-lt-btn.active{background:rgba(39,245,155,.15);color:var(--gold);border-color:rgba(39,245,155,.3)}
+ .admin-lt-btn:hover{opacity:1;background:rgba(255,255,255,.06);color:#d0dae8}
 
 /* ── Campanas & Citas ── */
 .camp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -222,7 +197,6 @@
 .analytics-card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
 .an-val{font-size:28px;font-weight:700;color:#fff}
 .an-lbl{font-size:11px;color:#888;line-height:1.3}
-@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -344,10 +318,6 @@
    <button class="nav-item nav-superadmin" data-tab="users" onclick="tab('users')" style="display:none"><span class="ic"><i data-lucide="users-round"></i></span><span data-i18n="nav_users">Usuarios</span></button>
   </div>
   <div class="sb-group">
-   <div class="sb-label">Commerce</div>
-   <button class="nav-item" data-tab="billing" onclick="tab('billing')" id="nav-commerce-pro"><span class="ic"><i data-lucide="shopping-bag"></i></span><span>Commerce Pro</span></button>
-  </div>
-  <div class="sb-group">
    <div class="sb-label" data-i18n="sb_empresa">Empresa activa</div>
    <button class="nav-item" data-tab="config" onclick="tab('config')"><span class="ic"><i data-lucide="settings"></i></span><span data-i18n="nav_config">Configuración</span></button>
    <button class="nav-item" data-tab="persona" onclick="tab('persona')"><span class="ic"><i data-lucide="user-round"></i></span><span data-i18n="nav_persona">Personalidad</span></button>
@@ -366,13 +336,13 @@
    <button class="nav-item" data-tab="followup" onclick="tab('followup')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></span><span>Follow-up</span></button>
    <button class="nav-item" data-tab="instagram" onclick="tab('instagram')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span data-i18n="nav_instagram">Instagram</span></button>
    <button class="nav-item" data-tab="embed" onclick="tab('embed')"><span class="ic"><i data-lucide="code-2"></i></span><span data-i18n="nav_embed">Embeber</span></button>
+document.querySelectorAll('.nav-item[data-tab="billing"]').forEach(b => b.addEventListener('click', loadBillingStatus));
   </div>
   <div class="sb-group">
    <div class="sb-label" data-i18n="sb_data">Datos</div>
    <button class="nav-item" data-tab="leads" onclick="tab('leads')"><span class="ic"><i data-lucide="users"></i></span><span data-i18n="nav_leads">Leads</span></button>
    <button class="nav-item" data-tab="convs" onclick="tab('convs')"><span class="ic"><i data-lucide="message-square"></i></span><span data-i18n="nav_convs">Conversaciones</span></button>
    <button class="nav-item" data-tab="reports" onclick="tab('reports')"><span class="ic"><i data-lucide="trending-up"></i></span><span data-i18n="nav_reports">Reportes</span></button>
-   <button class="nav-item" data-tab="aiinsights" onclick="tab('aiinsights')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="18" cy="8" r="4" fill="currentColor" stroke="none" opacity=".3"/><path d="M18 6v2l1.5 1"/></svg></span><span>AI Insights</span></button>
   </div>
   <div class="sb-group">
    <div class="sb-label" data-i18n="sb_training">Entrenamiento</div>
@@ -491,22 +461,9 @@
  <h2 data-i18n="h2_activity">Actividad últimos 7 días</h2>
  <div id="activityChart"></div>
  </div>
-
  </div>
 
  <div id="tab-config" class="tab">
-
- <!-- ✦ GENERAR CONFIGURACIÓN COMPLETA CON IA -->
- <div class="card" style="border-color:rgba(39,245,155,.25);background:linear-gradient(135deg,rgba(39,245,155,.04),transparent)">
-  <h2 style="display:flex;align-items:center;gap:10px">✦ Generar configuración completa con IA</h2>
-  <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Pega cualquier información del negocio (página web, brochure, texto libre) y la IA genera automáticamente: nombre, descripción, FAQs, horarios, mensaje de bienvenida, personalidad del agente y más.</p>
-  <textarea id="aiConfigInfo" rows="5" placeholder="Ej: BeGlam Studio es un salón de belleza en Miami especializado en extensiones de cabello, maquillaje profesional y tratamientos faciales. Abrimos Lun-Sáb 9am-7pm. Contacto: info@beglam.com..." style="resize:vertical;font-size:13px;line-height:1.6;border-color:rgba(39,245,155,.3)"></textarea>
-  <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
-   <button onclick="aiGenerateConfig()" style="background:linear-gradient(135deg,var(--gold),#1ac77a);color:#000;border:none;font-weight:600;padding:10px 24px">✦ Generar con IA</button>
-   <span id="aiConfigStatus" style="font-size:13px;color:var(--muted)"></span>
-  </div>
- </div>
-
  <div class="card">
  <h2 data-i18n="h2_biz_info">Información del negocio</h2>
  <label data-i18n="label_biz_name">Nombre del negocio</label>
@@ -519,28 +476,14 @@
  </div>
  <label data-i18n="label_products">Productos / servicios</label>
  <textarea id="products"></textarea>
- <label>Tipo de industria</label>
- <select id="industry">
-  <option value="general">General / Otro</option>
-  <option value="peluqueria">Peluquería / Salón de belleza</option>
-  <option value="spa">Spa / Centro de bienestar</option>
-  <option value="clinica">Clínica médica / Consultorio</option>
-  <option value="dental">Clínica dental</option>
-  <option value="estetica">Centro estético / Cosmetología</option>
-  <option value="gimnasio">Gimnasio / Fitness</option>
-  <option value="restaurante">Restaurante / Cafetería</option>
-  <option value="tienda">Tienda / Retail</option>
- </select>
  </div>
 
  <div class="card">
  <h2 data-i18n="h2_agent_behavior">Comportamiento del agente</h2>
  <label data-i18n="label_tone">Tono</label>
  <input id="tone">
- <label data-i18n="label_welcome">Mensaje de bienvenida (español)</label>
+ <label data-i18n="label_welcome">Mensaje de bienvenida</label>
  <input id="welcomeMessage">
- <label>Mensaje de bienvenida (English) <span style="font-size:11px;color:var(--muted)">— se muestra cuando la página del cliente está en inglés</span></label>
- <input id="welcomeMessageEn" placeholder="Hi! How can I help you today?">
  <label data-i18n="label_booking">Link de citas (opcional) — se incluye automaticamente cuando alguien pide una cita</label>
  <input id="bookingUrl" placeholder="https://calendly.com/tu-link">
  <div style="display:flex;align-items:center;gap:8px;margin-top:-4px;margin-bottom:8px">
@@ -550,14 +493,6 @@
  <label data-i18n="label_extra">Instrucciones adicionales (opcional)</label>
  <textarea id="systemPromptExtra"></textarea>
  <div class="row">
- <div>
- <label>Plan de suscripción</label>
- <select id="plan" onchange="updateModelOptions()">
- <option value="starter">Starter — $147/mes (Haiku)</option>
- <option value="growth">Growth — $297/mes (Haiku o Sonnet +$50)</option>
- <option value="agency">Agency — $597/mes (todos los modelos)</option>
- </select>
- </div>
  <div>
  <label data-i18n="label_model">Modelo Claude</label>
  <select id="model">
@@ -933,114 +868,6 @@
 
  </div>
 
- <div id="tab-aiinsights" class="tab">
-
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-   <div>
-    <h2 style="margin:0;font-size:16px;font-weight:600">✦ AI Insights</h2>
-    <p style="color:#666;font-size:12px;margin:3px 0 0">Análisis inteligente de conversaciones y tasa de conversión</p>
-   </div>
-   <div style="display:flex;align-items:center;gap:8px">
-    <select id="insights-days" style="padding:7px 12px;font-size:12px;background:#12121e;color:#aaa;border:1px solid #2a2a3e;border-radius:8px;cursor:pointer">
-     <option value="7">Últimos 7 días</option>
-     <option value="14">Últimos 14 días</option>
-     <option value="30">Últimos 30 días</option>
-    </select>
-    <button id="insights-btn" onclick="loadAIInsights()" style="padding:7px 18px;font-size:12px">✦ Analizar con IA</button>
-   </div>
-  </div>
-
-  <!-- Loading -->
-  <div id="insights-loading" style="display:none">
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-    <div class="card" style="padding:32px;text-align:center;margin-bottom:0">
-     <div style="width:80px;height:80px;border-radius:50%;border:3px solid #1e1e30;border-top-color:var(--gold);animation:spin 1s linear infinite;margin:0 auto 16px"></div>
-     <p style="margin:0;color:#666;font-size:13px">Calculando funnel…</p>
-    </div>
-    <div class="card" style="padding:32px;text-align:center;margin-bottom:0">
-     <div style="width:80px;height:80px;border-radius:50%;border:3px solid #1e1e30;border-top-color:#6366f1;animation:spin 1.3s linear infinite;margin:0 auto 16px"></div>
-     <p style="margin:0;color:#666;font-size:13px">Analizando conversaciones…</p>
-    </div>
-   </div>
-  </div>
-
-  <!-- Empty state -->
-  <div id="insights-empty">
-   <div class="card" style="text-align:center;padding:60px 20px;margin-bottom:0">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5" style="margin-bottom:16px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
-    <h3 style="margin:0 0 8px;font-size:15px;color:#ccc;font-weight:500">Analiza el rendimiento de tu agente</h3>
-    <p style="margin:0 0 24px;color:#555;font-size:13px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.6">Ve dónde pierdes leads, cuántos convierten y qué ajustar para mejorar la tasa de conversión.</p>
-    <button onclick="loadAIInsights()" style="padding:9px 22px">✦ Generar análisis</button>
-   </div>
-  </div>
-
-  <!-- Results -->
-  <div id="insights-result" style="display:none">
-
-   <!-- Row 1: Funnel donut + Métricas -->
-   <div style="display:grid;grid-template-columns:240px 1fr;gap:16px;margin-bottom:16px;align-items:start">
-
-    <!-- Donut chart -->
-    <div class="card" style="margin-bottom:0;padding:24px;text-align:center">
-     <p style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin:0 0 16px">Conversión total</p>
-     <div style="position:relative;width:140px;height:140px;margin:0 auto 16px">
-      <svg width="140" height="140" viewBox="0 0 140 140" id="insights-donut">
-       <circle cx="70" cy="70" r="56" fill="none" stroke="#1a1a2e" stroke-width="16"/>
-       <circle cx="70" cy="70" r="56" fill="none" stroke="#6366f1" stroke-width="16" stroke-linecap="round"
-        stroke-dasharray="352" stroke-dashoffset="0" id="donut-convs" style="transform:rotate(-90deg);transform-origin:70px 70px;transition:stroke-dashoffset .8s ease"/>
-       <circle cx="70" cy="70" r="56" fill="none" stroke="#D4AF37" stroke-width="16" stroke-linecap="round"
-        stroke-dasharray="352" stroke-dashoffset="352" id="donut-leads" style="transform:rotate(-90deg);transform-origin:70px 70px;transition:stroke-dashoffset .8s ease .2s"/>
-       <circle cx="70" cy="70" r="56" fill="none" stroke="#4ade80" stroke-width="16" stroke-linecap="round"
-        stroke-dasharray="352" stroke-dashoffset="352" id="donut-conv" style="transform:rotate(-90deg);transform-origin:70px 70px;transition:stroke-dashoffset .8s ease .4s"/>
-      </svg>
-      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-       <span id="donut-pct" style="font-size:24px;font-weight:700;color:#e2e8f0">—</span>
-       <span style="font-size:10px;color:#555">conv.</span>
-      </div>
-     </div>
-     <div style="display:flex;flex-direction:column;gap:7px;text-align:left">
-      <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#6366f1;flex-shrink:0"></span><span style="font-size:12px;color:#888;flex:1">Conversaciones</span><span id="donut-lbl-c" style="font-size:12px;font-weight:600;color:#e2e8f0">—</span></div>
-      <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#D4AF37;flex-shrink:0"></span><span style="font-size:12px;color:#888;flex:1">Leads</span><span id="donut-lbl-l" style="font-size:12px;font-weight:600;color:#D4AF37">—</span></div>
-      <div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:#4ade80;flex-shrink:0"></span><span style="font-size:12px;color:#888;flex:1">Convertidos</span><span id="donut-lbl-cv" style="font-size:12px;font-weight:600;color:#4ade80">—</span></div>
-     </div>
-    </div>
-
-    <!-- Funnel barras -->
-    <div class="card" style="margin-bottom:0;padding:24px">
-     <p style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin:0 0 20px">Funnel de conversión</p>
-     <div id="funnel-rows" style="display:flex;flex-direction:column;gap:16px"></div>
-    </div>
-
-   </div>
-
-   <!-- Row 2: Resumen IA + Recomendaciones -->
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-
-    <!-- Resumen -->
-    <div class="card" style="margin-bottom:0;padding:24px">
-     <p style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin:0 0 14px">Resumen ejecutivo</p>
-     <p id="insights-summary" style="color:#bbb;font-size:13px;line-height:1.7;margin:0"></p>
-    </div>
-
-    <!-- Mini métricas -->
-    <div class="card" style="margin-bottom:0;padding:24px">
-     <p style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin:0 0 14px">Indicadores clave</p>
-     <div id="insights-kpis" style="display:flex;flex-direction:column;gap:12px"></div>
-    </div>
-
-   </div>
-
-   <!-- Row 3: Recomendaciones accionables -->
-   <div class="card" style="margin-bottom:0;padding:24px">
-    <p style="font-size:11px;font-weight:600;color:#555;letter-spacing:.6px;text-transform:uppercase;margin:0 0 16px">Recomendaciones accionables</p>
-    <div id="insights-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px"></div>
-    <p id="insights-ts" style="color:#333;font-size:11px;margin:16px 0 0;text-align:right"></p>
-   </div>
-
-  </div>
- </div>
-
  <div id="tab-knowledge" class="tab">
  <div class="card">
  <h2 data-i18n="h2_from_url">Agregar desde website</h2>
@@ -1331,16 +1158,6 @@
  </div>
 
  <div id="tab-embed" class="tab">
- <!-- Link directo para cliente -->
- <div class="card" style="border-color:rgba(39,245,155,.2)">
-  <h2 style="display:flex;align-items:center;gap:10px">🔗 Link directo para cliente</h2>
-  <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Comparte este link con tu cliente para que pruebe el agente sin necesidad de embeber nada en su web.</p>
-  <div style="display:flex;gap:8px;align-items:center">
-   <input readonly id="shareLink" style="flex:1;font-family:monospace;font-size:13px;color:var(--gold)" value="">
-   <button onclick="copyShareLink()" style="white-space:nowrap;background:rgba(39,245,155,.1);color:var(--gold);border:1px solid rgba(39,245,155,.3)">Copiar link</button>
-   <button onclick="window.open(document.getElementById('shareLink').value,'_blank')" style="white-space:nowrap;background:var(--card);color:var(--muted);border:1px solid var(--border)">Abrir</button>
-  </div>
- </div>
  <div class="card">
  <h2 data-i18n="h2_embed">Código para embeber</h2>
  <p style="color:#aaa;font-size:14px" data-i18n="p_embed">Pega este script antes de <code style="color:var(--gold)">&lt;/body&gt;</code> en cualquier web:</p>
@@ -1374,7 +1191,6 @@
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
    <button onclick="showConnectForm()" style="background:#1e1e2e;color:#fff;border:1px solid #3a3a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">+ Conectar Shopify</button>
    <button onclick="showConnectWooForm()" style="background:#1e1e2e;color:#fff;border:1px solid #3a3a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">+ Conectar WooCommerce</button>
-   <button onclick="showConnectSellibriForm()" style="background:#1e1e2e;color:#fff;border:1px solid #3a3a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px">+ Conectar Sellibri</button>
   </div>
   <div id="connect-shopify-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:20px">
    <h4 style="margin:0 0 14px;font-size:14px">Conectar Shopify</h4>
@@ -1385,7 +1201,7 @@
     <button onclick="document.getElementById('connect-shopify-form').style.display='none'" style="background:transparent;color:#aaa;border:1px solid #333;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
    </div>
   </div>
-  <div id="connect-woo-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:20px">
+  <div id="connect-woo-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:28px">
    <h4 style="margin:0 0 14px;font-size:14px">Conectar WooCommerce</h4>
    <input id="woo-url" placeholder="https://tu-tienda.com" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
    <input id="woo-key" placeholder="ck_..." style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
@@ -1395,36 +1211,11 @@
     <button onclick="document.getElementById('connect-woo-form').style.display='none'" style="background:transparent;color:#aaa;border:1px solid #333;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
    </div>
   </div>
-  <div id="connect-sellibri-form" style="display:none;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:28px">
-   <h4 style="margin:0 0 14px;font-size:14px">Conectar Sellibri</h4>
-   <input id="sellibri-url" placeholder="https://mi-tienda.tiendasellibri.com" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:8px">
-   <input id="sellibri-key" placeholder="API Key de Sellibri" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px">
-   <div style="display:flex;gap:8px">
-    <button onclick="connectSellibri()" style="background:#6c47ff;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Conectar</button>
-    <button onclick="document.getElementById('connect-sellibri-form').style.display='none'" style="background:transparent;color:#aaa;border:1px solid #333;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">Cancelar</button>
-   </div>
-  </div>
 
   <!-- PRODUCT RELATIONS -->
-  <h3 style="margin:28px 0 6px;font-size:16px">Relaciones de productos</h3>
-  <p style="color:#888;font-size:13px;margin:0 0 16px;line-height:1.5">Enseña al asistente qué productos están relacionados para que pueda sugerir alternativas, upgrades o complementos durante las conversaciones.</p>
-
-  <!-- AI suggestions -->
-  <div style="background:#12111e;border:1px solid #3a2a6a;border-radius:10px;padding:16px;max-width:600px;margin-bottom:16px">
-   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-    <div>
-     <div style="font-size:13px;font-weight:600;color:#c4b5fd">✦ Análisis automático con IA</div>
-     <div style="font-size:12px;color:#888;margin-top:3px">Claude analiza tu catálogo y sugiere relaciones basadas en categorías, precios y descripciones</div>
-    </div>
-    <button onclick="runAiRelations()" id="btn-ai-relations" style="background:#6c47ff;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">Analizar catálogo</button>
-   </div>
-   <div id="ai-relations-loading" style="display:none;margin-top:14px;color:#888;font-size:13px">Analizando productos... esto puede tomar unos segundos.</div>
-   <div id="ai-suggestions-list" style="margin-top:14px"></div>
-  </div>
-
-  <!-- Manual add -->
-  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;max-width:600px;margin-bottom:14px">
-   <div style="font-size:12px;color:#888;margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Agregar manualmente</div>
+  <h3 style="margin:28px 0 14px;font-size:16px">Relaciones de productos</h3>
+  <div id="relations-list" style="margin-bottom:14px;font-size:13px"></div>
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;max-width:600px;margin-bottom:32px">
    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
     <div>
      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Origen (ID)</label>
@@ -1445,76 +1236,39 @@
      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Destino (ID)</label>
      <input id="rel-target" placeholder="ID producto" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px 10px;border-radius:6px;font-size:12px">
     </div>
-    <button onclick="addRelation()" style="background:#2a2a2a;color:#fff;border:1px solid #444;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">+ Agregar</button>
+    <button onclick="addRelation()" style="background:#6c47ff;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap">+ Agregar</button>
    </div>
   </div>
-  <div id="relations-list" style="margin-bottom:32px;font-size:13px"></div>
 
   <!-- RECOVERY SETTINGS -->
-  <h3 style="margin:28px 0 6px;font-size:16px">Email de recuperación</h3>
-  <p style="color:#888;font-size:13px;margin:0 0 16px;line-height:1.5">Cuando alguien habla con el asistente sobre un producto y no compra, el sistema le envía un email personalizado con contexto de la conversación. No es un email genérico — menciona el producto específico que consultó.</p>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:760px;margin-bottom:20px;align-items:start">
-
-   <!-- Config panel -->
-   <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px">
-    <div style="font-size:12px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px">Configuración</div>
-    <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer">
-     <input type="checkbox" id="rec-coupon-enabled" style="width:16px;height:16px;accent-color:#6c47ff" onchange="updateEmailPreview()">
-     <span style="font-size:13px">Incluir cupón de descuento</span>
-    </label>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-     <div>
-      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Tipo de descuento</label>
-      <select id="rec-discount-type" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px;border-radius:6px;font-size:12px">
-       <option value="percent">Porcentaje (%)</option>
-       <option value="fixed">Monto fijo</option>
-      </select>
-     </div>
-     <div>
-      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Valor</label>
-      <input type="number" id="rec-discount-value" min="1" max="100" value="10" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px;border-radius:6px;font-size:12px" oninput="updateEmailPreview()">
-     </div>
-     <div>
-      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Expiración (horas)</label>
-      <input type="number" id="rec-expiration-hours" min="1" value="48" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px;border-radius:6px;font-size:12px">
-     </div>
-     <div>
-      <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Delay de envío (min)</label>
-      <input type="number" id="rec-delay-minutes" min="15" value="60" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:7px;border-radius:6px;font-size:12px">
-     </div>
+  <h3 style="margin:28px 0 14px;font-size:16px">Configuración de recuperación</h3>
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:20px;max-width:480px;margin-bottom:32px">
+   <label style="display:flex;align-items:center;gap:10px;margin-bottom:16px;cursor:pointer">
+    <input type="checkbox" id="rec-coupon-enabled" style="width:16px;height:16px;accent-color:#6c47ff">
+    <span style="font-size:14px">Enviar cupón de descuento en emails de recuperación</span>
+   </label>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Tipo de descuento</label>
+     <select id="rec-discount-type" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+      <option value="percent">Porcentaje (%)</option>
+      <option value="fixed">Monto fijo</option>
+     </select>
     </div>
-    <button onclick="saveRecoveryConfig()" style="background:#6c47ff;color:#fff;border:none;padding:8px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">Guardar</button>
-   </div>
-
-   <!-- AI email explanation -->
-   <div style="background:#1a1a2e;border:1px solid #6c47ff44;border-radius:10px;overflow:hidden">
-    <div style="background:#6c47ff18;padding:8px 14px;font-size:11px;color:#a78bfa;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px">
-     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-     Generado por IA en tiempo real
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Valor del descuento</label>
+     <input type="number" id="rec-discount-value" min="1" max="100" value="10" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
     </div>
-    <div style="padding:18px;font-size:12px;color:#ccc;line-height:1.65">
-     <p style="margin:0 0 12px;color:#e2d9ff;font-size:13px;font-weight:500">Cada email es único, generado por Claude al momento del envío.</p>
-     <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;gap:10px;align-items:flex-start">
-       <div style="width:22px;height:22px;background:#6c47ff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;font-weight:700;color:#fff">1</div>
-       <div><span style="color:#a78bfa;font-weight:600">Lee la conversación real</span><br>Analiza todo el chat que el usuario tuvo con el asistente.</div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-       <div style="width:22px;height:22px;background:#6c47ff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;font-weight:700;color:#fff">2</div>
-       <div><span style="color:#a78bfa;font-weight:600">Redacta personalizado</span><br>Menciona detalles específicos de lo hablado, sin frases de "carrito abandonado".</div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-       <div style="width:22px;height:22px;background:#6c47ff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;font-weight:700;color:#fff">3</div>
-       <div><span style="color:#a78bfa;font-weight:600">Incluye precio real</span><br>El precio del producto aparece siempre en el email, sin datos de ejemplo.</div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-       <div style="width:22px;height:22px;background:#6c47ff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;font-weight:700;color:#fff">4</div>
-       <div><span style="color:#a78bfa;font-weight:600">Agrega el cupón si está activo</span><br>El código se presenta como gesto personal, no como promoción masiva.</div>
-      </div>
-     </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Expiración (horas)</label>
+     <input type="number" id="rec-expiration-hours" min="1" value="48" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
+    </div>
+    <div>
+     <label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Delay de envío (min)</label>
+     <input type="number" id="rec-delay-minutes" min="15" value="60" style="width:100%;box-sizing:border-box;background:#111;border:1px solid #333;color:#fff;padding:8px;border-radius:6px;font-size:13px">
     </div>
    </div>
+   <button onclick="saveRecoveryConfig()" style="background:#6c47ff;color:#fff;border:none;padding:9px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">Guardar configuración</button>
   </div>
 
   <!-- ANALYTICS -->
@@ -1530,6 +1284,194 @@
 
  </div><!-- /#commerce-pro-sections -->
  </div><!-- /#tab-billing -->
+</div>
+</main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="demoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;padding:16px">
+ <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;height:580px;max-height:calc(100vh - 40px)">
+ <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+ <span style="font-weight:600;color:var(--gold);font-size:15px">Vista previa del agente</span>
+ <div style="display:flex;gap:8px">
+ <button class="secondary" onclick="resetDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0">Reiniciar</button>
+ <button class="secondary" onclick="closeDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0">Cerrar</button>
+ </div>
+ </div>
+ <div id="demoMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#0c0f14;scrollbar-width:thin"></div>
+ <form style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex-shrink:0"
+ onsubmit="event.preventDefault();const t=document.getElementById('demoInput').value.trim();if(t){document.getElementById('demoInput').value='';sendDemo(t);}">
+ <input id="demoInput" placeholder="Escribe un mensaje..." style="flex:1;font-size:14px" autocomplete="off">
+ <button type="submit" style="padding:8px 20px;text-transform:none;letter-spacing:0">Enviar</button>
+ </form>
+ </div>
+</div>
+
+
+
+</main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="demoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;padding:16px">
+ <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;height:580px;max-height:calc(100vh - 40px)">
+ <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+ <span style="font-weight:600;color:var(--gold);font-size:15px" data-i18n="modal_title">Vista previa del agente</span>
+ <div style="display:flex;gap:8px">
+ <button class="secondary" onclick="resetDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0" data-i18n="modal_reset">Reiniciar</button>
+ <button class="secondary" onclick="closeDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0" data-i18n="modal_close">Cerrar</button>
+ </div>
+ </div>
+ <div id="demoMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#0c0f14;scrollbar-width:thin"></div>
+ <form style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex-shrink:0"
+ onsubmit="event.preventDefault();const t=document.getElementById('demoInput').value.trim();if(t){document.getElementById('demoInput').value='';sendDemo(t);}">
+ <input id="demoInput" placeholder="Escribe un mensaje..." data-i18n-placeholder="modal_input_placeholder" style="flex:1;font-size:14px" autocomplete="off">
+ <button type="submit" style="padding:8px 20px;text-transform:none;letter-spacing:0" data-i18n="modal_send">Enviar</button>
+ </form>
+ </div>
+</div>
+
+
+</main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="demoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;padding:16px">
+ <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;height:580px;max-height:calc(100vh - 40px)">
+ <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+ <span style="font-weight:600;color:var(--gold);font-size:15px" data-i18n="modal_title">Vista previa del agente</span>
+ <div style="display:flex;gap:8px">
+ <button class="secondary" onclick="resetDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0" data-i18n="modal_reset">Reiniciar</button>
+ <button class="secondary" onclick="closeDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0" data-i18n="modal_close">Cerrar</button>
+ </div>
+ </div>
+ <div id="demoMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#0c0f14;scrollbar-width:thin"></div>
+ <form style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex-shrink:0"
+ onsubmit="event.preventDefault();const t=document.getElementById('demoInput').value.trim();if(t){document.getElementById('demoInput').value='';sendDemo(t);}">
+ <input id="demoInput" placeholder="Escribe un mensaje..." data-i18n-placeholder="modal_input_placeholder" style="flex:1;font-size:14px" autocomplete="off">
+ <button type="submit" style="padding:8px 20px;text-transform:none;letter-spacing:0" data-i18n="modal_send">Enviar</button>
+ </form>
+ </div>
+</div>
+
+<script>
+// ── i18n ─────────────────────────────────────────────────────────────
+const T_ADMIN = {
+ es: {
+  login_title:'Iniciar sesión', login_email:'Correo electrónico', login_pw:'Contraseña',
+  login_btn:'Iniciar sesión', login_privacy:'Políticas de privacidad',
+  sb_subtitle:'Panel Admin · Multi-empresa', sb_empresa_label:'Empresa activa',
+  sb_general:'General', sb_empresa:'Empresa activa', sb_channels:'Canales',
+  sb_data:'Datos', sb_training:'Entrenamiento',
+  nav_dashboard:'Dashboard', nav_companies:'Empresas', nav_demos:'Demos',
+  nav_users:'Usuarios', nav_config:'Configuración', nav_persona:'Personalidad',
+  nav_faqs:'FAQs', nav_quick:'Resp. rápidas', nav_hours:'Horarios',
+  nav_appearance:'Apariencia', nav_notifications:'Notificaciones',
+  nav_whatsapp:'WhatsApp', nav_instagram:'Instagram', nav_embed:'Embeber',
+  nav_leads:'Leads', nav_convs:'Conversaciones', nav_reports:'Reportes',
+  nav_knowledge:'Conocimiento', nav_training:'Entrenar',
+  theme_light:'Modo claro', theme_dark:'Modo oscuro', nav_logout:'Cerrar sesión',
+  h2_create_company:'Crear nueva empresa', label_name:'Nombre',
+  label_slug:'Slug (opcional, para subdominio)', btn_create_company:'+ Crear empresa',
+  h2_companies_list:'Empresas del sistema',
+  p_companies:'Cada empresa tiene su propia configuración, conversaciones, base de conocimiento y métricas aisladas.',
+  h2_create_demo:'Crear demo para prospecto',
+  p_create_demo:'Cada demo es un entorno aislado con su propio branding, FAQ, conversaciones y métricas. Genera un link único compartible con tu prospecto.',
+  label_demo_name:'Nombre del demo / prospecto', label_demo_clone:'Clonar configuración desde',
+  opt_demo_empty:'— Empresa vacía (plantilla)', label_demo_expiry:'Expira en (días, vacío = no expira)',
+  label_demo_seed:'Precargar FAQs y conversaciones de ejemplo', btn_create_demo:'Crear demo', btn_create_template:'+ Crear plantilla',
+  h2_demos_list:'Demos existentes', h2_templates:'Plantillas de demo',
+  p_templates:'Empresas base configuradas para clonar al crear demos. Solo accesibles desde aquí.',
+  h2_demo_mode:'Modo demo',
+  p_demo_mode:'Prueba tu agente como si fueras un cliente. Las conversaciones demo NO se guardan ni afectan las métricas.',
+  btn_demo_client:'Probar como cliente', h2_metrics:'Métricas',
+  h2_unresolved:'Consultas sin resolver',
+  h2_top_questions:'Preguntas más frecuentes (desde chats reales)',
+  h2_activity:'Actividad últimos 7 días',
+  h2_biz_info:'Información del negocio', label_biz_name:'Nombre del negocio',
+  label_description:'Descripción', label_hours:'Horario', label_contact:'Contacto',
+  label_products:'Productos / servicios', h2_agent_behavior:'Comportamiento del agente',
+  label_tone:'Tono', label_welcome:'Mensaje de bienvenida',
+  label_booking:'Link de citas (opcional) — se incluye automaticamente cuando alguien pide una cita',
+  label_extra:'Instrucciones adicionales (opcional)', label_model:'Modelo Claude',
+  opt_haiku:'Haiku 4.5 (rápido/barato)', opt_sonnet:'Sonnet 4.6 (balance)',
+  opt_opus:'Opus 4.6 (máxima calidad)', label_accent_color:'Color de acento',
+  h2_handoff:'Redireccionamiento a humano', handoff_enabled:'Activado',
+  p_handoff:'Si el usuario menciona alguna de estas frases, la IA dejará de responder y alertará al número de WhatsApp configurado para atención manual.',
+  label_triggers:'Si el usuario menciona o pregunta…',
+  label_handoff_phone:'Entonces la IA alertará a este número de WhatsApp',
+  label_handoff_msg:'Mensaje que recibe el usuario al ser redireccionado',
+  btn_save_changes:'Guardar cambios',
+  h2_identity:'Identidad del agente', label_agent_name:'Nombre del agente',
+  label_language:'Idioma por defecto',
+  label_auto_detect:'Detectar idioma automáticamente (responde en el idioma del cliente)',
+  p_lang_support:'Soporta: español, inglés, francés, portugués, hebreo y más.',
+  label_personality:'Personalidad', label_voice_tone:'Tono de voz',
+  h2_voice_examples:'Ejemplos de tu tono (entrena al agente)',
+  p_voice_examples:'Pega fragmentos reales tuyos: posts, emails, respuestas de WhatsApp. El agente imitará este estilo.',
+  h2_defaults:'Respuestas predeterminadas',
+  p_defaults:'El agente usará estas respuestas (o adaptaciones) en situaciones comunes.',
+  btn_add_default:'+ Añadir situación', btn_save_all:'Guardar todo',
+  h2_faqs:'Preguntas frecuentes', btn_add_faq:'+ Añadir FAQ', btn_save_faqs:'Guardar FAQs',
+  h2_quick:'Botones rápidos al iniciar chat',
+  p_quick:'El cliente verá estos botones debajo del mensaje de bienvenida. Al clickearlos envían el mensaje configurado automáticamente.',
+  btn_add_quick:'+ Añadir botón', btn_save:'Guardar',
+  h2_hours:'Horarios de atención', label_enable_hours:'Activar horarios de atención',
+  label_timezone:'Zona horaria', label_schedule:'Días y horarios',
+  h2_offline_msg:'Mensaje fuera de horario',
+  p_offline_msg:'El agente usará (o adaptará) este mensaje cuando un cliente escriba fuera de horario.',
+  btn_save_hours:'Guardar horarios',
+  h2_colors:'Colores', label_accent_btn:'Acento (botones, bordes)',
+  label_bg_color:'Fondo del chat', label_user_bubble:'Color burbuja usuario',
+  h2_logo:'Logo de la empresa', btn_clear_logo:'Quitar logo',
+  h2_avatar:'Avatar del agente', btn_clear_avatar:'Quitar avatar',
+  h2_widget_pos:'Posición del widget', pos_right:'Esquina inferior derecha',
+  pos_left:'Esquina inferior izquierda', btn_save_appearance:'Guardar apariencia',
+  h2_live_preview:'Preview en vivo',
+  h2_email_notifs:'Notificaciones por email',
+  p_email_notifs:'Recibirás un email cuando el agente capture un lead (email/teléfono del cliente) o cuando escale una conversación que no pudo resolver.',
+  label_notify_email:'Tu email de destino',
+  notif_leads:'Avisarme cuando capture leads', notif_escalation:'Avisarme de escalamientos',
+  h2_smtp:'Servidor SMTP',
+  p_smtp:'Configura tu SMTP. Opciones comunes: Gmail (smtp.gmail.com:587 con App Password), SendGrid, Mailgun, Resend SMTP, etc.',
+  label_smtp_host:'Host', label_smtp_port:'Puerto', label_smtp_user:'Usuario',
+  label_smtp_pass:'Contraseña / App Password', label_smtp_from:'Remitente (From)',
+  label_ssl:'Conexión SSL/TLS directa (puerto 465)',
+  btn_test_email:'Enviar email de prueba',
+  h2_stats:'Estadísticas', label_period:'Período:',
+  period_all:'Histórico', period_month:'Últimos 30 días', period_week:'Últimos 7 días', period_today:'Hoy',
+  btn_refresh:'↻ Actualizar', h3_channel_origin:'Origen de conversación',
+  h3_distribution:'Distribución', h3_campaigns:'Conversaciones por campaña',
+  h3_stages:'Conversación por etapa', h3_activity:'Actividad (últimos 30 días)',
+  h3_report:'Reporte PDF', report_7d:'Últimos 7 días', report_30d:'Últimos 30 días', report_90d:'Últimos 90 días',
+  btn_download_pdf:'Descargar PDF', btn_preview:'Vista previa',
+  h2_from_url:'Agregar desde website',
+  p_from_url:'Extrae automáticamente el contenido de una página web y lo agrega a la base de conocimiento.',
+  label_url:'URL de la página',
+  label_url_title:'Título (opcional — si no, se usa el título de la página)',
+  btn_scrape:'Extraer contenido', h2_upload_pdf:'Subir PDF',
+  label_pdf_title:'Título (opcional)', label_pdf_file:'Archivo PDF',
+  btn_upload_pdf:'Subir PDF', h2_add_text:'Añadir texto',
+  label_txt_title:'Título', label_txt_content:'Contenido', btn_add_text:'Añadir',
+  h2_docs:'Documentos cargados',
+  h2_pending_training:'Preguntas pendientes de entrenar',
+  p_pending_training:'Aquí aparecen preguntas que el agente no supo responder (escalamientos) o que recibieron thumbs down. Enséñale la respuesta correcta y la usará la próxima vez.',
+  h2_trained:'Respuestas ya entrenadas',
+  h2_leads:'Leads capturados', leads_search_placeholder:'Buscar por nombre, email o telefono...',
+  h2_convs:'Conversaciones recientes', btn_takeover:'Tomar control (/)',
+  btn_return_ai:'Devolver a IA (//)',
+  h2_connect_wa:'Conectar WhatsApp',
+  p_connect_wa:'Escanea el QR con WhatsApp en tu teléfono (Configuración → Dispositivos vinculados → Vincular dispositivo). Una vez conectado, el agente responde automáticamente.',
+  h2_create_user:'Crear usuario',
+  p_create_user:'Cada usuario accede con su email y contraseña y solo puede ver las empresas que le asignes.',
+  label_user_email:'Email', label_user_pw:'Contraseña',
+  label_assigned_companies:'Empresas asignadas', btn_create_user:'+ Crear usuario',
+  h2_users_list:'Usuarios del sistema',
+  h2_embed:'Código para embeber',
+  p_embed:'Pega este script antes de 
  <div id="tab-citas" class="tab">
   <div class="tab-topbar">
    <div class="tab-topbar-title">Gestion de Citas</div>
@@ -1545,33 +1487,6 @@
    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
    <span>No tienes un link de citas configurado. <button onclick="tab('config')" style="background:none;border:none;color:#f97316;text-decoration:underline;cursor:pointer;font-size:12px;padding:0;text-transform:none;letter-spacing:0;font-weight:600">Agregalo en Configuracion</button> para que las variables <code style="color:var(--gold)">{link_reserva}</code> funcionen.</span>
   </div>
-
-  <!-- GHL WEBHOOK PANEL -->
-  <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" width="15" height="15"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-    <div style="font-size:13px;font-weight:600;color:var(--text)">Webhook GHL → Lynkro</div>
-   </div>
-   <div style="font-size:11px;color:var(--muted);margin-bottom:10px">En GHL → Settings → Integrations → Webhooks → agregar este URL. Eventos: <strong style="color:var(--text)">AppointmentCreated</strong> y <strong style="color:var(--text)">AppointmentDeleted</strong></div>
-   <div style="display:flex;align-items:center;gap:8px">
-    <code id="ghl-webhook-url" style="flex:1;font-size:11px;background:rgba(0,0,0,.35);padding:7px 10px;border-radius:6px;color:#7dd3fc;overflow:auto;white-space:nowrap">Cargando…</code>
-    <button onclick="copyWebhookUrl()" style="font-size:11px;padding:5px 10px;white-space:nowrap">Copiar</button>
-   </div>
-  </div>
-
-  <!-- GENERIC WEBHOOK PANEL (Vagaro / Booksy / Zapier) -->
-  <div style="background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" width="15" height="15"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-    <div style="font-size:13px;font-weight:600;color:var(--text)">Webhook genérico — Vagaro / Booksy / Zapier</div>
-   </div>
-   <div style="font-size:11px;color:var(--muted);margin-bottom:10px">En Zapier: Trigger → tu app (Vagaro/Booksy) → Action → Webhooks → POST a este URL. Campos esperados: <code style="color:#c4b5fd">phone</code>, <code style="color:#c4b5fd">name</code>, <code style="color:#c4b5fd">event</code> (contain "creat/book/cancel")</div>
-   <div style="display:flex;align-items:center;gap:8px">
-    <code id="generic-webhook-url" style="flex:1;font-size:11px;background:rgba(0,0,0,.35);padding:7px 10px;border-radius:6px;color:#c4b5fd;overflow:auto;white-space:nowrap">Cargando…</code>
-    <button onclick="copyGenericWebhookUrl()" style="font-size:11px;padding:5px 10px;white-space:nowrap">Copiar</button>
-   </div>
-  </div>
-
   <div class="camp-grid">
 
    <div class="cita-card" id="cita-card-confirm">
@@ -1764,106 +1679,9 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
    <div class="metric"><div class="v" id="camp-stat-sent" style="color:#3BA5FF">—</div><div class="l">Enviadas este mes</div></div>
    <div class="metric"><div class="v" id="camp-stat-rate" style="color:var(--gold)">—</div><div class="l">Tasa de respuesta</div></div>
   </div>
-
-  <!-- GHL CONNECTION PANEL -->
-  <div id="ghl-banner" style="background:rgba(39,245,155,.05);border:1px solid rgba(39,245,155,.18);border-radius:12px;padding:16px 18px;margin-bottom:20px">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:10px">
-     <div id="ghl-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0;transition:background .3s"></div>
-     <div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">GoHighLevel — Fuente de datos</div>
-      <div id="ghl-status-txt" style="font-size:11px;color:var(--muted);margin-top:2px">No conectado · Las campanas necesitan GHL para obtener contactos y citas</div>
-     </div>
-    </div>
-    <div style="display:flex;gap:8px">
-     <button id="btn-ghl-connect" onclick="toggleGhlForm()" style="font-size:12px;padding:6px 14px">Conectar GHL</button>
-     <button id="btn-ghl-disconnect" onclick="disconnectGhl()" style="display:none;font-size:12px;padding:6px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;cursor:pointer">Desconectar</button>
-    </div>
-   </div>
-   <div id="ghl-form" style="display:none;margin-top:14px;border-top:1px solid rgba(39,245,155,.1);padding-top:14px">
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">
-     <div>
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Location ID</label>
-      <input id="ghl-location-id" type="text" placeholder="xxxxxxxxxxxxxxxxxxxxxxxx" style="font-size:12px;width:100%">
-     </div>
-     <div>
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">API Key (Private Integration)</label>
-      <input id="ghl-api-key" type="password" placeholder="eyJhbGciOi..." style="font-size:12px;width:100%">
-     </div>
-     <button onclick="testGhlConn()" style="font-size:12px;padding:7px 14px;white-space:nowrap">Probar y guardar</button>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">En GHL → Settings → Business Profile → Private Integrations → crear nueva clave</div>
-    <div id="ghl-test-result" style="display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:8px"></div>
-   </div>
-  </div>
-
-  <!-- CREDENTIALS PANEL — super admin only -->
-  <div id="server-creds-panel" style="display:none;background:rgba(250,204,21,.05);border:1px solid rgba(250,204,21,.2);border-radius:12px;padding:16px 18px;margin-bottom:14px">
-   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    <div style="font-size:13px;font-weight:600;color:var(--text)">Credenciales del servidor</div>
-    <span style="font-size:10px;background:rgba(250,204,21,.15);color:#facc15;padding:2px 7px;border-radius:10px;font-weight:600">SERVIDOR</span>
-   </div>
-   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div>
-     <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:6px;letter-spacing:.5px">SQUARE</div>
-     <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">App ID</label>
-     <input id="sq-app-id" type="text" placeholder="sq0idp-..." style="font-size:12px;margin-bottom:6px">
-     <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">App Secret</label>
-     <input id="sq-app-secret" type="password" placeholder="sq0csp-..." style="font-size:12px">
-    </div>
-    <div>
-     <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:6px;letter-spacing:.5px">QUICKBOOKS</div>
-     <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Client ID</label>
-     <input id="qbo-client-id-inp" type="text" placeholder="AB..." style="font-size:12px;margin-bottom:6px">
-     <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px">Client Secret</label>
-     <input id="qbo-client-secret-inp" type="password" placeholder="..." style="font-size:12px">
-    </div>
-   </div>
-   <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
-    <button onclick="saveServerCreds()" style="font-size:12px;padding:7px 18px">Guardar credenciales</button>
-    <span id="server-creds-msg" style="font-size:12px;color:var(--muted)"></span>
-   </div>
-   <div style="font-size:11px;color:var(--muted);margin-top:8px">Estas credenciales son globales — aplican para todas las empresas que conecten Square o QuickBooks desde este servidor.</div>
-  </div>
-
-  <!-- SQUARE CONNECTION PANEL -->
-  <div id="square-banner" style="background:rgba(59,165,255,.05);border:1px solid rgba(59,165,255,.18);border-radius:12px;padding:16px 18px;margin-bottom:14px">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:10px">
-     <div id="square-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0"></div>
-     <div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">Square — Reservas y clientes</div>
-      <div id="square-status-txt" style="font-size:11px;color:var(--muted);margin-top:2px">Cargando…</div>
-     </div>
-    </div>
-    <div style="display:flex;gap:8px">
-     <button id="btn-square-connect" onclick="connectSquare()" style="display:none;font-size:12px;padding:6px 14px">Conectar Square</button>
-     <button id="btn-square-disconnect" onclick="disconnectSquare()" style="display:none;font-size:12px;padding:6px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;cursor:pointer">Desconectar</button>
-    </div>
-   </div>
-  </div>
-
-  <!-- QBO CONNECTION PANEL -->
-  <div id="qbo-banner" style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.18);border-radius:12px;padding:16px 18px;margin-bottom:20px">
-   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:10px">
-     <div id="qbo-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0"></div>
-     <div>
-      <div style="font-size:13px;font-weight:600;color:var(--text)">QuickBooks — Facturación y clientes</div>
-      <div id="qbo-status-txt" style="font-size:11px;color:var(--muted);margin-top:2px">Cargando…</div>
-     </div>
-    </div>
-    <div style="display:flex;gap:8px">
-     <button id="btn-qbo-connect" onclick="connectQBO()" style="display:none;font-size:12px;padding:6px 14px">Conectar QuickBooks</button>
-     <button id="btn-qbo-disconnect" onclick="disconnectQBO()" style="display:none;font-size:12px;padding:6px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;cursor:pointer">Desconectar</button>
-    </div>
-   </div>
-  </div>
-
   <div class="camp-grid">
 
-   <div class="camp-card camp-industry-card" data-industry="peluqueria" id="camp-card-ext_maint">
+   <div class="camp-card" id="camp-card-ext_maint">
     <div class="camp-hdr" onclick="toggleCampOpen('ext_maint')">
      <span class="camp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span>
      <div style="flex:1"><div class="camp-name">Mantenimiento de extensiones</div><div class="camp-desc">Recuerda a tus clientes cuando es tiempo de volver para mantenimiento.</div></div>
@@ -1889,7 +1707,7 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
     </div>
    </div>
 
-   <div class="camp-card camp-industry-card" data-industry="peluqueria" id="camp-card-keratin">
+   <div class="camp-card" id="camp-card-keratin">
     <div class="camp-hdr" onclick="toggleCampOpen('keratin')">
      <span class="camp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2C8 2 5 5 5 9c0 2.4 1.1 4.5 2.8 5.9L9 21h6l1.2-6.1C17.9 13.5 19 11.4 19 9c0-4-3-7-7-7z"/></svg></span>
      <div style="flex:1"><div class="camp-name">Retoque de queratina</div><div class="camp-desc">Avisa cuando el efecto de la queratina esta por terminar.</div></div>
@@ -2049,209 +1867,11 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
    </div>
 
   </div>
-
-  <!-- Campañas personalizadas -->
-  <div style="margin-top:24px">
-   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div>
-     <div style="font-size:15px;font-weight:600;color:var(--text)">Campanas personalizadas</div>
-     <div style="font-size:12px;color:var(--muted);margin-top:2px">Crea campanas propias adaptadas a tu negocio</div>
-    </div>
-    <button onclick="showCustomCampForm()" style="font-size:12px;padding:7px 16px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);color:var(--gold);border-radius:8px;cursor:pointer">+ Nueva campana</button>
-   </div>
-
-   <!-- Form nueva campaña personalizada (oculto por defecto) -->
-   <div id="custom-camp-form" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px">Nueva campana personalizada</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-     <div>
-      <label style="font-size:11px;color:var(--muted)">Nombre de la campana</label>
-      <input id="cc-name" placeholder="Ej. Seguimiento VIP" style="margin-top:4px;font-size:12px">
-     </div>
-     <div>
-      <label style="font-size:11px;color:var(--muted)">Canal</label>
-      <select id="cc-channel" style="margin-top:4px;font-size:12px;padding:8px 10px">
-       <option value="whatsapp">WhatsApp</option>
-       <option value="sms">SMS</option>
-       <option value="instagram">Instagram</option>
-      </select>
-     </div>
-    </div>
-    <div style="margin-bottom:12px">
-     <label style="font-size:11px;color:var(--muted)">Descripcion</label>
-     <input id="cc-desc" placeholder="Ej. Mensaje especial para clientes premium" style="margin-top:4px;font-size:12px">
-    </div>
-    <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:end;margin-bottom:12px">
-     <div>
-      <label style="font-size:11px;color:var(--muted)">Enviar despues de</label>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-       <input type="number" id="cc-delay" value="3" min="1" max="365" style="width:70px;font-size:12px">
-       <select id="cc-delay-unit" style="font-size:12px;padding:8px 10px">
-        <option value="hours">horas</option>
-        <option value="days" selected>dias</option>
-        <option value="weeks">semanas</option>
-       </select>
-       <span style="font-size:11px;color:var(--muted)">del servicio</span>
-      </div>
-     </div>
-    </div>
-    <div style="margin-bottom:12px">
-     <label style="font-size:11px;color:var(--muted)">Mensaje</label>
-     <textarea id="cc-msg" style="min-height:80px;font-size:12px;margin-top:4px" placeholder="Hola {nombre}, ..."></textarea>
-     <div style="font-size:10px;color:var(--muted);margin-top:4px">Variables disponibles: <code style="background:rgba(39,245,155,.08);color:#27F59B;border-radius:3px;padding:1px 5px">{nombre}</code> <code style="background:rgba(39,245,155,.08);color:#27F59B;border-radius:3px;padding:1px 5px">{negocio}</code> <code style="background:rgba(39,245,155,.08);color:#27F59B;border-radius:3px;padding:1px 5px">{link_reserva}</code></div>
-    </div>
-    <div style="display:flex;gap:8px">
-     <button onclick="saveCustomCamp()" style="font-size:12px;padding:7px 18px">Guardar campana</button>
-     <button onclick="document.getElementById('custom-camp-form').style.display='none'" style="font-size:12px;padding:7px 16px;background:transparent;border:1px solid var(--border);color:var(--muted)">Cancelar</button>
-    </div>
-   </div>
-
-   <!-- Lista de campañas personalizadas existentes -->
-   <div id="custom-camps-list"></div>
-  </div>
-
   <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px;padding:14px 18px;margin-top:16px;font-size:12px;color:var(--muted);line-height:1.6">
    <strong style="color:#3B82F6">Canales requeridos:</strong> WhatsApp (seccion Canales), SMS (Telnyx via configuracion), Instagram (seccion Canales). Activa el canal correspondiente antes de habilitar una campana.
   </div>
  </div>
-</div>
-</main>
-</div>
-
-<div id="toast" class="toast"></div>
-
-<div id="demoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;padding:16px">
- <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;display:flex;flex-direction:column;height:580px;max-height:calc(100vh - 40px)">
- <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
- <span style="font-weight:600;color:var(--gold);font-size:15px">Vista previa del agente</span>
- <div style="display:flex;gap:8px">
- <button class="secondary" onclick="resetDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0">Reiniciar</button>
- <button class="secondary" onclick="closeDemo()" style="font-size:12px;padding:6px 12px;text-transform:none;letter-spacing:0">Cerrar</button>
- </div>
- </div>
- <div id="demoMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#0c0f14;scrollbar-width:thin"></div>
- <form style="display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);flex-shrink:0"
- onsubmit="event.preventDefault();const t=document.getElementById('demoInput').value.trim();if(t){document.getElementById('demoInput').value='';sendDemo(t);}">
- <input id="demoInput" placeholder="Escribe un mensaje..." style="flex:1;font-size:14px" autocomplete="off">
- <button type="submit" style="padding:8px 20px;text-transform:none;letter-spacing:0">Enviar</button>
- </form>
- </div>
-</div>
-<script>
-// ── i18n ─────────────────────────────────────────────────────────────
-const T_ADMIN = {
- es: {
-  login_title:'Iniciar sesión', login_email:'Correo electrónico', login_pw:'Contraseña',
-  login_btn:'Iniciar sesión', login_privacy:'Políticas de privacidad',
-  sb_subtitle:'Panel Admin · Multi-empresa', sb_empresa_label:'Empresa activa',
-  sb_general:'General', sb_empresa:'Empresa activa', sb_channels:'Canales',
-  sb_data:'Datos', sb_training:'Entrenamiento',
-  nav_dashboard:'Dashboard', nav_companies:'Empresas', nav_demos:'Demos',
-  nav_users:'Usuarios', nav_config:'Configuración', nav_persona:'Personalidad',
-  nav_faqs:'FAQs', nav_quick:'Resp. rápidas', nav_hours:'Horarios',
-  nav_appearance:'Apariencia', nav_notifications:'Notificaciones',
-  nav_whatsapp:'WhatsApp', nav_instagram:'Instagram', nav_embed:'Embeber',
-  nav_leads:'Leads', nav_convs:'Conversaciones', nav_reports:'Reportes',
-  nav_knowledge:'Conocimiento', nav_training:'Entrenar',
-  theme_light:'Modo claro', theme_dark:'Modo oscuro', nav_logout:'Cerrar sesión',
-  h2_create_company:'Crear nueva empresa', label_name:'Nombre',
-  label_slug:'Slug (opcional, para subdominio)', btn_create_company:'+ Crear empresa',
-  h2_companies_list:'Empresas del sistema',
-  p_companies:'Cada empresa tiene su propia configuración, conversaciones, base de conocimiento y métricas aisladas.',
-  h2_create_demo:'Crear demo para prospecto',
-  p_create_demo:'Cada demo es un entorno aislado con su propio branding, FAQ, conversaciones y métricas. Genera un link único compartible con tu prospecto.',
-  label_demo_name:'Nombre del demo / prospecto', label_demo_clone:'Clonar configuración desde',
-  opt_demo_empty:'— Empresa vacía (plantilla)', label_demo_expiry:'Expira en (días, vacío = no expira)',
-  label_demo_seed:'Precargar FAQs y conversaciones de ejemplo', btn_create_demo:'Crear demo', btn_create_template:'+ Crear plantilla',
-  h2_demos_list:'Demos existentes', h2_templates:'Plantillas de demo',
-  p_templates:'Empresas base configuradas para clonar al crear demos. Solo accesibles desde aquí.',
-  h2_demo_mode:'Modo demo',
-  p_demo_mode:'Prueba tu agente como si fueras un cliente. Las conversaciones demo NO se guardan ni afectan las métricas.',
-  btn_demo_client:'Probar como cliente', h2_metrics:'Métricas',
-  h2_unresolved:'Consultas sin resolver',
-  h2_top_questions:'Preguntas más frecuentes (desde chats reales)',
-  h2_activity:'Actividad últimos 7 días',
-  h2_biz_info:'Información del negocio', label_biz_name:'Nombre del negocio',
-  label_description:'Descripción', label_hours:'Horario', label_contact:'Contacto',
-  label_products:'Productos / servicios', h2_agent_behavior:'Comportamiento del agente',
-  label_tone:'Tono', label_welcome:'Mensaje de bienvenida',
-  label_booking:'Link de citas (opcional) — se incluye automaticamente cuando alguien pide una cita',
-  label_extra:'Instrucciones adicionales (opcional)', label_model:'Modelo Claude',
-  opt_haiku:'Haiku 4.5 (rápido/barato)', opt_sonnet:'Sonnet 4.6 (balance)',
-  opt_opus:'Opus 4.6 (máxima calidad)', label_accent_color:'Color de acento',
-  h2_handoff:'Redireccionamiento a humano', handoff_enabled:'Activado',
-  p_handoff:'Si el usuario menciona alguna de estas frases, la IA dejará de responder y alertará al número de WhatsApp configurado para atención manual.',
-  label_triggers:'Si el usuario menciona o pregunta…',
-  label_handoff_phone:'Entonces la IA alertará a este número de WhatsApp',
-  label_handoff_msg:'Mensaje que recibe el usuario al ser redireccionado',
-  btn_save_changes:'Guardar cambios',
-  h2_identity:'Identidad del agente', label_agent_name:'Nombre del agente',
-  label_language:'Idioma por defecto',
-  label_auto_detect:'Detectar idioma automáticamente (responde en el idioma del cliente)',
-  p_lang_support:'Soporta: español, inglés, francés, portugués, hebreo y más.',
-  label_personality:'Personalidad', label_voice_tone:'Tono de voz',
-  h2_voice_examples:'Ejemplos de tu tono (entrena al agente)',
-  p_voice_examples:'Pega fragmentos reales tuyos: posts, emails, respuestas de WhatsApp. El agente imitará este estilo.',
-  h2_defaults:'Respuestas predeterminadas',
-  p_defaults:'El agente usará estas respuestas (o adaptaciones) en situaciones comunes.',
-  btn_add_default:'+ Añadir situación', btn_save_all:'Guardar todo',
-  h2_faqs:'Preguntas frecuentes', btn_add_faq:'+ Añadir FAQ', btn_save_faqs:'Guardar FAQs',
-  h2_quick:'Botones rápidos al iniciar chat',
-  p_quick:'El cliente verá estos botones debajo del mensaje de bienvenida. Al clickearlos envían el mensaje configurado automáticamente.',
-  btn_add_quick:'+ Añadir botón', btn_save:'Guardar',
-  h2_hours:'Horarios de atención', label_enable_hours:'Activar horarios de atención',
-  label_timezone:'Zona horaria', label_schedule:'Días y horarios',
-  h2_offline_msg:'Mensaje fuera de horario',
-  p_offline_msg:'El agente usará (o adaptará) este mensaje cuando un cliente escriba fuera de horario.',
-  btn_save_hours:'Guardar horarios',
-  h2_colors:'Colores', label_accent_btn:'Acento (botones, bordes)',
-  label_bg_color:'Fondo del chat', label_user_bubble:'Color burbuja usuario',
-  h2_logo:'Logo de la empresa', btn_clear_logo:'Quitar logo',
-  h2_avatar:'Avatar del agente', btn_clear_avatar:'Quitar avatar',
-  h2_widget_pos:'Posición del widget', pos_right:'Esquina inferior derecha',
-  pos_left:'Esquina inferior izquierda', btn_save_appearance:'Guardar apariencia',
-  h2_live_preview:'Preview en vivo',
-  h2_email_notifs:'Notificaciones por email',
-  p_email_notifs:'Recibirás un email cuando el agente capture un lead (email/teléfono del cliente) o cuando escale una conversación que no pudo resolver.',
-  label_notify_email:'Tu email de destino',
-  notif_leads:'Avisarme cuando capture leads', notif_escalation:'Avisarme de escalamientos',
-  h2_smtp:'Servidor SMTP',
-  p_smtp:'Configura tu SMTP. Opciones comunes: Gmail (smtp.gmail.com:587 con App Password), SendGrid, Mailgun, Resend SMTP, etc.',
-  label_smtp_host:'Host', label_smtp_port:'Puerto', label_smtp_user:'Usuario',
-  label_smtp_pass:'Contraseña / App Password', label_smtp_from:'Remitente (From)',
-  label_ssl:'Conexión SSL/TLS directa (puerto 465)',
-  btn_test_email:'Enviar email de prueba',
-  h2_stats:'Estadísticas', label_period:'Período:',
-  period_all:'Histórico', period_month:'Últimos 30 días', period_week:'Últimos 7 días', period_today:'Hoy',
-  btn_refresh:'↻ Actualizar', h3_channel_origin:'Origen de conversación',
-  h3_distribution:'Distribución', h3_campaigns:'Conversaciones por campaña',
-  h3_stages:'Conversación por etapa', h3_activity:'Actividad (últimos 30 días)',
-  h3_report:'Reporte PDF', report_7d:'Últimos 7 días', report_30d:'Últimos 30 días', report_90d:'Últimos 90 días',
-  btn_download_pdf:'Descargar PDF', btn_preview:'Vista previa',
-  h2_from_url:'Agregar desde website',
-  p_from_url:'Extrae automáticamente el contenido de una página web y lo agrega a la base de conocimiento.',
-  label_url:'URL de la página',
-  label_url_title:'Título (opcional — si no, se usa el título de la página)',
-  btn_scrape:'Extraer contenido', h2_upload_pdf:'Subir PDF',
-  label_pdf_title:'Título (opcional)', label_pdf_file:'Archivo PDF',
-  btn_upload_pdf:'Subir PDF', h2_add_text:'Añadir texto',
-  label_txt_title:'Título', label_txt_content:'Contenido', btn_add_text:'Añadir',
-  h2_docs:'Documentos cargados',
-  h2_pending_training:'Preguntas pendientes de entrenar',
-  p_pending_training:'Aquí aparecen preguntas que el agente no supo responder (escalamientos) o que recibieron thumbs down. Enséñale la respuesta correcta y la usará la próxima vez.',
-  h2_trained:'Respuestas ya entrenadas',
-  h2_leads:'Leads capturados', leads_search_placeholder:'Buscar por nombre, email o telefono...',
-  h2_convs:'Conversaciones recientes', btn_takeover:'Tomar control (/)',
-  btn_return_ai:'Devolver a IA (//)',
-  h2_connect_wa:'Conectar WhatsApp',
-  p_connect_wa:'Escanea el QR con WhatsApp en tu teléfono (Configuración → Dispositivos vinculados → Vincular dispositivo). Una vez conectado, el agente responde automáticamente.',
-  h2_create_user:'Crear usuario',
-  p_create_user:'Cada usuario accede con su email y contraseña y solo puede ver las empresas que le asignes.',
-  label_user_email:'Email', label_user_pw:'Contraseña',
-  label_assigned_companies:'Empresas asignadas', btn_create_user:'+ Crear usuario',
-  h2_users_list:'Usuarios del sistema',
-  h2_embed:'Código para embeber',
-  p_embed:'Pega este script antes de </body> en cualquier web:',
+</body> en cualquier web:',
   btn_copy_embed:'Copiar código',
   modal_title:'Vista previa del agente', modal_reset:'Reiniciar', modal_close:'Cerrar',
   modal_send:'Enviar', modal_input_placeholder:'Escribe un mensaje...',
@@ -2599,8 +2219,8 @@ function logout() {
 })();
 
 function render() {
- ['businessName','description','industry','hours','contact','products','tone',
- 'welcomeMessage','welcomeMessageEn','bookingUrl','systemPromptExtra','model','plan','accentColor',
+ ['businessName','description','hours','contact','products','tone',
+ 'welcomeMessage','bookingUrl','systemPromptExtra','model','accentColor',
  'agentName','personality','language','voiceExamples',
  'waBaseUrl','waInstance','waApiKey',
  'metaAppId','metaAppSecret',
@@ -2633,24 +2253,8 @@ function render() {
   if (igConn) igConn.style.display = 'none';
  }
  renderFaqs(); renderDefaults(); renderQuick(); renderHours(); renderAppearance();
- updateModelOptions();
  document.getElementById('embedCode').value =
  `<script src="${location.origin}/widget.js" data-api="${location.origin}" data-company="${activeCompanyId}"><\/script>`;
- // Share link — usa share_token si existe, si no el token de company directamente
- const shareLinkEl = document.getElementById('shareLink');
- if (shareLinkEl) {
-  const co = companies.find(c => c.id === activeCompanyId);
-  const tok = co?.share_token || '';
-  shareLinkEl.value = tok ? `${location.origin}/demo/${tok}` : `${location.origin}/chat?company=${activeCompanyId}`;
- }
-}
-
-function updateShareLink() {
- const el = document.getElementById('shareLink');
- if (!el) return;
- const co = companies.find(c => c.id === activeCompanyId);
- const tok = co?.share_token || '';
- el.value = tok ? `${location.origin}/demo/${tok}` : `${location.origin}/chat?company=${activeCompanyId}`;
 }
 
 function renderFaqs() {
@@ -3022,8 +2626,8 @@ function setDay(d, key, val) {
 }
 
 function save() {
- ['businessName','description','industry','hours','contact','products','tone',
- 'welcomeMessage','welcomeMessageEn','bookingUrl','systemPromptExtra','model','plan','accentColor',
+ ['businessName','description','hours','contact','products','tone',
+ 'welcomeMessage','bookingUrl','systemPromptExtra','model','accentColor',
  'agentName','personality','language','voiceExamples',
  'waBaseUrl','waInstance','waApiKey',
  'metaAppId','metaAppSecret',
@@ -3067,11 +2671,10 @@ function tab(name) {
  if (name === 'knowledge') loadDocs();
  if (name === 'dashboard') loadDashboard();
  if (name === 'training') loadTraining();
- if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus() }
+ if (name === 'campanas') loadCampanas();
  if (name === 'citas') loadCitas();
  if (name === 'companies') loadCompaniesList();
  if (name === 'demos') loadDemos();
- if (name === 'embed') updateShareLink();
  if (name === 'users') loadUsers();
  if (name === 'reports') loadStats();
  if (name === 'triggers') renderTriggers();
@@ -3106,7 +2709,7 @@ function loadDemos() {
      </div>
      <button onclick="editTemplate('${t.id}')" style="background:var(--card);color:var(--gold);border:1px solid var(--border);font-size:11px;white-space:nowrap"> Editar plantilla</button>
      <button onclick="toggleGenerateForm('${t.id}')" style="background:rgba(0,200,90,.1);color:#4ade80;border:1px solid rgba(0,200,90,.3);font-size:11px;white-space:nowrap">Generar con IA</button>
-     <button onclick="deleteTemplate('${t.id}','${t.name.replace(/'/g,"\\'")}')" style="background:var(--card);color:#ef4444;border:1px solid var(--border);font-size:11px;white-space:nowrap">Eliminar</button>
+     <button onclick="deleteTemplate('${t.id}','${t.name.replace(/'/g,&quot;\\'&quot;)}')" style="background:var(--card);color:#ef4444;border:1px solid var(--border);font-size:11px;white-space:nowrap">Eliminar</button>
     </div>
     <div id="genform-${t.id}" style="display:none;margin-top:12px">
      <textarea id="geninfo-${t.id}" rows="3" placeholder="Describe el negocio en un párrafo: servicios, ubicación, horarios, diferenciadores, público objetivo..." style="width:100%;resize:vertical;font-size:12px;line-height:1.5;margin-bottom:8px"></textarea>
@@ -3438,101 +3041,6 @@ function renderDashboard(d) {
  <div class="count">${a.c}</div>
  </div>`).join('')
  : '<p style="color:#666">Sin actividad aún.</p>';
-}
-
-function loadAIInsights() {
- const days = document.getElementById('insights-days').value
- const btn = document.getElementById('insights-btn')
- document.getElementById('insights-loading').style.display = 'block'
- document.getElementById('insights-result').style.display = 'none'
- document.getElementById('insights-empty').style.display = 'none'
- btn.disabled = true
-
- fetch(`/api/dashboard/ai-insights?days=${days}`, { headers: { 'x-admin-password': password } })
- .then(r => r.json())
- .then(d => {
-  document.getElementById('insights-loading').style.display = 'none'
-  btn.disabled = false
-  const f = d.funnel
-
-  // Donut chart — 3 arcs stacked
-  const C = 2 * Math.PI * 56  // circumference ≈ 352
-  const leadFrac  = f.conversations ? f.leads / f.conversations : 0
-  const convFrac  = f.conversations ? f.converted / f.conversations : 0
-  const restFrac  = 1 - leadFrac
-  // arc for conversaciones (full background)
-  // arc for leads (gold)
-  const leadsOffset = C * (1 - leadFrac)
-  // arc for converted (green, on top of leads arc)
-  const convOffset  = C * (1 - convFrac)
-  document.getElementById('donut-leads').style.strokeDashoffset = leadsOffset
-  document.getElementById('donut-conv').style.strokeDashoffset  = convOffset
-  document.getElementById('donut-pct').textContent = f.conversionRate + '%'
-  document.getElementById('donut-lbl-c').textContent  = f.conversations
-  document.getElementById('donut-lbl-l').textContent  = f.leads
-  document.getElementById('donut-lbl-cv').textContent = f.converted
-
-  // Funnel barras
-  const stages = [
-   { label:'Conversaciones', val:f.conversations, pct:100,          color:'#6366f1', sub:'' },
-   { label:'Leads capturados', val:f.leads,       pct:f.leadRate,   color:'#D4AF37', sub:`${f.leadRate}% de conversaciones` },
-   { label:'Convertidos',     val:f.converted,    pct:f.conversionRate, color:'#4ade80', sub:`${f.conversionRate}% de leads` }
-  ]
-  document.getElementById('funnel-rows').innerHTML = stages.map(s => `
-   <div>
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-     <span style="font-size:13px;color:#bbb">${s.label}</span>
-     <span style="font-size:13px;font-weight:700;color:${s.color}">${s.val}</span>
-    </div>
-    <div style="background:#12121e;border-radius:4px;height:8px;overflow:hidden">
-     <div style="background:${s.color};height:100%;border-radius:4px;width:${s.pct}%;transition:width 1s ease;opacity:.85"></div>
-    </div>
-    ${s.sub ? `<p style="margin:4px 0 0;font-size:11px;color:#444">${s.sub}</p>` : ''}
-   </div>`).join('')
-
-  // KPIs
-  const kpiColor = v => v >= 50 ? '#4ade80' : v >= 25 ? '#fbbf24' : '#ef4444'
-  document.getElementById('insights-kpis').innerHTML = `
-   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1a1a2e">
-    <span style="font-size:12px;color:#888">Tasa captura de leads</span>
-    <span style="font-size:15px;font-weight:700;color:${kpiColor(f.leadRate)}">${f.leadRate}%</span>
-   </div>
-   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1a1a2e">
-    <span style="font-size:12px;color:#888">Tasa de conversión</span>
-    <span style="font-size:15px;font-weight:700;color:${kpiColor(f.conversionRate)}">${f.conversionRate}%</span>
-   </div>
-   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1a1a2e">
-    <span style="font-size:12px;color:#888">Leads sin convertir</span>
-    <span style="font-size:15px;font-weight:700;color:#aaa">${f.leads - f.converted}</span>
-   </div>
-   <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
-    <span style="font-size:12px;color:#888">Conversaciones sin lead</span>
-    <span style="font-size:15px;font-weight:700;color:#aaa">${f.conversations - f.leads}</span>
-   </div>`
-
-  // Resumen
-  if (d.summary) document.getElementById('insights-summary').textContent = d.summary
-
-  // Recomendaciones
-  document.getElementById('insights-list').innerHTML = (d.insights || []).map((i,idx) => `
-   <div style="background:#0d0d1a;border:1px solid #1c1c2e;border-radius:12px;padding:16px 18px;display:flex;gap:14px;align-items:flex-start">
-    <div style="width:36px;height:36px;border-radius:10px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${i.icon||'💡'}</div>
-    <div>
-     <div style="font-weight:600;color:#e2e8f0;font-size:13px;margin-bottom:5px">${i.title}</div>
-     <div style="color:#666;font-size:12px;line-height:1.6">${i.description}</div>
-    </div>
-   </div>`).join('')
-
-  document.getElementById('insights-ts').textContent = `Generado el ${d.generatedAt}`
-  document.getElementById('insights-result').style.display = 'block'
- })
- .catch(() => {
-  document.getElementById('insights-loading').style.display = 'none'
-  btn.disabled = false
-  document.getElementById('insights-empty').style.display = 'block'
-  document.getElementById('insights-empty').querySelector('h3').textContent = 'Error al generar análisis'
-  document.getElementById('insights-empty').querySelector('p').textContent = 'Ocurrió un error. Intenta de nuevo.'
- })
 }
 
 function resolveConv(id) {
@@ -3993,71 +3501,10 @@ function sendAdminReply() {
  }).then(() => { loadMessages(activeConvId); toast('Enviado'); });
 }
 
-async function aiGenerateConfig() {
- const info = document.getElementById('aiConfigInfo').value.trim();
- if (!info) return toast('Pega la información del negocio primero');
- const status = document.getElementById('aiConfigStatus');
- status.textContent = '⏳ Generando con IA... (puede tardar 15-20 seg)';
- try {
-  const r = await api('/api/dashboard/ai-generate-config', {
-   method: 'POST',
-   headers: { 'Content-Type': 'application/json' },
-   body: JSON.stringify({ info })
-  });
-  if (r.error) { status.textContent = '✗ ' + r.error; return; }
-  // Apply all generated fields to the form
-  const fields = ['businessName','description','industry','hours','contact','products','tone','welcomeMessage','agentName','language','personality','voiceExamples','systemPromptExtra','humanHandoffEnabled','humanHandoffTriggers','humanHandoffUserMsg'];
-  fields.forEach(f => {
-   const el = document.getElementById(f);
-   if (!el) return;
-   if (el.type === 'checkbox') el.checked = !!r[f];
-   else if (el.value !== undefined) el.value = r[f] ?? '';
-  });
-  // FAQs
-  if (Array.isArray(r.faqs) && r.faqs.length) {
-   config.faqs = r.faqs;
-   renderFaqs();
-  }
-  // Quick replies
-  if (Array.isArray(r.quickReplies) && r.quickReplies.length) {
-   config.quickReplies = r.quickReplies;
-   renderQuick();
-  }
-  // Office hours
-  if (r.officeHours) {
-   config.officeHours = r.officeHours;
-   renderHours();
-  }
-  // Default responses
-  if (Array.isArray(r.defaultResponses) && r.defaultResponses.length) {
-   config.defaultResponses = r.defaultResponses;
-   renderDefaults();
-  }
-  status.textContent = '✓ Configuración generada — revisa y guarda';
-  status.style.color = 'var(--gold)';
-  setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
-  toast('✓ Configuración generada con IA');
-  // Scroll to config form
-  document.getElementById('businessName')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
- } catch(e) {
-  status.textContent = '✗ Error al conectar con el servidor';
- }
-}
-
 function copyEmbed() {
  const el = document.getElementById('embedCode');
  el.select(); document.execCommand('copy');
  toast('Copiado ');
-}
-
-function copyShareLink() {
- const val = document.getElementById('shareLink').value;
- if (!val) return;
- navigator.clipboard.writeText(val).catch(() => {
-  const el = document.getElementById('shareLink');
-  el.select(); document.execCommand('copy');
- });
- toast('Link copiado ');
 }
 
 
@@ -4155,7 +3602,7 @@ function renderTriggers() {
  config.keywordTriggers = config.keywordTriggers || [];
  const triggers = config.keywordTriggers;
  if (!triggers.length) {
-  list.innerHTML = '<p style="color:#555;font-size:13px;text-align:center;padding:20px 0">No hay activadores. Haz clic en "+ Nuevo activador" para crear uno.</p>';
+  list.innerHTML = '<p style="color:#555;font-size:13px;text-align:center;padding:20px 0">No hay activadores. Haz clic en “+ Nuevo activador” para crear uno.</p>';
   return;
  }
  list.innerHTML = '';
@@ -4165,49 +3612,24 @@ function renderTriggers() {
   div.style.marginBottom = '14px';
   const kws = (t.keywords || []).join(', ');
   const mt = t.matchType || 'contains';
-  const isFlow = t.type === 'flow';
   const mtOpts = ['contains','word','exact'].map(function(v) {
    const labels = {contains:'contains — contiene la palabra', word:'word — palabra completa', exact:'exact — mensaje exacto'};
    return '<option value="' + v + '"' + (mt === v ? ' selected' : '') + '>' + labels[v] + '</option>';
   }).join('');
-
-  const steps = t.steps || [];
-
-  div.innerHTML = '<button onclick="removeTrigger(' + i + ')" title="Eliminar" style="position:absolute;top:10px;right:10px">✕</button>' +
-   '<div style="position:relative">' +
+  div.innerHTML = '<button onclick="removeTrigger(' + i + ')" title="Eliminar">✕</button>' +
    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
     '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Etiqueta (solo para ti)</label>' +
-    '<input value="' + (t.label||'').replace(/"/g,'&quot;') + '" placeholder="ej: Demo Flow" data-ti="' + i + '" data-field="label"></div>' +
+    '<input value="' + (t.label||'').replace(/"/g,'&quot;') + '" placeholder="ej: Solicitud de info" data-ti="' + i + '" data-field="label"></div>' +
     '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Tipo de coincidencia</label>' +
     '<select style="width:100%" data-ti="' + i + '" data-field="matchType">' + mtOpts + '</select></div>' +
    '</div>' +
-   '<div style="margin-bottom:12px"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Palabras clave <span style="color:#555">(separadas por comas)</span></label>' +
-   '<input value="' + kws.replace(/"/g,'&quot;') + '" placeholder="DEMO, info, precio" data-ti="' + i + '" data-field="keywords"></div>' +
-
-   // Type selector
-   '<div style="display:flex;gap:10px;margin-bottom:12px">' +
-    '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ' + (!isFlow ? 'var(--gold)' : 'var(--border)') + ';background:' + (!isFlow ? 'rgba(212,175,55,.1)' : 'transparent') + '">' +
-    '<input type="radio" name="ttype_' + i + '" value="response" ' + (!isFlow?'checked':'') + ' style="width:auto;margin:0" onchange="setTriggerType(' + i + ',\'response\')"> <span style="font-size:12px">Respuesta automática</span></label>' +
-    '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ' + (isFlow ? 'var(--gold)' : 'var(--border)') + ';background:' + (isFlow ? 'rgba(212,175,55,.1)' : 'transparent') + '">' +
-    '<input type="radio" name="ttype_' + i + '" value="flow" ' + (isFlow?'checked':'') + ' style="width:auto;margin:0" onchange="setTriggerType(' + i + ',\'flow\')"> <span style="font-size:12px">Flujo de preguntas</span></label>' +
-   '</div>' +
-
-   // Response textarea (shown when type=response)
-   '<div id="tresponse_' + i + '" style="' + (isFlow ? 'display:none' : '') + '">' +
-   '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Respuesta automática</label>' +
+   '<div style="margin-bottom:10px"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Palabras clave <span style="color:#555">(separadas por comas)</span></label>' +
+   '<input value="' + kws.replace(/"/g,'&quot;') + '" placeholder="info, precio, quiero saber" data-ti="' + i + '" data-field="keywords"></div>' +
+   '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Respuesta automática</label>' +
    '<textarea style="min-height:80px" placeholder="Escribe el mensaje que se enviará cuando el lead use esta palabra..." data-ti="' + i + '" data-field="response">' + (t.response||'') + '</textarea></div>' +
-
-   // Flow steps (shown when type=flow)
-   '<div id="tflow_' + i + '" style="' + (!isFlow ? 'display:none' : '') + '">' +
-   '<label style="font-size:11px;color:#888;display:block;margin-bottom:8px">Mensajes del flujo <span style="color:#555">(se envían en orden, uno por respuesta del usuario)</span></label>' +
-   '<div id="tsteps_' + i + '"></div>' +
-   '<button onclick="addTriggerStep(' + i + ')" style="font-size:11px;padding:5px 14px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:7px;margin-top:4px">+ Agregar mensaje</button></div>' +
-
    '<div style="margin-top:10px;padding:8px 10px;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;gap:8px">' +
    '<input type="checkbox" id="tfu_' + i + '" data-ti="' + i + '" data-field="followupEnabled"' + (t.followupEnabled ? ' checked' : '') + ' style="width:auto;margin:0">' +
-   '<label for="tfu_' + i + '" style="font-size:12px;color:#aaa;margin:0;cursor:pointer">Enviar seguimiento 1 hora después preguntando si tomó acción</label></div>' +
-   '</div>';
-
+   '<label for="tfu_' + i + '" style="font-size:12px;color:#aaa;margin:0;cursor:pointer">Enviar seguimiento 1 hora después preguntando si tomó acción</label></div>';
   div.querySelectorAll('[data-field]').forEach(function(el) {
    el.addEventListener('change', function() {
     const idx = parseInt(el.dataset.ti);
@@ -4217,76 +3639,12 @@ function renderTriggers() {
     else config.keywordTriggers[idx][field] = el.value;
    });
   });
-
   list.appendChild(div);
-
-  // Populate flow steps via _buildStepRow (needs div in DOM first so getElementById works)
-  const stepsContainer = document.getElementById('tsteps_' + i);
-  if (stepsContainer) {
-   steps.forEach(function(s, si) {
-    stepsContainer.appendChild(_buildStepRow(i, si, s.message || ''));
-   });
-  }
  });
 }
-
-function setTriggerType(i, type) {
- config.keywordTriggers[i].type = type;
- document.getElementById('tresponse_' + i).style.display = type === 'flow' ? 'none' : '';
- document.getElementById('tflow_' + i).style.display = type === 'flow' ? '' : 'none';
- // Update radio label styles
- const labels = document.querySelectorAll('input[name="ttype_' + i + '"]');
- labels.forEach(function(r) {
-  const lbl = r.closest('label');
-  const active = r.value === type;
-  lbl.style.borderColor = active ? 'var(--gold)' : 'var(--border)';
-  lbl.style.background = active ? 'rgba(212,175,55,.1)' : 'transparent';
- });
-}
-
-function _buildStepRow(i, si, message) {
- const row = document.createElement('div');
- row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px';
- row.dataset.stepRow = si;
- row.innerHTML =
-  '<div style="min-width:22px;height:22px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;margin-top:8px;flex-shrink:0">' + (si+1) + '</div>' +
-  '<textarea style="flex:1;min-height:64px;font-size:12px" placeholder="Mensaje ' + (si+1) + '...">' + (message||'').replace(/</g,'&lt;') + '</textarea>' +
-  '<button onclick="removeTriggerStep(' + i + ',' + si + ')" style="margin-top:6px;background:transparent;border:1px solid rgba(239,68,68,.3);color:#EF4444;padding:4px 8px;font-size:11px;border-radius:6px;flex-shrink:0">✕</button>';
- const ta = row.querySelector('textarea');
- ta.addEventListener('input', function() {
-  config.keywordTriggers[i].steps[si] = { message: ta.value };
- });
- return row;
-}
-
-function addTriggerStep(i) {
- config.keywordTriggers[i].steps = config.keywordTriggers[i].steps || [];
- const si = config.keywordTriggers[i].steps.length;
- config.keywordTriggers[i].steps.push({ message: '' });
- const container = document.getElementById('tsteps_' + i);
- if (!container) return;
- const row = _buildStepRow(i, si, '');
- container.appendChild(row);
- row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
- row.querySelector('textarea').focus();
-}
-
-function removeTriggerStep(i, si) {
- const steps = config.keywordTriggers[i].steps || [];
- steps.splice(si, 1);
- config.keywordTriggers[i].steps = steps;
- // Re-render just the steps container
- const container = document.getElementById('tsteps_' + i);
- if (!container) return;
- container.innerHTML = '';
- steps.forEach(function(s, idx) {
-  container.appendChild(_buildStepRow(i, idx, s.message));
- });
-}
-
 function addTrigger() {
  config.keywordTriggers = config.keywordTriggers || [];
- config.keywordTriggers.push({ label:'', keywords:[], matchType:'exact', type:'response', response:'', steps:[], caseSensitive:false, followupEnabled:false });
+ config.keywordTriggers.push({ label:'', keywords:[], matchType:'contains', response:'', caseSensitive:false, followupEnabled:false });
  renderTriggers();
 }
 function removeTrigger(i) {
@@ -4396,17 +3754,9 @@ function updateUserCompanies(userId, checkbox) {
 const CAMP_IDS = ['ext_maint','keratin','inactive','birthday','review','winback','post_consult'];
 const CITA_IDS = ['confirm','reminder_24h','reminder_2h','cancel','reschedule'];
 
-function filterCampsByIndustry(industry) {
-  document.querySelectorAll('.camp-industry-card').forEach(card => {
-    const cardIndustry = card.dataset.industry;
-    card.style.display = (industry === cardIndustry) ? '' : 'none';
-  });
-}
-
 function loadCampanas() {
   api('/api/config').then(cfg => {
     const camps = cfg.campaigns || {};
-    filterCampsByIndustry(cfg.industry || 'general');
     CAMP_IDS.forEach(id => {
       const c = camps[id] || {};
       const el = document.getElementById('camp-' + id + '-enabled');
@@ -4425,7 +3775,6 @@ function loadCampanas() {
       if (id === 'review') { const l = document.getElementById('camp-review-link'); if (l && c.review_link) l.value = c.review_link; }
       if (id === 'winback') { const d = document.getElementById('camp-winback-discount'); if (d && c.discount != null) d.value = c.discount; }
     });
-    renderCustomCamps(camps.custom_campaigns || []);
     updateCampStat();
   }).catch(() => {});
 }
@@ -4457,14 +3806,7 @@ function setCampChannelById(id, ch) {
 function updateCampStat() {
   CAMP_IDS.forEach(id => syncCampCard(id));
   const el = document.getElementById('camp-stat-active');
-  if (el) {
-    const builtinActive = CAMP_IDS.filter(id => {
-      const card = document.getElementById('camp-card-' + id);
-      return card && card.style.display !== 'none' && document.getElementById('camp-' + id + '-enabled')?.checked;
-    }).length;
-    const customActive = document.querySelectorAll('.custom-camp-card .custom-camp-toggle:checked').length;
-    el.textContent = builtinActive + customActive;
-  }
+  if (el) el.textContent = CAMP_IDS.filter(id => document.getElementById('camp-' + id + '-enabled')?.checked).length;
 }
 function saveCampaign(id) {
   const enabled = document.getElementById('camp-' + id + '-enabled')?.checked ?? false;
@@ -4480,103 +3822,6 @@ function saveCampaign(id) {
   api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({}, config, {campaigns: merged})) })
     .then(c => { config = c; updateCampStat(); toast('Campana guardada'); });
 }
-
-function showCustomCampForm() {
-  const form = document.getElementById('custom-camp-form');
-  form.style.display = form.style.display === 'none' ? 'block' : 'none';
-  if (form.style.display === 'block') {
-    document.getElementById('cc-name').value = '';
-    document.getElementById('cc-desc').value = '';
-    document.getElementById('cc-msg').value = '';
-    document.getElementById('cc-delay').value = '3';
-    document.getElementById('cc-channel').value = 'whatsapp';
-    document.getElementById('cc-delay-unit').value = 'days';
-    form.dataset.editing = '';
-  }
-}
-
-function saveCustomCamp() {
-  const name = document.getElementById('cc-name').value.trim();
-  const msg  = document.getElementById('cc-msg').value.trim();
-  if (!name) { toast('Escribe un nombre para la campana'); return; }
-  if (!msg)  { toast('Escribe el mensaje de la campana'); return; }
-  const camp = {
-    id: document.getElementById('custom-camp-form').dataset.editing || ('cc_' + Date.now()),
-    name,
-    description: document.getElementById('cc-desc').value.trim(),
-    channel: document.getElementById('cc-channel').value,
-    delay: Number(document.getElementById('cc-delay').value),
-    delay_unit: document.getElementById('cc-delay-unit').value,
-    message: msg,
-    enabled: true
-  };
-  const merged = Object.assign({}, config.campaigns || {});
-  const customs = (merged.custom_campaigns || []).filter(c => c.id !== camp.id);
-  customs.push(camp);
-  merged.custom_campaigns = customs;
-  api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({}, config, {campaigns: merged})) })
-    .then(c => {
-      config = c;
-      renderCustomCamps(c.campaigns?.custom_campaigns || []);
-      document.getElementById('custom-camp-form').style.display = 'none';
-      updateCampStat();
-      toast('Campana guardada');
-    });
-}
-
-function toggleCustomCamp(id, enabled) {
-  const merged = Object.assign({}, config.campaigns || {});
-  const customs = (merged.custom_campaigns || []).map(c => c.id === id ? Object.assign({}, c, {enabled}) : c);
-  merged.custom_campaigns = customs;
-  api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({}, config, {campaigns: merged})) })
-    .then(c => { config = c; updateCampStat(); });
-}
-
-function deleteCustomCamp(id) {
-  const merged = Object.assign({}, config.campaigns || {});
-  merged.custom_campaigns = (merged.custom_campaigns || []).filter(c => c.id !== id);
-  api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({}, config, {campaigns: merged})) })
-    .then(c => { config = c; renderCustomCamps(c.campaigns?.custom_campaigns || []); updateCampStat(); toast('Campana eliminada'); });
-}
-
-function editCustomCamp(id) {
-  const camp = (config.campaigns?.custom_campaigns || []).find(c => c.id === id);
-  if (!camp) return;
-  const form = document.getElementById('custom-camp-form');
-  form.style.display = 'block';
-  form.dataset.editing = id;
-  document.getElementById('cc-name').value = camp.name || '';
-  document.getElementById('cc-desc').value = camp.description || '';
-  document.getElementById('cc-channel').value = camp.channel || 'whatsapp';
-  document.getElementById('cc-delay').value = camp.delay || 3;
-  document.getElementById('cc-delay-unit').value = camp.delay_unit || 'days';
-  document.getElementById('cc-msg').value = camp.message || '';
-  form.scrollIntoView({behavior:'smooth', block:'nearest'});
-}
-
-function renderCustomCamps(customs) {
-  const container = document.getElementById('custom-camps-list');
-  if (!container) return;
-  if (!customs.length) { container.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:12px 0">No hay campanas personalizadas aun. Crea la primera con el boton de arriba.</div>'; return; }
-  const chIcons = { whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> WA', sms: 'SMS', instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/></svg> IG' };
-  const unitLabel = {hours:'h', days:'d', weeks:'sem'};
-  container.innerHTML = customs.map(c => `
-   <div class="camp-card custom-camp-card ${c.enabled ? 'camp-on' : ''}" style="margin-bottom:12px">
-    <div class="camp-hdr" style="cursor:default">
-     <span class="camp-icon" style="background:rgba(212,175,55,.1)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
-     <div style="flex:1">
-      <div class="camp-name">${c.name}</div>
-      <div class="camp-desc">${c.description || ''} <span style="color:#3BA5FF;margin-left:6px">${chIcons[c.channel]||c.channel} · ${c.delay}${unitLabel[c.delay_unit]||c.delay_unit}</span></div>
-     </div>
-     <div style="display:flex;align-items:center;gap:10px">
-      <button onclick="editCustomCamp('${c.id}')" style="font-size:11px;padding:4px 10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px">Editar</button>
-      <button onclick="deleteCustomCamp('${c.id}')" style="font-size:11px;padding:4px 10px;background:transparent;border:1px solid rgba(239,68,68,.3);color:#EF4444;border-radius:6px">Eliminar</button>
-      <label class="camp-toggle"><input type="checkbox" class="custom-camp-toggle" ${c.enabled ? 'checked' : ''} onchange="toggleCustomCamp('${c.id}',this.checked);updateCampStat()"><span class="camp-track"></span><span class="camp-thumb"></span></label>
-     </div>
-    </div>
-   </div>`).join('');
-}
-
 function loadCitas() {
   api('/api/config').then(cfg => {
     const banner = document.getElementById('cita-booking-banner');
@@ -4631,18 +3876,6 @@ function saveCita(id) {
 // ── Commerce Pro ───────────────────────────────────────────────
 async function loadBillingStatus() {
  try {
-  // Auto-switch to a company with active Commerce Pro if current one is inactive
-  if (companies.length) {
-    const currentHasCommerce = companies.find(c => c.id === activeCompanyId && c.commerce_pro_enabled && c.commerce_pro_status === 'active')
-    if (!currentHasCommerce) {
-      const commerceCompany = companies.find(c => c.commerce_pro_enabled && c.commerce_pro_status === 'active')
-      if (commerceCompany) {
-        switchCompany(commerceCompany.id)
-        return
-      }
-    }
-  }
-
   const res = await fetch('/api/billing/status', {
    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
   })
@@ -4658,7 +3891,7 @@ async function loadBillingStatus() {
   label.textContent = statusLabels[data.commerce_pro_status] || data.commerce_pro_status || 'Sin datos'
   desc.textContent = data.commerce_pro_status === 'active'
    ? `Discovery Call: ${data.discovery_call_status} · Onboarding: ${data.onboarding_status}`
-   : 'Activá Commerce Pro para conectar tu tienda Shopify, WooCommerce o Sellibri y habilitar el asistente de ventas.'
+   : 'Activá Commerce Pro para conectar tu tienda Shopify o WooCommerce y habilitar el asistente de ventas.'
   btnUpgrade.style.display = (!data.commerce_pro_status || data.commerce_pro_status === 'inactive') ? 'inline-block' : 'none'
   btnPortal.style.display = data.stripe_customer_id ? 'inline-block' : 'none'
   const sections = document.getElementById('commerce-pro-sections')
@@ -4716,7 +3949,7 @@ async function loadCommerceStores() {
     list.innerHTML = stores.map(s => `
       <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div>
-          <span style="background:${s.platform==='shopify'?'#96bf48':s.platform==='sellibri'?'#e8a020':'#7f54b3'};color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:8px">${s.platform.toUpperCase()}</span>
+          <span style="background:${s.platform==='shopify'?'#96bf48':'#7f54b3'};color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;margin-right:8px">${s.platform.toUpperCase()}</span>
           <strong style="font-size:13px">${s.store_url}</strong>
           <div style="font-size:11px;color:#888;margin-top:4px">${s.product_count||0} productos · ${s.sync_status} · ${s.last_sync_at?new Date(s.last_sync_at).toLocaleString('es-AR'):'nunca sincronizado'}</div>
         </div>
@@ -4816,419 +4049,15 @@ async function loadAnalytics() {
     const topList = document.getElementById('top-products-list')
     if (topList && data.top_products?.length) {
       topList.innerHTML = data.top_products.map(p =>
-        `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1a1a1a;max-width:480px;gap:12px">
-          <span style="color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</span>
-          <span style="color:#22c55e;font-weight:700;font-size:13px;white-space:nowrap">${p.currency || 'USD'} ${Number(p.price).toLocaleString()}</span>
-          <span style="color:#888;white-space:nowrap">${p.count}× · <span style="color:${p.stock_status==='instock'?'#22c55e':'#ef4444'}">${p.stock_status==='instock'?'✓':'✗'}</span></span>
+        `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a1a1a;max-width:400px">
+          <span style="color:#ccc">${p.title}</span>
+          <span style="color:#888">${p.count} · <span style="color:${p.stock_status==='instock'?'#22c55e':'#ef4444'}">${p.stock_status}</span></span>
          </div>`
       ).join('')
     } else if (topList) {
       topList.innerHTML = '<p style="color:#888;font-size:13px">Sin datos aún.</p>'
     }
   } catch(e) {}
-}
-
-function updateEmailPreview() { /* preview removed — emails are AI-generated per conversation */ }
-
-async function runAiRelations() {
-  const btn = document.getElementById('btn-ai-relations')
-  const loading = document.getElementById('ai-relations-loading')
-  const list = document.getElementById('ai-suggestions-list')
-  btn.disabled = true
-  btn.textContent = 'Analizando...'
-  loading.style.display = 'block'
-  list.innerHTML = ''
-  try {
-    const res = await fetch('/api/commerce/product-relations/ai-suggest', {
-      method: 'POST',
-      headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
-    })
-    const data = await res.json()
-    loading.style.display = 'none'
-    if (data.error) { list.innerHTML = `<p style="color:#ef4444;font-size:13px">${data.error}</p>`; return }
-    if (!data.suggestions?.length) {
-      list.innerHTML = '<p style="color:#888;font-size:13px">No se encontraron relaciones. Asegúrate de tener productos sincronizados.</p>'
-      return
-    }
-    const typeLabels = { alternative:'Alternativa', upsell:'Upsell', downsell:'Downsell', cross_sell:'Cross-sell', bundle:'Bundle', replacement:'Reemplazo' }
-    const typeColors = { alternative:'#60a5fa', upsell:'#34d399', downsell:'#f59e0b', cross_sell:'#a78bfa', bundle:'#f472b6', replacement:'#94a3b8' }
-    list.innerHTML = `<div style="font-size:12px;color:#888;margin-bottom:10px">${data.suggestions.length} sugerencias encontradas — aprobá las que quieras agregar:</div>` +
-      data.suggestions.map((s, i) => `
-        <div id="ai-sug-${i}" style="background:#0d0d1a;border:1px solid #2a2040;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <div style="font-size:13px;color:#e2e8f0;margin-bottom:4px">
-              <strong style="color:#fff">${s.source_title}</strong>
-              <span style="color:#888;margin:0 6px">→</span>
-              <span style="background:${typeColors[s.relation_type]||'#6c47ff'};color:#000;font-size:10px;padding:1px 7px;border-radius:3px;font-weight:700;vertical-align:middle">${typeLabels[s.relation_type]||s.relation_type}</span>
-              <span style="color:#888;margin:0 6px">→</span>
-              <strong style="color:#fff">${s.target_title}</strong>
-            </div>
-            <div style="font-size:12px;color:#888">${s.reason}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0">
-            <button onclick="approveAiSuggestion(${i},'${s.source_id}','${s.target_id}','${s.relation_type}')" style="background:#1a3a1a;color:#4ade80;border:1px solid #16a34a;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px">Aprobar</button>
-            <button onclick="document.getElementById('ai-sug-${i}').remove()" style="background:transparent;color:#888;border:1px solid #333;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:12px">Omitir</button>
-          </div>
-        </div>`
-      ).join('')
-  } catch(e) {
-    loading.style.display = 'none'
-    list.innerHTML = `<p style="color:#ef4444;font-size:13px">Error: ${e.message}</p>`
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'Analizar catálogo'
-  }
-}
-
-async function approveAiSuggestion(index, sourceId, targetId, relationType) {
-  const res = await fetch('/api/commerce/product-relations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
-    body: JSON.stringify({ source_product_id: sourceId, relation_type: relationType, target_product_id: targetId })
-  })
-  const data = await res.json()
-  if (data.error) return alert('Error: ' + data.error)
-  document.getElementById(`ai-sug-${index}`)?.remove()
-  toast('Relación agregada')
-  loadRelations()
-}
-
-function showConnectForm() {
-  document.getElementById('connect-shopify-form').style.display = 'block'
-  document.getElementById('connect-woo-form').style.display = 'none'
-  document.getElementById('connect-sellibri-form').style.display = 'none'
-}
-
-function showConnectWooForm() {
-  document.getElementById('connect-woo-form').style.display = 'block'
-  document.getElementById('connect-shopify-form').style.display = 'none'
-  document.getElementById('connect-sellibri-form').style.display = 'none'
-}
-
-function showConnectSellibriForm() {
-  document.getElementById('connect-sellibri-form').style.display = 'block'
-  document.getElementById('connect-shopify-form').style.display = 'none'
-  document.getElementById('connect-woo-form').style.display = 'none'
-}
-
-async function connectWoo() {
-  const url = document.getElementById('woo-url').value.trim()
-  const key = document.getElementById('woo-key').value.trim()
-  const secret = document.getElementById('woo-secret').value.trim()
-  if (!url || !key || !secret) return alert('Completá todos los campos')
-  const res = await fetch('/api/commerce/stores/connect-woocommerce', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
-    body: JSON.stringify({ store_url: url, consumer_key: key, consumer_secret: secret })
-  })
-  const data = await res.json()
-  if (data.error) return alert('Error: ' + data.error)
-  toast('Tienda conectada. Sincronizando catálogo...')
-  document.getElementById('connect-woo-form').style.display = 'none'
-  loadCommerceStores()
-}
-
-async function connectSellibri() {
-  const url = document.getElementById('sellibri-url').value.trim()
-  const key = document.getElementById('sellibri-key').value.trim()
-  if (!url || !key) return alert('Completá la URL y la API Key')
-  const res = await fetch('/api/commerce/stores/connect-sellibri', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
-    body: JSON.stringify({ store_url: url, api_key: key })
-  })
-  const data = await res.json()
-  if (data.error) return alert('Error: ' + data.error)
-  toast('Tienda Sellibri conectada. Sincronizando catálogo...')
-  document.getElementById('connect-sellibri-form').style.display = 'none'
-  loadCommerceStores()
-}
-
-async function syncStore(storeId) {
-  const res = await fetch(`/api/commerce/stores/${storeId}/sync`, {
-    method: 'POST',
-    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
-  })
-  const data = await res.json()
-  if (data.error) return alert('Error: ' + data.error)
-  toast('Sincronización iniciada...')
-  setTimeout(loadCommerceStores, 3000)
-}
-
-async function saveRecoveryConfig() {
-  const enabled = document.getElementById('rec-coupon-enabled')?.checked
-  const discountType = document.getElementById('rec-discount-type')?.value
-  const discountValue = parseFloat(document.getElementById('rec-discount-value')?.value)
-  const expirationHours = parseInt(document.getElementById('rec-expiration-hours')?.value)
-  const delayMinutes = parseInt(document.getElementById('rec-delay-minutes')?.value)
-  const res = await fetch('/api/commerce/config', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId },
-    body: JSON.stringify({
-      recovery_coupon_enabled: enabled,
-      recovery_coupon_discount_type: discountType,
-      recovery_coupon_discount_value: discountValue,
-      recovery_coupon_expiration_hours: expirationHours,
-      recovery_delay_minutes: delayMinutes
-    })
-  })
-  const data = await res.json()
-  if (data.error) return alert('Error: ' + data.error)
-  toast('Configuración guardada')
-}
-
-async function openBillingPortal() {
-  const res = await fetch('/api/billing/customer-portal', {
-    method: 'POST',
-    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
-  })
-  const { url, error } = await res.json()
-  if (error) return alert('Error: ' + error)
-  window.open(url, '_blank')
-}
-
-async function deleteRelation(id) {
-  if (!confirm('¿Eliminar esta relación?')) return
-  await fetch(`/api/commerce/product-relations/${id}`, {
-    method: 'DELETE',
-    headers: { 'x-admin-password': password, 'x-admin-email': adminEmail, 'x-company-id': activeCompanyId }
-  })
-  toast('Relación eliminada')
-  loadRelations()
-}
-
-// ────────────────────────────────────────────────────────────
-// Plan → model options enforcement
-function updateModelOptions() {
-  const plan = document.getElementById('plan')?.value || 'starter'
-  const modelSel = document.getElementById('model')
-  if (!modelSel) return
-  const currentVal = modelSel.value
-  // Starter: only Haiku. Growth: Haiku + Sonnet. Agency: all.
-  const allowed = plan === 'starter'
-    ? ['claude-haiku-4-5-20251001']
-    : plan === 'growth'
-      ? ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6']
-      : ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6', 'claude-opus-4-6']
-  Array.from(modelSel.options).forEach(opt => {
-    opt.disabled = !allowed.includes(opt.value)
-    opt.style.color = opt.disabled ? '#666' : ''
-  })
-  if (!allowed.includes(currentVal)) modelSel.value = 'claude-haiku-4-5-20251001'
-}
-
-// GHL Integration
-// ────────────────────────────────────────────────────────────
-async function loadGhlStatus() {
-  try {
-    const r = await api('/api/ghl/status')
-    const dot = document.getElementById('ghl-dot')
-    const txt = document.getElementById('ghl-status-txt')
-    const btnCon = document.getElementById('btn-ghl-connect')
-    const btnDis = document.getElementById('btn-ghl-disconnect')
-    if (r.connected) {
-      dot.style.background = '#4ade80'
-      txt.textContent = `Conectado · ${r.location_name || 'GHL'} · desde ${r.connected_at ? new Date(r.connected_at).toLocaleDateString() : 'hoy'}`
-      btnCon.style.display = 'none'
-      btnDis.style.display = 'inline-flex'
-    } else {
-      dot.style.background = '#6b7280'
-      txt.textContent = 'No conectado · Las campanas necesitan GHL para obtener contactos y citas'
-      btnCon.style.display = 'inline-flex'
-      btnDis.style.display = 'none'
-    }
-  } catch(e) {}
-}
-
-function toggleGhlForm() {
-  const f = document.getElementById('ghl-form')
-  f.style.display = f.style.display === 'none' ? 'block' : 'none'
-}
-
-async function testGhlConn() {
-  const locationId = document.getElementById('ghl-location-id').value.trim()
-  const apiKey     = document.getElementById('ghl-api-key').value.trim()
-  const res = document.getElementById('ghl-test-result')
-  if (!locationId || !apiKey) { toast('Completa Location ID y API Key'); return }
-  res.style.display = 'block'
-  res.style.background = 'rgba(100,100,100,.15)'
-  res.textContent = 'Probando conexión...'
-  try {
-    const r = await api('/api/ghl/test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ api_key: apiKey, location_id: locationId }) })
-    if (r.ok) {
-      res.style.background = 'rgba(74,222,128,.1)'
-      res.style.color = '#4ade80'
-      res.textContent = `✓ Conectado · ${r.name}`
-      document.getElementById('ghl-form').style.display = 'none'
-      loadGhlStatus()
-      toast('GHL conectado correctamente')
-    } else {
-      res.style.background = 'rgba(239,68,68,.1)'
-      res.style.color = '#ef4444'
-      res.textContent = `✗ Error: ${r.error}`
-    }
-  } catch(e) {
-    res.style.background = 'rgba(239,68,68,.1)'
-    res.style.color = '#ef4444'
-    res.textContent = `✗ ${e.message}`
-  }
-}
-
-async function disconnectGhl() {
-  if (!confirm('¿Desconectar GoHighLevel? Las campanas dejarán de ejecutarse.')) return
-  await api('/api/ghl/disconnect', { method: 'DELETE' })
-  loadGhlStatus()
-  toast('GHL desconectado')
-}
-
-function loadGhlWebhookUrl() {
-  const el = document.getElementById('ghl-webhook-url')
-  if (!el) return
-  el.textContent = `https://chat.lynkro.io/api/webhooks/ghl/${activeCompanyId}`
-}
-
-function copyWebhookUrl() {
-  const url = document.getElementById('ghl-webhook-url').textContent
-  navigator.clipboard.writeText(url).then(() => toast('URL copiada'))
-}
-
-// ────────────────────────────────────────────────────────────
-// Server Credentials (super admin)
-// ────────────────────────────────────────────────────────────
-async function loadServerCreds() {
-  const panel = document.getElementById('server-creds-panel')
-  if (!panel) return
-  panel.style.display = 'block'
-  try {
-    const r = await api('/api/server-config/integrations')
-    if (r.square_app_id) document.getElementById('sq-app-id').value = r.square_app_id
-    if (r.square_app_secret) document.getElementById('sq-app-secret').placeholder = r.square_app_secret
-    if (r.qbo_client_id) document.getElementById('qbo-client-id-inp').value = r.qbo_client_id
-    if (r.qbo_client_secret) document.getElementById('qbo-client-secret-inp').placeholder = r.qbo_client_secret
-  } catch(e) {}
-}
-
-async function saveServerCreds() {
-  const msg = document.getElementById('server-creds-msg')
-  msg.textContent = 'Guardando…'
-  msg.style.color = 'var(--muted)'
-  const body = {
-    square_app_id:     document.getElementById('sq-app-id').value.trim(),
-    square_app_secret: document.getElementById('sq-app-secret').value.trim(),
-    qbo_client_id:     document.getElementById('qbo-client-id-inp').value.trim(),
-    qbo_client_secret: document.getElementById('qbo-client-secret-inp').value.trim(),
-  }
-  try {
-    await api('/api/server-config/integrations', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
-    msg.textContent = '✓ Guardado'
-    msg.style.color = '#4ade80'
-    // Clear secret fields and reload status
-    document.getElementById('sq-app-secret').value = ''
-    document.getElementById('qbo-client-secret-inp').value = ''
-    loadSquareStatus()
-    loadQBOStatus()
-    setTimeout(() => { msg.textContent = '' }, 3000)
-  } catch(e) {
-    msg.textContent = '✗ Error al guardar'
-    msg.style.color = '#ef4444'
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// Square Integration
-// ────────────────────────────────────────────────────────────
-async function loadSquareStatus() {
-  try {
-    const r = await api('/api/square/status')
-    const dot  = document.getElementById('square-dot')
-    const txt  = document.getElementById('square-status-txt')
-    const btnC = document.getElementById('btn-square-connect')
-    const btnD = document.getElementById('btn-square-disconnect')
-    if (!r.configured) {
-      dot.style.background = '#6b7280'
-      txt.textContent = 'Necesita credenciales del servidor (SQUARE_APP_ID + SQUARE_APP_SECRET)'
-      btnC.style.display = 'none'; btnD.style.display = 'none'
-    } else if (r.connected) {
-      dot.style.background = '#4ade80'
-      txt.textContent = 'Conectado · Square activo'
-      btnC.style.display = 'none'; btnD.style.display = 'inline-flex'
-    } else {
-      dot.style.background = '#f59e0b'
-      txt.textContent = 'Configurado · Pendiente de autorización OAuth'
-      btnC.style.display = 'inline-flex'; btnD.style.display = 'none'
-    }
-  } catch(e) {}
-}
-
-function connectSquare() {
-  const url = `/api/square/connect?companyId=${activeCompanyId}&adminPassword=${encodeURIComponent(password)}&adminEmail=${encodeURIComponent(adminEmail)}`
-  window.open(url, '_blank')
-}
-
-async function disconnectSquare() {
-  if (!confirm('¿Desconectar Square?')) return
-  await api('/api/square/disconnect', { method: 'DELETE' })
-  loadSquareStatus()
-  toast('Square desconectado')
-}
-
-// ────────────────────────────────────────────────────────────
-// QuickBooks Integration
-// ────────────────────────────────────────────────────────────
-async function loadQBOStatus() {
-  try {
-    const r = await api('/api/qbo/status')
-    const dot  = document.getElementById('qbo-dot')
-    const txt  = document.getElementById('qbo-status-txt')
-    const btnC = document.getElementById('btn-qbo-connect')
-    const btnD = document.getElementById('btn-qbo-disconnect')
-    if (!r.configured) {
-      dot.style.background = '#6b7280'
-      txt.textContent = 'Necesita credenciales del servidor (QBO_CLIENT_ID + QBO_CLIENT_SECRET)'
-      btnC.style.display = 'none'; btnD.style.display = 'none'
-    } else if (r.connected) {
-      dot.style.background = '#4ade80'
-      txt.textContent = `Conectado · ${r.company_name || 'QuickBooks'}`
-      btnC.style.display = 'none'; btnD.style.display = 'inline-flex'
-    } else {
-      dot.style.background = '#f59e0b'
-      txt.textContent = 'Configurado · Pendiente de autorización OAuth'
-      btnC.style.display = 'inline-flex'; btnD.style.display = 'none'
-    }
-  } catch(e) {}
-}
-
-function connectQBO() {
-  window.open(`/api/qbo/connect?company_id=${activeCompanyId}`, '_blank')
-}
-
-async function disconnectQBO() {
-  if (!confirm('¿Desconectar QuickBooks?')) return
-  await api('/api/qbo/disconnect', { method: 'DELETE' })
-  loadQBOStatus()
-  toast('QuickBooks desconectado')
-}
-
-// ────────────────────────────────────────────────────────────
-// Generic Webhook (Vagaro / Booksy / Zapier)
-// ────────────────────────────────────────────────────────────
-function loadGenericWebhookUrl() {
-  const el = document.getElementById('generic-webhook-url')
-  if (!el) return
-  el.textContent = `https://chat.lynkro.io/api/webhooks/generic/${activeCompanyId}`
-}
-
-function copyGenericWebhookUrl() {
-  const url = document.getElementById('generic-webhook-url').textContent
-  navigator.clipboard.writeText(url).then(() => toast('URL copiada'))
-}
-
-// Hook into tab change
-const _origTab = tab
-window.tab = function(t) {
-  _origTab(t)
-  if (t === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus() }
-  if (t === 'citas')    { loadGhlWebhookUrl(); loadGenericWebhookUrl() }
 }
 
 </script>

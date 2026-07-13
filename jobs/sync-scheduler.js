@@ -28,10 +28,11 @@ async function runScheduledSync() {
       const accessToken = store.access_token_encrypted ? decryptCredential(store.access_token_encrypted) : null
       const consumerKey = store.consumer_key_encrypted ? decryptCredential(store.consumer_key_encrypted) : null
       const consumerSecret = store.consumer_secret_encrypted ? decryptCredential(store.consumer_secret_encrypted) : null
+      const apiKey = store.api_key_encrypted ? decryptCredential(store.api_key_encrypted) : null
 
       const result = await syncStore(
         store.id, store.account_id, store.platform,
-        store.store_url, accessToken, consumerKey, consumerSecret
+        store.store_url, accessToken, consumerKey, consumerSecret, apiKey
       )
       console.log(`[sync-scheduler] Store ${store.id}: ${result.count} products synced`)
     } catch (err) {
@@ -66,3 +67,35 @@ async function runRecoveryJob() {
 
 setInterval(runRecoveryJob, 15 * 60 * 1000)
 console.log('[sync-scheduler] Recovery job started (every 15 minutes)')
+// Appended to sync-scheduler.js
+
+// ============================================================
+// CAMPAIGN + APPOINTMENT REMINDER SCHEDULER (daily at 8am)
+// ============================================================
+
+async function runCampaignScheduler() {
+  console.log('[campaign-scheduler] Starting daily run')
+  try {
+    const { runAllCampaigns } = await import('./campaign-scheduler.js')
+    await runAllCampaigns()
+    console.log('[campaign-scheduler] Done')
+  } catch(e) {
+    console.error('[campaign-scheduler] Fatal:', e.message)
+  }
+}
+
+// Schedule daily at 08:00 local time
+function scheduleDaily(hour, fn) {
+  const now = new Date()
+  const next = new Date(now)
+  next.setHours(hour, 0, 0, 0)
+  if (next <= now) next.setDate(next.getDate() + 1)
+  const delay = next - now
+  setTimeout(() => {
+    fn()
+    setInterval(fn, 24 * 60 * 60 * 1000)
+  }, delay)
+  console.log(`[campaign-scheduler] Next run in ${Math.round(delay/60000)} minutes (${next.toLocaleTimeString()})`)
+}
+
+scheduleDaily(8, runCampaignScheduler)

@@ -12,7 +12,7 @@ import { requireAdmin, requireSuperAdmin, withCompany } from '../middleware/auth
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
   listCompanies, getCompany, getCompanyByToken, createCompany, updateCompanyMeta, deleteCompany,
-  regenerateShareToken, seedSampleContent
+  regenerateShareToken, seedSampleContent, getServerSetting, setServerSetting
 } from '../db.js'
 
 const require = createRequire(import.meta.url)
@@ -141,6 +141,7 @@ adminRouter.get('/config/public', withCompany, (req, res) => {
     slug: req.company.slug,
     businessName: cfg.businessName,
     welcomeMessage: cfg.welcomeMessage,
+    welcomeMessageEn: cfg.welcomeMessageEn || '',
     accentColor: cfg.accentColor,
     bgColor: cfg.bgColor,
     userBubbleColor: cfg.userBubbleColor,
@@ -218,6 +219,19 @@ adminRouter.post('/demos/:id/regenerate-token', requireAdmin, (req, res) => {
   if (!c) return res.status(404).json({ error: 'No encontrada' })
   const tok = regenerateShareToken(c.id)
   res.json({ share_token: tok })
+})
+
+// Generate or return share token for any active company
+adminRouter.post('/company/share-token', requireAdmin, withCompany, (req, res) => {
+  const c = req.company
+  let tok = c.share_token
+  if (!tok) tok = regenerateShareToken(c.id)
+  res.json({ share_token: tok, url: `/demo/${tok}` })
+})
+
+adminRouter.post('/company/regenerate-share-token', requireAdmin, withCompany, (req, res) => {
+  const tok = regenerateShareToken(req.company.id)
+  res.json({ share_token: tok, url: `/demo/${tok}` })
 })
 
 // Public config by token (used by the demo page widget)
@@ -464,6 +478,76 @@ adminRouter.get('/dashboard', requireAdmin, withCompany, (req, res) => {
 })
 
 // ============================================================
+// AI INSIGHTS
+// ============================================================
+adminRouter.get('/dashboard/ai-insights', requireAdmin, withCompany, async (req, res) => {
+  const cid = req.company.id
+  const days = parseInt(req.query.days) || 7
+  const since = Date.now() - days * 86400000
+  const cfg = req.company.config
+
+  const totalConvs = db.prepare('SELECT COUNT(*) as c FROM conversations WHERE company_id = ? AND created_at > ?').get(cid, since).c
+  const leads = db.prepare("SELECT COUNT(*) as c FROM conversations WHERE company_id = ? AND created_at > ? AND (lead_email IS NOT NULL OR lead_phone IS NOT NULL OR lead_name IS NOT NULL)").get(cid, since).c
+  const converted = db.prepare("SELECT COUNT(*) as c FROM conversations WHERE company_id = ? AND created_at > ? AND converted = 1").get(cid, since).c
+  const leadRate = totalConvs ? Math.round(leads / totalConvs * 100) : 0
+  const conversionRate = leads ? Math.round(converted / leads * 100) : 0
+
+  const convSamples = db.prepare(`
+    SELECT c.id, c.converted, c.lead_email, c.lead_phone, c.unresolved, c.channel
+    FROM conversations c WHERE c.company_id = ? AND c.created_at > ?
+    ORDER BY c.created_at DESC LIMIT 20
+  `).all(cid, since)
+
+  const convDetails = convSamples.map(conv => {
+    const msgs = db.prepare('SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id LIMIT 8').all(conv.id)
+    const state = conv.converted ? 'CONVERTIDA' : (conv.lead_email || conv.lead_phone) ? 'LEAD' : 'SIN LEAD'
+    const dialog = msgs.map(m => `${m.role === 'user' ? 'Cliente' : 'IA'}: ${m.content.slice(0, 150)}`).join('\n')
+    return `[${state}] ${dialog}`
+  }).join('\n---\n')
+
+  let summary = ''
+  let insights = []
+
+  try {
+    const resp = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1200,
+      messages: [{
+        role: 'user',
+        content: `Eres experto en optimización de conversión para chatbots de ventas.
+
+Negocio: ${cfg.businessName || 'Sin nombre'}
+Período: últimos ${days} días
+
+FUNNEL:
+- Conversaciones: ${totalConvs}
+- Leads capturados: ${leads} (${leadRate}%)
+- Convertidos: ${converted} (${conversionRate}% de leads)
+
+MUESTRA DE CONVERSACIONES:
+${convDetails || 'Sin conversaciones recientes.'}
+
+Devuelve SOLO este JSON sin markdown:
+{"summary":"2-3 oraciones sobre el estado actual y qué impacta más la conversión","insights":[{"icon":"🎯","title":"título corto","description":"recomendación accionable específica"}]}`
+      }]
+    })
+    const text = resp.content[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+    if (match) {
+      const parsed = JSON.parse(match[0])
+      summary = parsed.summary || ''
+      insights = (parsed.insights || []).slice(0, 6)
+    }
+  } catch (err) { console.error('AI Insights error:', err.message) }
+
+  res.json({
+    funnel: { conversations: totalConvs, leads, converted, leadRate, conversionRate },
+    summary, insights,
+    generatedAt: new Date().toLocaleString('es-MX')
+  })
+})
+
+// ============================================================
 // EMAIL NOTIFICATIONS
 // ============================================================
 adminRouter.post('/notify/test', requireAdmin, withCompany, async (req, res) => {
@@ -600,3 +684,384 @@ function hashPassword(pw) {
   const hash = crypto.scryptSync(pw, salt, 64).toString('hex')
   return `${salt}:${hash}`
 }
+
+// ============================================================
+// GHL INTEGRATION
+// ============================================================
+
+adminRouter.get('/ghl/status', requireAdmin, withCompany, (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  const g = cfg.ghl || {}
+  res.json({ connected: !!(g.api_key && g.location_id), location_name: g.location_name, connected_at: g.connected_at })
+})
+
+adminRouter.post('/ghl/test', requireAdmin, withCompany, async (req, res) => {
+  const { api_key, location_id } = req.body
+  if (!api_key || !location_id) return res.status(400).json({ error: 'Falta api_key o location_id' })
+  const { testGhlConnection } = await import('../services/ghl.js')
+  const result = await testGhlConnection(api_key, location_id)
+  if (result.ok) {
+    const cfg = loadConfig(req.company.id)
+    cfg.ghl = { api_key, location_id, location_name: result.name, connected_at: new Date().toISOString() }
+    saveConfig(req.company.id, cfg)
+  }
+  res.json(result)
+})
+
+adminRouter.delete('/ghl/disconnect', requireAdmin, withCompany, (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  delete cfg.ghl
+  saveConfig(req.company.id, cfg)
+  res.json({ ok: true })
+})
+
+adminRouter.get('/campaigns/stats', requireAdmin, withCompany, (req, res) => {
+  try {
+    const since = new Date(); since.setDate(1); since.setHours(0,0,0,0)
+    const rows = db.prepare(`
+      SELECT campaign_type, COUNT(*) as count
+      FROM campaign_log WHERE company_id=? AND sent_at>=? AND status='sent'
+      GROUP BY campaign_type
+    `).all(req.company.id, since.toISOString())
+    res.json({ rows, total: rows.reduce((s,r) => s + r.count, 0) })
+  } catch(e) { res.json({ rows: [], total: 0 }) }
+})
+
+// GHL webhook — appointment created/deleted (no auth, public)
+adminRouter.post('/webhooks/ghl/:token', async (req, res) => {
+  res.json({ ok: true })
+  const company = getCompanyByToken(req.params.token)
+  if (!company) return
+  const cfg = loadConfig(company.id)
+  if (!cfg.ghl?.api_key) return
+  const { type, appointment } = req.body || {}
+  if (!appointment?.contactId || !appointment?.id) return
+  try {
+    const { getContact, normalizePhone, fillTemplate } = await import('../services/ghl.js')
+    const { sendWhatsApp: sendWA } = await import('../routes/chat.js')
+    const citas = cfg.citas || {}
+    const businessName = cfg.businessName || cfg.name || ''
+    const apptDate = new Date(appointment.startTime || appointment.start || Date.now())
+    const contact = await getContact(cfg.ghl.api_key, appointment.contactId)
+    const vars = {
+      nombre: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'cliente',
+      negocio: businessName, servicio: appointment.title || '',
+      link_reserva: cfg.bookingUrl || '',
+      fecha: apptDate.toLocaleDateString('es-US', { weekday:'long', month:'long', day:'numeric' }),
+      hora:  apptDate.toLocaleTimeString('es-US', { hour:'2-digit', minute:'2-digit' })
+    }
+    const phone = normalizePhone(contact.phone || '')
+    if (!phone) return
+    const logRow = db.prepare(`
+      INSERT INTO campaign_log(company_id,contact_id,campaign_type,appointment_id,channel,status,error)
+      VALUES(?,?,?,?,?,?,?)
+    `)
+    const isCreate = type === 'AppointmentCreated' || type === 'appointment.created'
+    const isDelete = type === 'AppointmentDeleted' || type === 'appointment.deleted' || type === 'AppointmentCancelled'
+    if (isCreate && citas.confirm?.enabled) {
+      const dup = db.prepare('SELECT 1 FROM campaign_log WHERE company_id=? AND appointment_id=? AND campaign_type=?')
+        .get(company.id, appointment.id, 'cita_confirm')
+      if (!dup) {
+        await sendWA(cfg, phone, fillTemplate(citas.confirm.message, vars))
+        logRow.run(company.id, appointment.contactId, 'cita_confirm', appointment.id, 'whatsapp', 'sent', null)
+      }
+    }
+    if (isDelete && citas.cancel?.enabled) {
+      await sendWA(cfg, phone, fillTemplate(citas.cancel.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars))
+      logRow.run(company.id, appointment.contactId, 'cita_cancel', appointment.id, 'whatsapp', 'sent', null)
+    }
+  } catch(e) { console.error('[ghl-webhook]', e.message) }
+})
+
+// ============================================================
+// SQUARE INTEGRATION
+// ============================================================
+
+adminRouter.get('/square/status', requireAdmin, withCompany, async (req, res) => {
+  const { hasCredentials } = await import('../services/square.js')
+  const cfg = loadConfig(req.company.id)
+  res.json({
+    configured: hasCredentials(),
+    connected: !!(cfg.square?.access_token),
+    merchant_name: cfg.square?.merchant_name || null
+  })
+})
+
+adminRouter.get('/square/connect', requireAdmin, withCompany, async (req, res) => {
+  const { hasCredentials, getOAuthUrl } = await import('../services/square.js')
+  if (!hasCredentials()) return res.status(503).json({ error: 'Faltan SQUARE_APP_ID / SQUARE_APP_SECRET en el servidor' })
+  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  res.redirect(getOAuthUrl(state))
+})
+
+adminRouter.get('/square/callback', async (req, res) => {
+  const { code, state, error } = req.query
+  if (error) return res.redirect('/admin?msg=square_denied')
+  try {
+    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const { exchangeCode } = await import('../services/square.js')
+    const tokens = await exchangeCode(code)
+    const cfg = loadConfig(cid)
+    cfg.square = { access_token: tokens.access_token, merchant_id: tokens.merchant_id, merchant_name: tokens.merchant_id || 'Square', connected_at: new Date().toISOString() }
+    saveConfig(cid, cfg)
+    res.redirect('/admin?msg=square_ok')
+  } catch(e) {
+    console.error('[square-callback]', e.message)
+    res.redirect('/admin?msg=square_error')
+  }
+})
+
+adminRouter.delete('/square/disconnect', requireAdmin, withCompany, async (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  if (cfg.square?.access_token) {
+    const { revokeToken } = await import('../services/square.js')
+    await revokeToken(cfg.square.access_token).catch(() => {})
+  }
+  saveConfig(req.company.id, { square: null })
+  res.json({ ok: true })
+})
+
+// ============================================================
+// QUICKBOOKS INTEGRATION
+// ============================================================
+
+adminRouter.get('/qbo/status', requireAdmin, withCompany, async (req, res) => {
+  const { hasCredentials } = await import('../services/qbo.js')
+  const cfg = loadConfig(req.company.id)
+  res.json({
+    configured: hasCredentials(),
+    connected: !!(cfg.qbo?.access_token),
+    company_name: cfg.qbo?.company_name || null,
+    connected_at: cfg.qbo?.connected_at || null
+  })
+})
+
+adminRouter.get('/qbo/connect', requireAdmin, withCompany, async (req, res) => {
+  const { hasCredentials, getOAuthUrl } = await import('../services/qbo.js')
+  if (!hasCredentials()) return res.status(503).json({ error: 'Faltan QBO_CLIENT_ID / QBO_CLIENT_SECRET en el servidor' })
+  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  res.redirect(getOAuthUrl(state))
+})
+
+adminRouter.get('/qbo/callback', async (req, res) => {
+  const { code, state, realmId, error } = req.query
+  if (error) return res.redirect('/admin?msg=qbo_denied')
+  try {
+    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const { exchangeCode, getCustomers } = await import('../services/qbo.js')
+    const tokens = await exchangeCode(code)
+    const cfg = loadConfig(cid)
+    cfg.qbo = { access_token: tokens.access_token, refresh_token: tokens.refresh_token, realm_id: realmId, connected_at: new Date().toISOString() }
+    // Try to get company name
+    try {
+      const { queryQBO } = await import('../services/qbo.js')
+      const r = await queryQBO(tokens.access_token, realmId, 'SELECT CompanyName FROM CompanyInfo')
+      cfg.qbo.company_name = r.CompanyInfo?.[0]?.CompanyName || 'QuickBooks'
+    } catch(_) {}
+    saveConfig(cid, cfg)
+    res.redirect('/admin?msg=qbo_ok')
+  } catch(e) {
+    console.error('[qbo-callback]', e.message)
+    res.redirect('/admin?msg=qbo_error')
+  }
+})
+
+adminRouter.delete('/qbo/disconnect', requireAdmin, withCompany, (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  delete cfg.qbo
+  saveConfig(req.company.id, cfg)
+  res.json({ ok: true })
+})
+
+// ============================================================
+// GENERIC WEBHOOK (Vagaro, Booksy, cualquier app via Zapier)
+// ============================================================
+
+adminRouter.post('/webhooks/generic/:token', async (req, res) => {
+  res.json({ ok: true, received: true })
+  const company = getCompanyByToken(req.params.token)
+  if (!company) return
+  const cfg = loadConfig(company.id)
+  const body = req.body || {}
+
+  // Flexible field extraction — handles multiple payload shapes
+  const contact = {
+    name:  body.contact?.name  || body.client_name  || body.customer_name || body.name  || [body.first_name, body.last_name].filter(Boolean).join(' ') || '',
+    phone: body.contact?.phone || body.client_phone || body.customer_phone || body.phone || body.mobile || '',
+    email: body.contact?.email || body.client_email || body.customer_email || body.email || ''
+  }
+  const appt = {
+    id:       body.appointment?.id  || body.booking_id  || body.appointment_id || body.id || `gen_${Date.now()}`,
+    service:  body.appointment?.service || body.service_name || body.service || body.title || '',
+    datetime: body.appointment?.datetime || body.start_time || body.appointment_datetime || body.booking_date || body.date || ''
+  }
+  const rawEvent = (body.event || body.event_type || body.type || body.status || '').toLowerCase()
+  const isCreate = rawEvent.includes('creat') || rawEvent.includes('book') || rawEvent.includes('schedul') || rawEvent.includes('new') || rawEvent.includes('confirm')
+  const isCancel = rawEvent.includes('cancel') || rawEvent.includes('delet') || rawEvent.includes('remov')
+
+  if (!contact.phone) return
+
+  try {
+    const { sendWhatsApp } = await import('../routes/chat.js')
+    const { fillTemplate, normalizePhone } = await import('../services/ghl.js')
+    const phone = normalizePhone(contact.phone)
+    if (!phone) return
+    const citas = cfg.citas || {}
+    const apptDate = appt.datetime ? new Date(appt.datetime) : new Date()
+    const vars = {
+      nombre: contact.name || 'cliente', negocio: cfg.businessName || cfg.name || '',
+      servicio: appt.service, link_reserva: cfg.bookingUrl || '',
+      fecha: apptDate.toLocaleDateString('es-US', { weekday:'long', month:'long', day:'numeric' }),
+      hora:  apptDate.toLocaleTimeString('es-US', { hour:'2-digit', minute:'2-digit' })
+    }
+    const logStmt = db.prepare(`
+      INSERT INTO campaign_log(company_id,contact_id,campaign_type,appointment_id,channel,status,error)
+      VALUES(?,?,?,?,?,?,?)
+    `)
+    if (isCreate && citas.confirm?.enabled) {
+      const dup = db.prepare('SELECT 1 FROM campaign_log WHERE company_id=? AND appointment_id=? AND campaign_type=?')
+        .get(company.id, appt.id, 'cita_confirm')
+      if (!dup) {
+        await sendWhatsApp(cfg, phone, fillTemplate(citas.confirm.message, vars))
+        logStmt.run(company.id, contact.phone, 'cita_confirm', appt.id, 'whatsapp', 'sent', null)
+      }
+    }
+    if (isCancel && citas.cancel?.enabled) {
+      await sendWhatsApp(cfg, phone, fillTemplate(citas.cancel?.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars))
+      logStmt.run(company.id, contact.phone, 'cita_cancel', appt.id, 'whatsapp', 'sent', null)
+    }
+  } catch(e) { console.error('[generic-webhook]', e.message) }
+})
+
+// ============================================================
+// SERVER CONFIG — integration credentials (super admin only)
+// ============================================================
+adminRouter.get('/server-config/integrations', requireAdmin, (req, res) => {
+  res.json({
+    square_app_id:      getServerSetting('square_app_id') || process.env.SQUARE_APP_ID || '',
+    square_app_secret:  getServerSetting('square_app_secret') ? '••••••••' : (process.env.SQUARE_APP_SECRET ? '••••••••' : ''),
+    qbo_client_id:      getServerSetting('qbo_client_id') || process.env.QBO_CLIENT_ID || '',
+    qbo_client_secret:  getServerSetting('qbo_client_secret') ? '••••••••' : (process.env.QBO_CLIENT_SECRET ? '••••••••' : ''),
+    square_configured:  !!(getServerSetting('square_app_id') || process.env.SQUARE_APP_ID),
+    qbo_configured:     !!(getServerSetting('qbo_client_id') || process.env.QBO_CLIENT_ID),
+  })
+})
+
+adminRouter.post('/server-config/integrations', requireAdmin, (req, res) => {
+  const { square_app_id, square_app_secret, qbo_client_id, qbo_client_secret } = req.body
+  if (square_app_id    !== undefined) setServerSetting('square_app_id',    square_app_id)
+  if (square_app_secret !== undefined && square_app_secret !== '••••••••') setServerSetting('square_app_secret', square_app_secret)
+  if (qbo_client_id    !== undefined) setServerSetting('qbo_client_id',    qbo_client_id)
+  if (qbo_client_secret !== undefined && qbo_client_secret !== '••••••••') setServerSetting('qbo_client_secret', qbo_client_secret)
+  res.json({ ok: true })
+})
+
+adminRouter.post('/dashboard/ai-generate-config', requireAdmin, withCompany, async (req, res) => {
+  const { info } = req.body
+  if (!info || !info.trim()) return res.status(400).json({ error: 'info required' })
+
+  const prompt = `Eres un experto en configurar agentes de IA para negocios. El usuario te dará un párrafo con información general de su empresa. Debes extraer toda la información relevante y generar una configuración completa y profesional para el agente de IA.
+
+INFORMACIÓN DEL NEGOCIO (párrafo libre):
+"${info}"
+
+Genera un JSON con EXACTAMENTE esta estructura (todos los campos son requeridos):
+{
+  "businessName": "nombre del negocio extraído del párrafo",
+  "description": "descripción clara del negocio en 2-3 oraciones",
+  "industry": "uno de: general | peluqueria | spa | clinica | dental | estetica | gimnasio | restaurante | tienda",
+  "hours": "horario de atención en texto (ej: Lun-Vie 9am-6pm)",
+  "contact": "email o teléfono de contacto",
+  "products": "lista de productos o servicios principales separados por coma",
+  "tone": "descripción del tono de voz en 5-10 palabras",
+  "welcomeMessage": "mensaje de bienvenida en español (1-2 oraciones, cálido, menciona el negocio)",
+  "welcomeMessageEn": "welcome message in English (1-2 sentences, warm, mentions the business)",
+  "systemPromptExtra": "instrucciones adicionales para el agente en 2-4 oraciones: qué hacer, qué evitar, objetivos clave",
+  "humanHandoffEnabled": true,
+  "humanHandoffTriggers": "quiero hablar con una persona\\nhablar con un agente\\nfactura\\ncancelar\\nreembolso\\nqueja",
+  "humanHandoffUserMsg": "mensaje que el agente manda al usuario al escalar (1 oración)",
+  "agentName": "nombre de persona para el agente, acorde a la industria y cultura del negocio",
+  "language": "español",
+  "autoDetectLanguage": true,
+  "personality": "descripción de personalidad en 2-3 oraciones: cómo se comporta, qué rasgos tiene",
+  "voiceExamples": "Ejemplo 1: frase tipica del agente | Ejemplo 2: otra frase tipica | Ejemplo 3: otra mas",
+  "defaultResponses": [
+    {"situation": "Saludo inicial", "response": "respuesta apropiada para este negocio"},
+    {"situation": "No sé la respuesta", "response": "respuesta apropiada"},
+    {"situation": "Despedida", "response": "respuesta apropiada"},
+    {"situation": "Cliente molesto", "response": "respuesta apropiada"},
+    {"situation": "Pregunta por precio", "response": "respuesta apropiada para este negocio"}
+  ],
+  "faqs": [
+    {"q": "pregunta frecuente 1 real para este negocio", "a": "respuesta completa y útil"},
+    {"q": "pregunta frecuente 2", "a": "respuesta completa"},
+    {"q": "pregunta frecuente 3", "a": "respuesta completa"},
+    {"q": "pregunta frecuente 4", "a": "respuesta completa"},
+    {"q": "pregunta frecuente 5", "a": "respuesta completa"}
+  ],
+  "quickReplies": [
+    {"label": "etiqueta botón 1 (2-4 palabras)", "message": "mensaje que se envía al clickear"},
+    {"label": "etiqueta botón 2", "message": "mensaje"},
+    {"label": "etiqueta botón 3", "message": "mensaje"}
+  ],
+  "officeHours": {
+    "enabled": true,
+    "timezone": "America/New_York",
+    "offlineMessage": "mensaje fuera de horario apropiado para el negocio (2-3 oraciones)",
+    "schedule": [
+      {"day": 1, "enabled": true, "open": "09:00", "close": "18:00"},
+      {"day": 2, "enabled": true, "open": "09:00", "close": "18:00"},
+      {"day": 3, "enabled": true, "open": "09:00", "close": "18:00"},
+      {"day": 4, "enabled": true, "open": "09:00", "close": "18:00"},
+      {"day": 5, "enabled": true, "open": "09:00", "close": "18:00"},
+      {"day": 6, "enabled": true, "open": "10:00", "close": "14:00"},
+      {"day": 0, "enabled": false, "open": "10:00", "close": "14:00"}
+    ]
+  }
+}
+
+Importante:
+- Extrae businessName, industry, horario y contacto directamente del párrafo si están mencionados
+- Adapta TODO al tipo de negocio específico detectado
+- Los FAQs deben ser preguntas reales que haría un cliente de este negocio
+- Los botones rápidos deben ser las acciones más comunes del negocio
+- El horario en officeHours.schedule debe coincidir con el horario mencionado
+- Responde ÚNICAMENTE con el JSON válido, sin texto adicional`
+
+  try {
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+    const raw = msg.content[0].text.trim()
+    // Extract outermost JSON object robustly
+    const start = raw.indexOf('{')
+    const end = raw.lastIndexOf('}')
+    if (start === -1 || end === -1) return res.status(500).json({ error: 'No JSON in response' })
+    const jsonStr = raw.slice(start, end + 1)
+    let generated
+    try {
+      generated = JSON.parse(jsonStr)
+    } catch (parseErr) {
+      // Log raw for debugging
+      console.error('[ai-generate-config] JSON parse error:', parseErr.message)
+      console.error('[ai-generate-config] Raw:', jsonStr.slice(0, 500))
+      return res.status(500).json({ error: 'JSON inválido generado por la IA. Intenta de nuevo.' })
+    }
+    res.json(generated)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Manual trigger for Lynkro follow-up job (testing/admin)
+adminRouter.post('/jobs/lynkro-followup', requireAdmin, async (req, res) => {
+  try {
+    const { runLynkroFollowUp } = await import('../routes/chat.js')
+    await runLynkroFollowUp()
+    res.json({ ok: true, message: 'Lynkro follow-up job ejecutado' })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})

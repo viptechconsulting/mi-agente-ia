@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seleccionar voz</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0B0F14; font-family: system-ui, sans-serif; padding: 40px 20px; }
+  h1 { color: #27F59B; font-size: 22px; margin-bottom: 8px; }
+  p { color: #9FB0C8; font-size: 14px; margin-bottom: 32px; }
+  .voice { background: #111827; border: 1px solid #252A38; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: center; gap: 20px; }
+  .num { color: #27F59B; font-size: 28px; font-weight: 800; width: 32px; flex-shrink: 0; }
+  .name { color: #FFFFFF; font-size: 17px; font-weight: 600; }
+  audio { flex: 1; height: 36px; }
+</style>
+</head>
+<body>
+  <h1>Elige la voz del narrador</h1>
+  <p>Escucha cada preview y dime cuál quieres para el video.</p>
+
+  <div class="voice">
+    <div class="num">1</div>
+    <div class="name">Narrator Mateo</div>
+    <audio controls src="/1_narrator-mateo.mp3"></audio>
+  </div>
+
+  <div class="voice">
+    <div class="num">2</div>
+    <div class="name">Hugo - Newscaster</div>
+    <audio controls src="/2_hugo-newscaster.wav"></audio>
+  </div>
+
+  <div class="voice">
+    <div class="num">3</div>
+    <div class="name">Diego Martinez</div>
+    <audio controls src="/3_diego-martinez.mp3"></audio>
+  </div>
+
+  <div class="voice">
+    <div class="num">4</div>
+    <div class="name">Enrique Mondragón</div>
+    <audio controls src="/4_enrique-mondragon.wav"></audio>
+  </div>
+
+  <div class="voice">
+    <div class="num">5</div>
+    <div class="name">Rafael Cruz</div>
+    <audio controls src="/5_rafael-cruz.mp3"></audio>
+  </div>
+
+  <div class="voice">
+    <div class="num">6</div>
+    <div class="name">Mateo Plácido</div>
+    <audio controls src="/6_mateo-placido.mp3"></audio>
+  </div>
+</body>
+</html>

@@ -13,6 +13,10 @@ import {
   listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
 } from '../db.js'
 import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
+import { getServices, searchAvailability, createBooking, getLocations } from '../services/square.js'
+import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/medspa-response-schema.js'
+import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
+import { loadState as loadMedspaState, saveState as saveMedspaState, setDoNotContact } from '../services/medspa-state.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -20,10 +24,129 @@ const rootDir = path.join(__dirname, '..')
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ============================================================
+// SQUARE BOOKING TOOLS
+// ============================================================
+const SQUARE_GET_SERVICES_TOOL = {
+  name: 'square_get_services',
+  description: 'Obtiene la lista de servicios disponibles para agendar citas. Úsalo al inicio cuando el usuario quiera reservar o pregunté qué tratamientos hay.',
+  input_schema: { type: 'object', properties: {}, required: [] }
+}
+
+// Single combined tool: finds the best available slot and books it atomically
+const SQUARE_BOOK_APPOINTMENT_TOOL = {
+  name: 'square_book_appointment',
+  description: 'Busca disponibilidad y crea la cita en Square en un solo paso. Úsalo cuando el cliente haya elegido servicio, fecha/hora y dado su nombre y teléfono. El sistema encuentra el slot más cercano a lo solicitado y lo reserva automáticamente.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      service_variation_id: { type: 'string', description: 'variationId del servicio (de square_get_services)' },
+      service_variation_version: { type: 'number', description: 'variationVersion del servicio (de square_get_services)' },
+      requested_date: { type: 'string', description: 'Fecha solicitada en formato YYYY-MM-DD (ej: "2026-07-09")' },
+      requested_time: { type: 'string', description: 'Hora solicitada en formato HH:MM zona Miami/ET (ej: "18:00" para 6pm, "10:30" para 10:30am)' },
+      customer_name: { type: 'string', description: 'Nombre completo del cliente' },
+      customer_phone: { type: 'string', description: 'Teléfono con código de país (ej: +17863511573)' },
+      customer_email: { type: 'string', description: 'Email del cliente (NO lo pidas, déjalo vacío siempre)' },
+      note: { type: 'string', description: 'Nota adicional (opcional)' }
+    },
+    required: ['service_variation_id', 'service_variation_version', 'requested_date', 'requested_time', 'customer_name', 'customer_phone']
+  }
+}
+
+// Atomic: find best slot near requested time and book it
+async function squareBookAppointment(accessToken, { serviceVariationId, serviceVariationVersion, requestedDate, requestedTime, customerName, customerPhone, customerEmail, note }) {
+  const locations = await getLocations(accessToken)
+  if (!locations.length) throw new Error('No hay ubicaciones configuradas en Square')
+
+  // Build search window: requested date ± 1 day to find slots near the request
+  const tzOffset = '-04:00' // Miami EDT (adjust to -05:00 for EST Nov-Mar)
+  const requestedIso = `${requestedDate}T${requestedTime}:00${tzOffset}`
+  const requestedMs = new Date(requestedIso).getTime()
+  const dayStart = new Date(`${requestedDate}T00:00:00${tzOffset}`).toISOString()
+  const dayEnd = new Date(`${requestedDate}T23:59:59${tzOffset}`).toISOString()
+
+  let allSlots = []
+  for (const loc of locations) {
+    try {
+      const slots = await searchAvailability(accessToken, {
+        serviceVariationId,
+        startAt: dayStart,
+        endAt: dayEnd,
+        locationId: loc.id
+      })
+      allSlots.push(...slots.map(s => ({ ...s, locationId: loc.id })))
+    } catch {}
+  }
+
+  // If no slots on that day, search next 7 days
+  if (!allSlots.length) {
+    const nextWeek = new Date(requestedMs + 7 * 24 * 60 * 60 * 1000).toISOString()
+    for (const loc of locations) {
+      try {
+        const slots = await searchAvailability(accessToken, {
+          serviceVariationId,
+          startAt: new Date().toISOString(),
+          endAt: nextWeek,
+          locationId: loc.id
+        })
+        allSlots.push(...slots.map(s => ({ ...s, locationId: loc.id })))
+      } catch {}
+    }
+  }
+
+  if (!allSlots.length) {
+    throw new Error('No hay disponibilidad en los próximos 7 días para ese servicio.')
+  }
+
+  // Pick the slot closest to the requested time
+  allSlots.sort((a, b) => Math.abs(new Date(a.startAt) - requestedMs) - Math.abs(new Date(b.startAt) - requestedMs))
+  const best = allSlots[0]
+
+  const booking = await createBooking(accessToken, {
+    startAt: best.startAt,
+    serviceVariationId: best.serviceVariationId || serviceVariationId,
+    serviceVariationVersion,
+    teamMemberId: best.teamMemberId,
+    locationId: best.locationId,
+    customerName,
+    customerPhone,
+    customerEmail,
+    note
+  })
+
+  // Format confirmation time for display
+  const confirmedTime = new Date(booking.start_at).toLocaleString('es-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true
+  })
+
+  return {
+    success: true,
+    bookingId: booking.id,
+    confirmedTime,
+    startAt: booking.start_at,
+    status: booking.status,
+    note: booking.start_at !== requestedIso ? `Confirmado para el horario más cercano disponible: ${confirmedTime}` : null
+  }
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 function sanitizeFTS(q) {
   return q.replace(/["']/g, ' ').split(/\s+/).filter(w => w.length > 2).slice(0, 10).map(w => `"${w}"`).join(' OR ')
+}
+
+// Bounds the raw transcript sent to Claude for long-running medspa
+// conversations; earlier context is carried instead via conversation_summary
+// (already injected into the system prompt by buildMedspaPromptModule).
+// Ensures the result still starts on a 'user' turn, as the Anthropic API requires.
+function windowHistory(history, threshold, keep) {
+  if (history.length <= threshold) return history
+  let sliced = history.slice(-keep)
+  const firstUserIdx = sliced.findIndex(m => m.role === 'user')
+  if (firstUserIdx > 0) sliced = sliced.slice(firstUserIdx)
+  return sliced
 }
 
 function searchKnowledge(companyId, query, limit = 5) {
@@ -136,9 +259,33 @@ export async function sendInstagram(accessToken, recipientId, text) {
 }
 
 // ============================================================
+// WEB CHAT ALERT — notify owner on WhatsApp when a new web chat starts
+// ============================================================
+async function sendWebChatAlert(companyId, conversationId, firstMessage) {
+  const cfg = loadConfig(companyId)
+  const alertPhone = (cfg.webAlertPhone || '').replace(/\D/g, '')
+  console.log(`[WebAlert] company=${companyId.substring(0,8)} alertPhone=${alertPhone||'(vacío)'}`)
+  if (!alertPhone) { console.log('[WebAlert] Abortado: webAlertPhone no configurado'); return }
+  const conn = waConnections.get(companyId)
+  console.log(`[WebAlert] WA status=${conn?.state?.status || 'no conn'} sock=${!!conn?.sock}`)
+  if (!conn?.sock || conn.state?.status !== 'open') { console.log('[WebAlert] Abortado: WA no conectado'); return }
+  const shortId = conversationId.substring(0, 8)
+  const preview = firstMessage.length > 120 ? firstMessage.substring(0, 117) + '...' : firstMessage
+  const text = `🌐 *Nuevo web chat* | #${shortId}\n\n💬 _"${preview}"_\n\n` +
+    `↩️ *Mantén presionado este mensaje → Responder* para contestar directamente al visitante.\n\n` +
+    `La IA se pausa automáticamente cuando respondes.`
+  try {
+    await conn.sock.sendMessage(`${alertPhone}@s.whatsapp.net`, { text })
+    console.log(`[WebAlert:${companyId}] Alerta enviada a ${alertPhone}`)
+  } catch (err) {
+    console.error(`[WebAlert:${companyId}] Error:`, err.message)
+  }
+}
+
+// ============================================================
 // CORE CHAT processMessage
 // ============================================================
-export async function processMessage({ companyId, message, conversationId, visitorId, channel, pageUrl, pageTitle }) {
+export async function processMessage({ companyId, message, conversationId, visitorId, channel, pageUrl, pageTitle, isNewSession }) {
   const cfg = loadConfig(companyId)
   let convId = conversationId
   const now = Date.now()
@@ -148,27 +295,54 @@ export async function processMessage({ companyId, message, conversationId, visit
     if (existing) convId = existing.id
   }
 
+  let isReactivation = false
   if (!convId) {
     convId = crypto.randomUUID()
     db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(convId, visitorId || 'anon', channel || 'web', now, now, companyId)
   } else {
     // ensure conv belongs to same company
-    const owner = db.prepare('SELECT company_id FROM conversations WHERE id = ?').get(convId)
+    const owner = db.prepare('SELECT company_id, human_mode, updated_at FROM conversations WHERE id = ?').get(convId)
     if (owner && owner.company_id !== companyId) {
       // re-create under correct company
       convId = crypto.randomUUID()
       db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(convId, visitorId || 'anon', channel || 'web', now, now, companyId)
     } else {
-      db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, convId)
+      // Auto-reset human_mode for web conversations idle >30 min (prevents test pollution)
+      const idleMs = now - (owner?.updated_at || 0)
+      if (channel === 'web' && idleMs > 30 * 60 * 1000) {
+        isReactivation = true
+        db.prepare('UPDATE conversations SET human_mode = 0, updated_at = ? WHERE id = ?').run(now, convId)
+      } else {
+        db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, convId)
+      }
     }
   }
+
+  // Check conversation state BEFORE inserting the new user message
+  const aiRepliesCount = db.prepare("SELECT COUNT(*) as cnt FROM messages WHERE conversation_id = ? AND role = 'assistant'").get(convId)
+  const lastAiMessage = db.prepare("SELECT content FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(convId)
 
   db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'user', message, now)
   // Reset retargeting so it fires again after new activity
   db.prepare('UPDATE conversations SET retargeting_sent = 0 WHERE id = ?').run(convId)
 
   const contacts = extractContacts(message)
-  const conv = db.prepare('SELECT lead_email, lead_phone, lead_name, lead_notified, human_mode FROM conversations WHERE id = ?').get(convId)
+  const conv = db.prepare('SELECT lead_email, lead_phone, lead_name, lead_notified, human_mode, web_alert_sent FROM conversations WHERE id = ?').get(convId)
+
+  // Send web chat alert only after the client replies to the system's first message
+  if (channel === 'web' && aiRepliesCount.cnt >= 1 && !conv.web_alert_sent) {
+    db.prepare('UPDATE conversations SET web_alert_sent = 1 WHERE id = ?').run(convId)
+    setImmediate(() => sendWebChatAlert(companyId, convId, message))
+  }
+
+  // Auto-expire human_mode if owner hasn't replied in 10 min
+  if (channel === 'web' && conv.human_mode) {
+    const lastOwner = db.prepare("SELECT MAX(created_at) as ts FROM messages WHERE conversation_id = ? AND role = 'assistant'").get(convId)
+    if (!lastOwner?.ts || (now - lastOwner.ts) > 10 * 60 * 1000) {
+      db.prepare('UPDATE conversations SET human_mode = 0 WHERE id = ?').run(convId)
+      conv.human_mode = 0
+    }
+  }
 
   // Human takeover — skip AI
   if (conv.human_mode) return { reply: null, conversationId: convId }
@@ -184,12 +358,28 @@ export async function processMessage({ companyId, message, conversationId, visit
       newLead = true
     }
   }
-  // Extract name from message using simple patterns
+  // Extract name: explicit patterns OR response to AI asking for name
   if (!conv.lead_name) {
-    const namePat = /(?:me llamo|soy|mi nombre es|my name is)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i
+    const namePat = /(?:me llamo|soy|mi nombre es|my name is|mi nombre:|nombre:)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i
     const nm = message.match(namePat)
     if (nm) {
       db.prepare('UPDATE conversations SET lead_name = ? WHERE id = ?').run(nm[1].trim(), convId)
+      newLead = true
+    } else if (lastAiMessage?.content && /con quién|cómo te llamas|tu nombre|me dices tu nombre|¿y tú\?/i.test(lastAiMessage.content)) {
+      // AI asked for name — treat short response as the name
+      const trimmed = message.trim()
+      if (trimmed.length >= 2 && trimmed.length <= 40 && /^[A-ZÁÉÍÓÚÑ\s'-]+$/i.test(trimmed)) {
+        db.prepare('UPDATE conversations SET lead_name = ? WHERE id = ?').run(trimmed, convId)
+        newLead = true
+      }
+    }
+  }
+  // Extract email: explicit in message OR response to AI asking for email
+  if (!conv.lead_email && !contacts.emails[0] && lastAiMessage?.content && /correo|email|e-mail/i.test(lastAiMessage.content)) {
+    const emailPat = /[\w.+-]+@[\w-]+\.[\w.-]+/
+    const em = message.match(emailPat)
+    if (em) {
+      db.prepare('UPDATE conversations SET lead_email = ? WHERE id = ?').run(em[0], convId)
       newLead = true
     }
   }
@@ -214,20 +404,69 @@ export async function processMessage({ companyId, message, conversationId, visit
     ? '\n\nTIENES ACCESO AL CATÁLOGO DE PRODUCTOS. Cuando el usuario pregunte por productos, precios, disponibilidad, alternativas o muestre intención de compra, usa la herramienta search_products para buscar en el catálogo. Siempre incluye la URL del producto en tus respuestas. Si un producto está agotado, ofrece alternativas.'
     : ''
 
+  const hasSquare = !!(cfg.square?.access_token)
+  const squareSystemBlock = hasSquare
+    ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
+    : ''
+
+  // Med Spa vertical: forces structured output via respond_to_patient instead
+  // of raw text. Phase 1 scoping: mutually exclusive with Commerce/Square tools
+  // in the same call (tool_choice forces exactly one tool) — Phase 2 will
+  // generalize this into a "terminal tool" pattern that composes with the
+  // GHL booking tool. See docs/superpowers/plans for the medspa design.
+  const isMedspa = cfg.industry === 'medspa'
+  let medspaState = isMedspa ? loadMedspaState(convId) : null
+  const medspaSystemBlock = isMedspa ? buildMedspaPromptModule(cfg, medspaState) : ''
+
+  const activeTools = []
+  if (isMedspa) {
+    activeTools.push(RESPOND_TO_PATIENT_TOOL)
+  } else {
+    if (hasCommercePro) activeTools.push(SEARCH_PRODUCTS_TOOL)
+    if (hasSquare) activeTools.push(SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL)
+  }
+
   const callParams = {
     model: cfg.model || 'claude-haiku-4-5-20251001',
-    max_tokens: hasCommercePro ? 800 : 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock,
-    messages: history.map(m => ({ role: m.role, content: m.content }))
+    max_tokens: (hasCommercePro || hasSquare || isMedspa) ? 800 : 350,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + medspaSystemBlock,
+    messages: (isMedspa ? windowHistory(history, 20, 16) : history).map(m => ({ role: m.role, content: m.content }))
   }
-  if (hasCommercePro) callParams.tools = [SEARCH_PRODUCTS_TOOL]
+  if (activeTools.length > 0) callParams.tools = activeTools
+  if (isMedspa) callParams.tool_choice = { type: 'tool', name: 'respond_to_patient' }
 
   let response = await client.messages.create(callParams)
   const discussedProductIds = []
 
-  // Tool-use loop (max 3 iterations to prevent runaway)
+  // Med Spa: forced tool_choice guarantees the structured block on the first
+  // response — no action-tool loop needed yet (Phase 2 adds GHL booking here).
+  let medspaResult = null
+  if (isMedspa) {
+    const block = response.content.find(b => b.type === 'tool_use' && b.name === 'respond_to_patient')
+    if (block) {
+      const { valid, errors } = validateAgentResponse(block.input)
+      if (!valid) console.warn('[medspa] respond_to_patient validation errors:', errors)
+      medspaResult = block.input
+    } else {
+      // Defensive fallback — should not happen with tool_choice forced, but never crash the reply path.
+      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+      console.warn('[medspa] model did not call respond_to_patient, falling back to raw text')
+      medspaResult = {
+        message_to_user: text || 'Dame un momento, ya te ayudo.',
+        next_state: medspaState.current_state,
+        primary_intent: 'UNCLEAR',
+        lead_temperature: medspaState.lead_temperature,
+        confidence: 0,
+        handoff_required: false,
+        follow_up_eligible: false,
+        conversation_summary_update: medspaState.conversation_summary
+      }
+    }
+  }
+
+  // Tool-use loop (max 3 iterations to prevent runaway) — skipped for medspa (see above)
   let iterations = 0
-  while (response.stop_reason === 'tool_use' && iterations < 3) {
+  while (!isMedspa && response.stop_reason === 'tool_use' && iterations < 3) {
     iterations++
     const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
     const toolResults = []
@@ -235,12 +474,37 @@ export async function processMessage({ companyId, message, conversationId, visit
     for (const block of toolUseBlocks) {
       let resultContent
       try {
-        const { query, intent, product_id } = block.input
-        const searchResult = buildSearchResponse(db, companyId, query, intent, product_id || null)
-        discussedProductIds.push(...searchResult.products.map(p => p.id))
-        resultContent = JSON.stringify(searchResult)
+        if (block.name === 'search_products') {
+          const { query, intent, product_id } = block.input
+          const searchResult = buildSearchResponse(db, companyId, query, intent, product_id || null)
+          discussedProductIds.push(...searchResult.products.map(p => p.id))
+          resultContent = JSON.stringify(searchResult)
+        } else if (block.name === 'square_get_services') {
+          const token = cfg.square.access_token
+          const services = await getServices(token)
+          resultContent = JSON.stringify({ services })
+        } else if (block.name === 'square_book_appointment') {
+          const token = cfg.square.access_token
+          const { service_variation_id, service_variation_version, requested_date, requested_time, customer_name, customer_phone, customer_email, note } = block.input
+          console.log('[Square] book_appointment:', requested_date, requested_time, customer_name)
+          const result = await squareBookAppointment(token, {
+            serviceVariationId: service_variation_id,
+            serviceVariationVersion: service_variation_version,
+            requestedDate: requested_date,
+            requestedTime: requested_time,
+            customerName: customer_name,
+            customerPhone: customer_phone,
+            customerEmail: customer_email,
+            note
+          })
+          console.log('[Square] booked:', result.bookingId, result.confirmedTime)
+          resultContent = JSON.stringify(result)
+        } else {
+          resultContent = JSON.stringify({ error: `Herramienta desconocida: ${block.name}` })
+        }
       } catch (err) {
-        resultContent = JSON.stringify({ error: err.message, products: [] })
+        console.error('[Square tool error]', block.name, err.message)
+        resultContent = JSON.stringify({ error: err.message })
       }
       toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultContent })
     }
@@ -254,7 +518,7 @@ export async function processMessage({ companyId, message, conversationId, visit
     response = await client.messages.create(callParams)
   }
 
-  const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+  const reply = isMedspa ? medspaResult.message_to_user : response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
 
   // Track products discussed in this conversation
   if (discussedProductIds.length > 0) {
@@ -271,7 +535,23 @@ export async function processMessage({ companyId, message, conversationId, visit
     }
   }
   const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', reply, Date.now())
-  if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
+
+  if (isMedspa) {
+    medspaResult.last_meaningful_user_message = message
+    medspaState = saveMedspaState(convId, medspaResult)
+
+    if (medspaResult.primary_intent === 'OPT_OUT' || medspaResult.next_state === 'DO_NOT_CONTACT') {
+      setDoNotContact(convId)
+    }
+    if (medspaResult.handoff_required) {
+      const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
+      db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId)
+      if (!c.escalated_notified) {
+        db.prepare('UPDATE conversations SET escalated_notified = 1 WHERE id = ?').run(convId)
+        setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId, companyId }))
+      }
+    }
+  } else if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
     const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
     db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId)
     if (!c.escalated_notified) {
@@ -350,17 +630,47 @@ export async function startBuiltinWhatsApp(companyId) {
         // Handle commands sent FROM the business phone (fromMe)
         if (msg.key.fromMe) {
           const cmd = text.trim()
-          if (cmd === '/' || cmd === '//') {
+          if (cmd === '*' || cmd === '**') {
             const conv = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND company_id = ? AND channel = 'whatsapp' ORDER BY updated_at DESC LIMIT 1").get(visitorId, companyId)
             if (conv) {
-              const mode = cmd === '/' ? 1 : 0
+              const mode = cmd === '*' ? 1 : 0
               db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
-              const ack = mode ? '⏸ IA pausada. Tú tienes el control.' : '▶ IA reactivada.'
-              await sock.sendMessage(remoteJid, { text: ack })
               console.log(`[WA:${companyId}] human_mode=${mode} para ${visitorId}`)
             }
           }
           continue // never process fromMe messages through AI
+        }
+
+        // Web chat relay — two methods:
+        // 1) Reply (quote) the alert message in WhatsApp → extract #shortId from quoted text
+        // 2) Manual: type #shortId message (legacy, still supported)
+        const quotedText = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation
+          || msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text
+          || ''
+        const quotedIdMatch = quotedText.match(/#([a-f0-9]{8})\b/i)
+        const directRelayMatch = text.trim().match(/^#([a-f0-9]{8})\s+([\s\S]+)$/i)
+
+        if (quotedIdMatch || directRelayMatch) {
+          const shortId = (quotedIdMatch ? quotedIdMatch[1] : directRelayMatch[1]).toLowerCase()
+          const replyText = directRelayMatch ? directRelayMatch[2].trim() : text.trim()
+          const webConv = db.prepare("SELECT id FROM conversations WHERE id LIKE ? AND company_id = ? AND channel = 'web' ORDER BY updated_at DESC LIMIT 1").get(shortId + '%', companyId)
+          if (webConv) {
+            if (replyText === '*') {
+              db.prepare('UPDATE conversations SET human_mode = 1 WHERE id = ?').run(webConv.id)
+              await sock.sendMessage(remoteJid, { text: `⏸ IA pausada en web chat.` })
+            } else if (replyText === '**') {
+              db.prepare('UPDATE conversations SET human_mode = 0 WHERE id = ?').run(webConv.id)
+              await sock.sendMessage(remoteJid, { text: `▶ IA reactivada en web chat.` })
+            } else {
+              db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(webConv.id, 'assistant', replyText, Date.now())
+              db.prepare('UPDATE conversations SET updated_at = ?, human_mode = 1 WHERE id = ?').run(Date.now(), webConv.id)
+              await sock.sendMessage(remoteJid, { text: `✅ Enviado al visitante.` })
+            }
+            console.log(`[WebRelay:${companyId}] Relay ${shortId} → "${replyText.substring(0, 50)}"`)
+          } else {
+            await sock.sendMessage(remoteJid, { text: `⚠️ No encontré conversación web #${shortId}.` })
+          }
+          continue
         }
 
         try {
@@ -414,8 +724,12 @@ async function runRetargeting() {
       })
       const retargetMsg = resp.content[0].text.trim()
       if (conv.channel === 'whatsapp') {
-        const phone = conv.visitor_id.replace('wa:', '')
-        await sendWhatsApp(cfg, phone, retargetMsg)
+        const conn = waConnections.get(conv.company_id)
+        if (conn?.sock && conn.state?.status === 'open') {
+          await conn.sock.sendMessage(conv.visitor_id.replace('wa:', ''), { text: retargetMsg })
+        } else {
+          await sendWhatsApp(cfg, conv.visitor_id.replace('wa:', ''), retargetMsg)
+        }
       } else if (conv.channel === 'instagram') {
         const igId = conv.visitor_id.replace('ig:', '')
         await sendInstagram(cfg.igAccessToken, igId, retargetMsg)
@@ -428,7 +742,155 @@ async function runRetargeting() {
 }
 setInterval(runRetargeting, 30 * 60 * 1000) // check every 30 min
 
+// ============================================================
+// LYNKRO FOLLOW-UP JOB — qualification flow follow-ups
+// ============================================================
+const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
+
+// Phases: early = calificación (bot_count 1-2), mid = shock factor mostrado (3), late = demo ofrecida (4+)
+const LYNKRO_FU = {
+  fu1: {
+    early: '¿Pudiste ver mi mensaje? Solo para no hacerte perder tiempo — ¿cuántos mensajes o consultas recibes a la semana en tu clínica que tu equipo no logra responder a tiempo?',
+    mid:   '¿Tiene sentido el número que te mostré? Con solo 5 prospectos perdidos a la semana el impacto mensual es bastante real. ¿Te interesa ver cómo funciona el sistema?',
+    late:  'Hola, ¿pudiste pensarlo? La llamada de 10-15 min es sin compromiso — te muestro el sistema en vivo y si no te sirve no pasa nada. ¿Cómo tienes la agenda esta semana?'
+  },
+  fu2: {
+    early: 'Sin apuro — si me dices qué tipo de clínica o medspa tienes, te armo el cálculo de cuánto podrías estar dejando sobre la mesa cada mes. No tiene que ser exacto, un estimado alcanza.',
+    mid:   'El número que te mostré es siendo conservador. La mayoría de clínicas pierden más de 5 prospectos a la semana. ¿Le damos 15 minutos para verlo en vivo con tu caso real?',
+    late:  'Sé que estás muy ocupado. Hagamos esto: si me das tu correo te grabo un video de 3 min mostrándote exactamente cómo funciona para tu tipo de clínica. Sin llamadas, sin presión. ¿A qué correo te lo mando?'
+  },
+  fu3: 'Hola, sé que estás a full con la clínica. Una pregunta rápida para cerrar el tema: ¿sigue siendo prioridad para ti recuperar esos pacientes que se están perdiendo por falta de respuesta, o lo dejamos para otro momento?'
+}
+
+export async function runLynkroFollowUp() {
+  const now = Date.now()
+  const H4  = 4  * 60 * 60 * 1000
+  const H24 = 24 * 60 * 60 * 1000
+  const D3  = 3  * 24 * 60 * 60 * 1000
+  const D7  = 7  * 24 * 60 * 60 * 1000
+  const D30 = 30 * 24 * 60 * 60 * 1000
+
+  const convs = db.prepare(`
+    SELECT id, visitor_id, channel, updated_at, flow_state, company_id
+    FROM conversations
+    WHERE company_id = ?
+      AND channel IN ('whatsapp','instagram')
+      AND human_mode = 0
+  `).all(LYNKRO_COMPANY_ID)
+
+  const cfg = loadConfig(LYNKRO_COMPANY_ID)
+
+  for (const conv of convs) {
+    try {
+      const state = conv.flow_state ? JSON.parse(conv.flow_state) : {}
+      if (state.nurture) continue
+
+      // Only follow up when last message was from the bot (lead hasn't replied)
+      const lastMsg = db.prepare('SELECT role FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1').get(conv.id)
+      if (!lastMsg || lastMsg.role !== 'assistant') continue
+
+      // Detect phase: early=calificación, mid=shock factor shown, late=demo offered
+      const { bot_count } = db.prepare(`SELECT SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as bot_count FROM messages WHERE conversation_id = ?`).get(conv.id)
+      const phase = bot_count >= 4 ? 'late' : bot_count === 3 ? 'mid' : 'early'
+
+      const elapsed = now - conv.updated_at
+      let fuKey = null
+      let fuText = null
+
+      if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; fuText = LYNKRO_FU.fu1[phase] }
+      else if (elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
+      else if (elapsed >= D3  && elapsed < D7  && !state.fu3) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
+      else if (elapsed >= D7  && elapsed < D30 && !state.reactivacion) { state.reactivacion = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
+      else if (elapsed >= D30 && !state.nurture) { state.nurture = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
+
+      if (!fuKey || !fuText) continue
+
+      if (conv.channel === 'whatsapp') {
+        const conn = waConnections.get(conv.company_id)
+        if (conn?.sock && conn.state?.status === 'open') {
+          const rawJid = conv.visitor_id.replace('wa:', '')
+          const jid = rawJid.includes('@') ? rawJid : `${rawJid}@s.whatsapp.net`
+          console.log(`[Lynkro FU] sending to jid=${jid} conn=${conn.state?.status}`)
+          const result = await conn.sock.sendMessage(jid, { text: fuText })
+          console.log(`[Lynkro FU] sendMessage result=${result ? result.key?.id : 'null'}`)
+        } else {
+          console.log(`[Lynkro FU] no conn or not open for company ${conv.company_id}`)
+          await sendWhatsApp(cfg, conv.visitor_id.replace('wa:', ''), fuText)
+        }
+      } else {
+        await sendInstagram(cfg.igAccessToken, conv.visitor_id.replace('ig:', ''), fuText)
+      }
+
+      state[fuKey] = true
+      db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
+      db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', fuText, now)
+      console.log(`[Lynkro FU] ${fuKey} → ${conv.visitor_id} (phase:${phase})`)
+    } catch (e) { console.error('[Lynkro FU]', e.message) }
+  }
+}
+setInterval(runLynkroFollowUp, 30 * 60 * 1000)
+
 export const chatRouter = express.Router()
+
+// ============================================================
+// INBOX — multi-company conversations for admin
+// ============================================================
+chatRouter.get('/inbox/conversations', requireAdmin, (req, res) => {
+  const allCompanies = req.allowedCompanies === null
+    ? db.prepare("SELECT id, name FROM companies WHERE active=1").all()
+    : db.prepare(`SELECT id, name FROM companies WHERE id IN (${(req.allowedCompanies||[]).map(()=>'?').join(',') || "''"}) AND active=1`).all(req.allowedCompanies || [])
+
+  const rows = []
+  for (const co of allCompanies) {
+    const convs = db.prepare(`
+      SELECT c.id, c.visitor_id, c.channel, c.human_mode, c.created_at, c.updated_at,
+        '${co.id}' as company_id, '${co.name.replace(/'/g,"''")}' as company_name,
+        (SELECT role    FROM messages WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) as last_role,
+        (SELECT content FROM messages WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) as last_content
+      FROM conversations c
+      WHERE c.company_id=? AND c.channel='web'
+      ORDER BY c.updated_at DESC LIMIT 50
+    `).all(co.id)
+    rows.push(...convs)
+  }
+  rows.sort((a, b) => b.updated_at - a.updated_at)
+  res.json(rows.slice(0, 200))
+})
+
+chatRouter.get('/inbox/conversations/:id', requireAdmin, (req, res) => {
+  const { companyId } = req.query
+  if (!companyId) return res.status(400).json({ error: 'Falta companyId' })
+  const conv = db.prepare('SELECT id, human_mode, channel, visitor_id FROM conversations WHERE id=? AND company_id=?').get(req.params.id, companyId)
+  if (!conv) return res.status(404).json({ error: 'No encontrada' })
+  const msgs = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id=? ORDER BY created_at ASC').all(req.params.id)
+  res.json({ conv, msgs })
+})
+
+chatRouter.post('/inbox/conversations/:id/reply', requireAdmin, async (req, res) => {
+  const { text, companyId } = req.body
+  if (!text?.trim() || !companyId) return res.status(400).json({ error: 'Falta texto o companyId' })
+  const conv = db.prepare('SELECT id, channel, visitor_id FROM conversations WHERE id=? AND company_id=?').get(req.params.id, companyId)
+  if (!conv) return res.status(404).json({ error: 'No encontrada' })
+  const now = Date.now()
+  db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', text.trim(), now)
+  db.prepare('UPDATE conversations SET human_mode=1, updated_at=? WHERE id=?').run(now, conv.id)
+  const company = db.prepare('SELECT config FROM companies WHERE id=?').get(companyId)
+  const cfg = company?.config ? JSON.parse(company.config) : {}
+  try {
+    if (conv.channel === 'whatsapp') await sendWhatsApp(cfg, conv.visitor_id.replace('wa:', ''), text.trim())
+    else if (conv.channel === 'instagram') await sendInstagram(cfg.igAccessToken, conv.visitor_id.replace('ig:', ''), text.trim())
+  } catch (e) { console.error('[inbox reply]', e.message) }
+  res.json({ ok: true })
+})
+
+chatRouter.post('/inbox/conversations/:id/human-mode', requireAdmin, (req, res) => {
+  const { mode, companyId } = req.body
+  if (!companyId) return res.status(400).json({ error: 'Falta companyId' })
+  const conv = db.prepare('SELECT id FROM conversations WHERE id=? AND company_id=?').get(req.params.id, companyId)
+  if (!conv) return res.status(404).json({ error: 'No encontrada' })
+  db.prepare('UPDATE conversations SET human_mode=? WHERE id=?').run(mode ? 1 : 0, req.params.id)
+  res.json({ ok: true })
+})
 
 // ============================================================
 // RATINGS
@@ -446,7 +908,16 @@ chatRouter.post('/rate', (req, res) => {
 // CONVERSATIONS (scoped to company)
 // ============================================================
 chatRouter.get('/conversations', requireAdmin, withCompany, (req, res) => {
-  res.json(db.prepare('SELECT id, visitor_id, channel, unresolved, human_mode, created_at, updated_at FROM conversations WHERE company_id = ? ORDER BY updated_at DESC LIMIT 100').all(req.company.id))
+  const channel = req.query.channel || null
+  const rows = db.prepare(`
+    SELECT c.id, c.visitor_id, c.channel, c.unresolved, c.human_mode, c.created_at, c.updated_at,
+      (SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_role,
+      (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_content
+    FROM conversations c
+    WHERE c.company_id = ?${channel ? " AND c.channel = ?" : ''}
+    ORDER BY c.updated_at DESC LIMIT 150
+  `).all(channel ? [req.company.id, channel] : [req.company.id])
+  res.json(rows)
 })
 
 chatRouter.get('/conversations/:id', requireAdmin, withCompany, (req, res) => {
@@ -476,7 +947,11 @@ chatRouter.post('/conversations/:id/reply', requireAdmin, withCompany, async (re
   if (!text?.trim()) return res.status(400).json({ error: 'Falta texto' })
   const conv = db.prepare('SELECT id, channel, visitor_id FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
   if (!conv) return res.status(404).json({ error: 'No encontrada' })
-  db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', text.trim(), Date.now())
+  const now2 = Date.now()
+  db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', text.trim(), now2)
+  if (conv.channel === 'web') {
+    db.prepare('UPDATE conversations SET human_mode = 1, updated_at = ? WHERE id = ?').run(now2, conv.id)
+  }
   const cfg = req.company.config
   try {
     if (conv.channel === 'whatsapp') {
@@ -531,6 +1006,16 @@ chatRouter.delete('/leads/:id', requireAdmin, withCompany, (req, res) => {
 // ============================================================
 // CORE CHAT
 // ============================================================
+chatRouter.get('/chat/poll', withCompany, (req, res) => {
+  const { conversationId, after } = req.query
+  if (!conversationId) return res.json({ messages: [] })
+  const since = parseInt(after) || 0
+  const conv = db.prepare('SELECT human_mode FROM conversations WHERE id = ? AND company_id = ?').get(conversationId, req.company.id)
+  if (!conv) return res.json({ messages: [] })
+  const messages = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id = ? AND created_at > ? ORDER BY created_at ASC').all(conversationId, since)
+  res.json({ messages, human_mode: conv.human_mode })
+})
+
 chatRouter.post('/chat', withCompany, async (req, res) => {
   try {
     const { message, conversationId, visitorId, demo, history, pageUrl, pageTitle } = req.body
@@ -544,17 +1029,63 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
       const knowledgeText = knowledge.length
         ? `\n\nINFORMACIÓN RELEVANTE:\n${knowledge.map(k => `[${k.title}]\n${k.content}`).join('\n---\n')}`
         : ''
-      const resp = await client.messages.create({
+      const hasSquareDemo = !!(cfg.square?.access_token)
+      const squareSysDemo = hasSquareDemo
+        ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
+        : ''
+      const demoCallParams = {
         model: cfg.model || 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO]',
+        max_tokens: hasSquareDemo ? 800 : 350,
+        system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO]' + squareSysDemo,
         messages: msgs
-      })
-      const reply = resp.content.map(c => c.text || '').join('').trim()
+      }
+      if (hasSquareDemo) demoCallParams.tools = [SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL]
+      let demoResp = await client.messages.create(demoCallParams)
+      let demoIterations = 0
+      while (demoResp.stop_reason === 'tool_use' && demoIterations < 3) {
+        demoIterations++
+        const toolBlocks = demoResp.content.filter(b => b.type === 'tool_use')
+        const toolResults = []
+        for (const block of toolBlocks) {
+          let resultContent
+          try {
+            const token = cfg.square.access_token
+            if (block.name === 'square_get_services') {
+              const services = await getServices(token)
+              resultContent = JSON.stringify({ services })
+            } else if (block.name === 'square_book_appointment') {
+              const { service_variation_id, service_variation_version, requested_date, requested_time, customer_name, customer_phone, customer_email, note } = block.input
+              console.log('[Square demo] book_appointment:', requested_date, requested_time, customer_name)
+              const result = await squareBookAppointment(token, {
+                serviceVariationId: service_variation_id,
+                serviceVariationVersion: service_variation_version,
+                requestedDate: requested_date,
+                requestedTime: requested_time,
+                customerName: customer_name,
+                customerPhone: customer_phone,
+                customerEmail: customer_email,
+                note
+              })
+              console.log('[Square demo] booked:', result.bookingId, result.confirmedTime)
+              resultContent = JSON.stringify(result)
+            } else {
+              resultContent = JSON.stringify({ error: `Herramienta desconocida: ${block.name}` })
+            }
+          } catch (err) {
+            console.error('[Square demo error]', block.name, err.message)
+            resultContent = JSON.stringify({ error: err.message })
+          }
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultContent })
+        }
+        demoCallParams.messages = [...demoCallParams.messages, { role: 'assistant', content: demoResp.content }, { role: 'user', content: toolResults }]
+        demoResp = await client.messages.create(demoCallParams)
+      }
+      const reply = demoResp.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
       return res.json({ reply, history: [...msgs, { role: 'assistant', content: reply }] })
     }
 
-    const result = await processMessage({ companyId: req.company.id, message, conversationId, visitorId, channel: 'web', pageUrl, pageTitle })
+    const isNewSession = !conversationId
+    const result = await processMessage({ companyId: req.company.id, message, conversationId, visitorId, channel: 'web', pageUrl, pageTitle, isNewSession })
     res.json(result)
   } catch (err) {
     console.error(err)
@@ -575,10 +1106,21 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
     const company = findCompanyByWaInstance(instance) || getCompany('default')
     if (!company) return
     const data = ev.data || ev
-    if (data?.key?.fromMe) return
     const jid = data?.key?.remoteJid || ''
     if (!jid || jid.includes('@g.us')) return
     const phone = jid.split('@')[0]
+    if (data?.key?.fromMe) {
+      // Business initiated — create conversation with human_mode=1 so AI won't respond when client replies
+      const visitorIdOut = `wa:${phone}`
+      const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = 'whatsapp' AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorIdOut, company.id)
+      if (!existing) {
+        const newId = crypto.randomUUID()
+        const now = Date.now()
+        db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorIdOut, 'whatsapp', now, now, company.id)
+        console.log('[WA webhook] Business initiated — human_mode=1 for', visitorIdOut)
+      }
+      return
+    }
     const text = data.message?.conversation
       || data.message?.extendedTextMessage?.text
       || data.message?.imageMessage?.caption || ''
@@ -655,14 +1197,29 @@ chatRouter.get('/whatsapp/builtin/qr', requireAdmin, withCompany, async (req, re
   const conn = getWaConn(cid)
   if (conn.state.status === 'open') return res.json({ status: 'open', phone: conn.state.phone })
   if (conn.state.status === 'qr') return res.json({ status: 'qr', qr: conn.state.qr })
-  if (conn.state.status !== 'connecting') {
-    conn.state.status = 'connecting'
+
+  const clearAndRestart = () => {
+    if (conn.sock) { try { conn.sock.end(new Error('reset')) } catch {} conn.sock = null }
+    const authDir = path.join(waBaseDir, cid)
+    if (fs.existsSync(authDir)) fs.rmSync(authDir, { recursive: true, force: true })
+    conn.state = { status: 'connecting', qr: null, phone: null }
     startBuiltinWhatsApp(cid).catch(console.error)
   }
-  for (let i = 0; i < 30; i++) {
+
+  if (conn.state.status !== 'connecting') {
+    if (['logged_out', 'disconnected', 'waiting'].includes(conn.state.status)) {
+      clearAndRestart()
+    } else {
+      conn.state.status = 'connecting'
+      startBuiltinWhatsApp(cid).catch(console.error)
+    }
+  }
+
+  for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 500))
     if (conn.state.status === 'qr') return res.json({ status: 'qr', qr: conn.state.qr })
     if (conn.state.status === 'open') return res.json({ status: 'open', phone: conn.state.phone })
+    if (conn.state.status === 'logged_out') { clearAndRestart() }
   }
   res.json({ status: 'connecting' })
 })
@@ -781,6 +1338,16 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
             const ack = mode ? '⏸ IA pausada. Tú tienes el control.' : '▶ IA reactivada.'
             await sendInstagram(cfg.igAccessToken, recipientId, ack)
             console.log(`[Instagram] human_mode=${mode} para ${visitorId}`)
+          }
+        } else {
+          // Business initiated conversation — create with human_mode=1 so AI won't respond when client replies
+          const visitorId = `ig:${recipientId}`
+          const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND company_id = ? AND channel = 'instagram' ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
+          if (!existing) {
+            const newId = crypto.randomUUID()
+            const now = Date.now()
+            db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorId, 'instagram', now, now, company.id)
+            console.log('[Instagram] Business initiated — human_mode=1 for', visitorId)
           }
         }
         continue

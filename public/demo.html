@@ -5,73 +5,275 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Demo — Agente IA</title>
 <style>
-  :root{--green:#27F59B;--blue:#3BA5FF;--bg:#0B0F14;--card:#151922;--border:#252A38;--muted:#9FB0C8;--text:#F5F7FA}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column}
-  .banner{background:linear-gradient(135deg,var(--card),#0e1219);border-bottom:1px solid var(--border);padding:18px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .banner img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:1px solid var(--border)}
-  .banner .title{font-weight:600;font-size:17px}
-  .banner .tag{background:var(--green);color:#0B0F14;font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;letter-spacing:1.2px}
-  .banner .tag.exp{background:#fbbf24}
-  .banner .expires{color:var(--muted);font-size:12px;margin-left:auto}
-  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;max-width:720px;margin:0 auto}
-  h1{font-weight:300;font-size:clamp(28px,5vw,44px);margin:0 0 16px;line-height:1.2}
-  h1 strong{background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700}
-  .sub{color:var(--muted);font-size:16px;line-height:1.6;max-width:560px}
-  .instructions{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-top:36px;max-width:520px}
-  .instructions h3{color:var(--green);font-size:11px;letter-spacing:2px;margin:0 0 10px}
-  .instructions div{color:var(--muted);font-size:14px;line-height:1.6}
-  .footer{padding:20px;text-align:center;color:#666;font-size:11px;letter-spacing:1px;border-top:1px solid var(--border)}
+:root{
+  --ac:#27F59B;--ac2:#1ac77a;
+  --bg:#080c10;--s1:#0e1318;--s2:#131820;--border:#1e2530;
+  --text:#f0f4f8;--muted:#7a8fa8;--card:#111720;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+
+/* ── Noise overlay ── */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+
+/* ── Glow orbs ── */
+.orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.12;pointer-events:none;z-index:0}
+.orb1{width:500px;height:500px;background:var(--ac);top:-150px;right:-100px}
+.orb2{width:400px;height:400px;background:#3BA5FF;bottom:-100px;left:-100px}
+
+/* ── Nav ── */
+nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:18px 32px;border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
+.nav-logo img{height:28px}
+.nav-badge{background:rgba(39,245,155,.12);border:1px solid rgba(39,245,155,.3);color:var(--ac);font-size:10px;font-weight:700;letter-spacing:.1em;padding:4px 10px;border-radius:20px}
+.nav-cta{background:var(--ac);color:#000;font-weight:700;font-size:13px;padding:9px 20px;border-radius:8px;text-decoration:none;transition:opacity .15s}
+.nav-cta:hover{opacity:.85}
+@media(max-width:600px){nav{padding:14px 20px}.nav-cta{display:none}}
+
+/* ── Hero ── */
+.hero{position:relative;z-index:2;text-align:center;padding:64px 24px 48px}
+.hero-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(39,245,155,.08);border:1px solid rgba(39,245,155,.2);border-radius:100px;padding:6px 16px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ac);margin-bottom:24px}
+.hero-pill-dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:blink 2s ease-in-out infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.1;letter-spacing:-.03em;margin-bottom:16px}
+.hero h1 span{color:var(--ac)}
+.hero-sub{font-size:16px;color:var(--muted);max-width:520px;margin:0 auto 32px;line-height:1.65}
+.hero-chips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:40px}
+.chip{display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid var(--border);border-radius:100px;padding:7px 14px;font-size:12px;color:var(--muted)}
+.chip-dot{width:7px;height:7px;border-radius:50%;background:var(--ac);flex-shrink:0}
+.hero-btn{display:inline-flex;align-items:center;gap:10px;background:var(--ac);color:#000;font-weight:700;font-size:15px;padding:14px 32px;border-radius:12px;text-decoration:none;cursor:pointer;border:none;font-family:var(--font);transition:all .2s;box-shadow:0 8px 32px rgba(39,245,155,.3)}
+.hero-btn:hover{transform:translateY(-2px);box-shadow:0 14px 48px rgba(39,245,155,.45)}
+.hero-btn svg{transition:transform .2s}
+.hero-btn:hover svg{transform:translateX(3px)}
+
+/* ── Agent card ── */
+.agent-card{position:relative;z-index:2;max-width:640px;margin:0 auto 60px;padding:0 24px}
+.ac-inner{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;display:flex;align-items:center;gap:18px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.ac-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,rgba(39,245,155,.2),rgba(39,245,155,.05));border:2px solid rgba(39,245,155,.3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden}
+.ac-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.ac-name{font-weight:700;font-size:16px;margin-bottom:3px}
+.ac-role{font-size:13px;color:var(--muted);margin-bottom:8px}
+.ac-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ac)}
+.ac-status-dot{width:7px;height:7px;border-radius:50%;background:var(--ac);animation:blink 2s ease-in-out infinite}
+.ac-channels{margin-left:auto;display:flex;gap:8px;flex-shrink:0}
+.ac-ch{width:32px;height:32px;border-radius:8px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+
+/* ── Chat section ── */
+.chat-section{position:relative;z-index:2;max-width:800px;margin:0 auto;padding:0 24px 80px}
+.chat-label{text-align:center;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:20px}
+.chat-wrap{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.chat-bar{background:var(--s1);padding:12px 18px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.chat-bar .dot{width:10px;height:10px;border-radius:50%}
+.dot-r{background:#ff5f57}.dot-y{background:#febc2e}.dot-g{background:var(--ac)}
+.chat-url{flex:1;background:rgba(255,255,255,.04);border-radius:6px;padding:4px 12px;font-size:11px;color:#4a5568;text-align:center}
+.chat-body{padding:24px;min-height:420px;display:flex;flex-direction:column;gap:10px;position:relative}
+.chat-msg{max-width:72%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.55}
+.chat-msg.agent{background:var(--s2);border:1px solid var(--border);color:#d4dde8;align-self:flex-start}
+.chat-msg.user{align-self:flex-end;color:#e8edd4}
+.chat-quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.chat-quick button{background:transparent;border:1px solid rgba(39,245,155,.3);color:var(--ac);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-family:var(--font);transition:all .15s}
+.chat-quick button:hover{background:rgba(39,245,155,.08)}
+.chat-typing{display:flex;gap:4px;align-items:center;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:14px;align-self:flex-start;width:60px}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:tdot 1.2s ease-in-out infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+.chat-input-bar{border-top:1px solid var(--border);padding:14px 18px;display:flex;gap:10px;align-items:center}
+.chat-input{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:24px;padding:10px 18px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s}
+.chat-input:focus{border-color:rgba(39,245,155,.4)}
+.chat-send{width:38px;height:38px;border-radius:50%;background:var(--ac);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
+.chat-send:hover{opacity:.85}
+.chat-send svg{width:16px;height:16px}
+
+/* ── Footer ── */
+footer{position:relative;z-index:2;text-align:center;padding:24px;border-top:1px solid var(--border);color:#2a3a4a;font-size:11px;letter-spacing:.08em}
+footer a{color:#3a5060;text-decoration:none}
+footer a:hover{color:var(--ac)}
+
+@media(max-width:600px){
+  .hero{padding:44px 20px 36px}
+  .hero h1{font-size:1.9rem}
+  .hero-chips{gap:8px}
+  .agent-card{padding:0 16px}
+  .chat-section{padding:0 16px 60px}
+}
 </style>
 </head>
 <body>
-  <div class="banner">
-    <img id="logo" src="" alt="" style="display:none">
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<nav>
+  <a class="nav-logo" href="https://chat.lynkro.io" target="_blank">
+    <img src="/logo.png" alt="Lynkro" onerror="this.style.display='none'">
+    <span>chat.lynkro.io</span>
+  </a>
+  <span class="nav-badge" id="navBadge">DEMO EN VIVO</span>
+  <a class="nav-cta" href="https://lynkro.io/agendar-consulta" target="_blank" id="navCta">Quiero uno para mi negocio →</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-pill"><span class="hero-pill-dot"></span><span id="heroLabel">Agente activo · Responde al instante</span></div>
+  <h1 id="heroTitle">Habla con el agente de<br><span id="heroName">tu negocio</span></h1>
+  <p class="hero-sub" id="heroDesc">Prueba cómo el agente de IA responde, califica leads y da seguimiento — exactamente como lo haría para tu negocio.</p>
+  <div class="hero-chips" id="heroChips">
+    <span class="chip"><span class="chip-dot"></span>Respuesta en segundos</span>
+    <span class="chip"><span class="chip-dot"></span>FAQs automáticas</span>
+    <span class="chip"><span class="chip-dot"></span>Calificación de leads</span>
+  </div>
+  <button class="hero-btn" onclick="scrollToChat()">
+    Iniciar conversación
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+  </button>
+</section>
+
+<div class="agent-card">
+  <div class="ac-inner" id="agentCard">
+    <div class="ac-avatar" id="acAvatar">🤖</div>
     <div>
-      <div class="title" id="title">Cargando...</div>
-      <div id="sub" style="color:var(--muted);font-size:12px"></div>
+      <div class="ac-name" id="acName">Agente IA</div>
+      <div class="ac-role" id="acRole">Asistente virtual</div>
+      <div class="ac-status"><span class="ac-status-dot"></span>En línea · Responde al instante</div>
     </div>
-    <span class="tag">DEMO</span>
-    <span class="expires" id="expires"></span>
-  </div>
-
-  <div class="hero">
-    <h1>Prueba el agente de <strong id="brand">tu empresa</strong></h1>
-    <p class="sub" id="desc">Este es un entorno de demostración interactiva. Haz click en el botón de chat abajo a la derecha y conversa como si fueras un cliente real.</p>
-    <div class="instructions">
-      <h3>CÓMO USAR ESTA DEMO</h3>
-      <div>
-        1. Abre el chat con el botón flotante<br>
-        2. Prueba preguntas típicas de un cliente<br>
-        3. El agente responde con la personalidad y la información configurada<br>
-        4. Todas las conversaciones aquí son de prueba y no afectan datos reales
-      </div>
+    <div class="ac-channels">
+      <div class="ac-ch" title="Web Chat">💬</div>
+      <div class="ac-ch" title="WhatsApp">📱</div>
+      <div class="ac-ch" title="Instagram">📸</div>
     </div>
   </div>
+</div>
 
-  <div class="footer">Agente IA · Powered by Claude · Entorno de demostración</div>
+<section class="chat-section" id="chatSection">
+  <div class="chat-label">— Prueba el agente en vivo —</div>
+  <div class="chat-wrap">
+    <div class="chat-bar">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <div class="chat-url" id="chatUrl">chat.lynkro.io · demo</div>
+    </div>
+    <div class="chat-body" id="chatBody">
+      <!-- messages injected here -->
+    </div>
+    <div class="chat-input-bar">
+      <input class="chat-input" id="chatInput" placeholder="Escribe tu mensaje…" onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="chat-send" onclick="sendMsg()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
 
-  <script>
-    const token = location.pathname.split('/').pop();
-    fetch(`/api/demo/config/${token}`).then(r => r.json()).then(cfg => {
-      if (cfg.error) { document.body.innerHTML = '<h1 style="text-align:center;margin-top:80px;color:#9FB0C8">' + cfg.error + '</h1>'; return; }
-      document.title = `Demo · ${cfg.businessName}`;
-      document.getElementById('title').textContent = cfg.businessName;
-      document.getElementById('sub').textContent = cfg.agentName ? `Agente: ${cfg.agentName}` : '';
-      document.getElementById('brand').textContent = cfg.businessName;
-      if (cfg.description) document.getElementById('desc').textContent = cfg.description.slice(0, 200);
-      if (cfg.logoUrl) { const l = document.getElementById('logo'); l.src = cfg.logoUrl; l.style.display = 'block'; }
-      if (cfg.expiresAt) {
-        const days = Math.max(0, Math.ceil((cfg.expiresAt - Date.now()) / 86400000));
-        document.getElementById('expires').textContent = days > 0 ? `Expira en ${days} día${days===1?'':'s'}` : 'Expira hoy';
-      }
-      // Inject widget
-      const s = document.createElement('script');
-      s.src = '/widget.js';
-      s.setAttribute('data-api', location.origin);
-      s.setAttribute('data-company', cfg.companyId);
-      document.body.appendChild(s);
+<footer>
+  Powered by <a href="https://chat.lynkro.io" target="_blank">Lynkro AI</a> · Entorno de demo
+</footer>
+
+<script>
+let cfg = { businessName:'', agentName:'Agente', accentColor:'#27F59B', welcomeMessage:'¡Hola! ¿En qué puedo ayudarte hoy?', description:'', quickReplies:[], faqs:[] };
+let companyId = '';
+let demoHistory = [];
+const token = location.pathname.split('/').pop();
+
+fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
+  if (data.error) {
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#080c10;color:#7a8fa8;text-align:center;padding:40px"><div><div style="font-size:48px;margin-bottom:16px">🔒</div><h2 style="color:#f0f4f8;margin-bottom:8px">Demo no disponible</h2><p>${data.error}</p></div></div>`;
+    return;
+  }
+  cfg = { ...cfg, ...data };
+  companyId = data.companyId || '';
+
+  const ac = data.accentColor || '#27F59B';
+  document.documentElement.style.setProperty('--ac', ac);
+  document.documentElement.style.setProperty('--ac2', ac);
+
+  const name = data.businessName || 'tu negocio';
+  document.title = `Demo · ${name}`;
+  document.getElementById('heroName').textContent = name;
+  document.getElementById('heroName').style.color = ac;
+  if (data.description) document.getElementById('heroDesc').textContent = data.description;
+  document.getElementById('acName').textContent = data.agentName || 'Agente IA';
+  document.getElementById('acRole').textContent = `Asistente de ${name}`;
+  document.getElementById('chatUrl').textContent = `${location.host} · ${name}`;
+  if (data.logoUrl) {
+    const av = document.getElementById('acAvatar');
+    av.innerHTML = `<img src="${data.logoUrl}" alt="">`;
+  }
+  if (data.quickReplies && data.quickReplies.length) {
+    const chips = data.quickReplies.slice(0,3).map(q => `<span class="chip"><span class="chip-dot"></span>${escH(q.label)}</span>`).join('');
+    document.getElementById('heroChips').innerHTML = chips;
+  }
+
+  // Render welcome message + quick replies
+  const body = document.getElementById('chatBody');
+  const wMsg = document.createElement('div');
+  wMsg.className = 'chat-msg agent';
+  wMsg.innerHTML = linkify(data.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte hoy?');
+  body.appendChild(wMsg);
+  if (data.quickReplies && data.quickReplies.length) {
+    const qr = document.createElement('div');
+    qr.className = 'chat-quick';
+    data.quickReplies.slice(0,3).forEach(q => {
+      const btn = document.createElement('button');
+      btn.textContent = q.label;
+      btn.onclick = () => sendMsg(q.message);
+      qr.appendChild(btn);
     });
-  </script>
+    body.appendChild(qr);
+  }
+}).catch(() => {
+  document.getElementById('chatBody').innerHTML = `<p style="color:#7a8fa8;text-align:center;margin-top:60px">Error al cargar el agente. Recarga la página.</p>`;
+});
+
+function scrollToChat() {
+  document.getElementById('chatSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => document.getElementById('chatInput').focus(), 600);
+}
+
+function sendMsg(text) {
+  text = text || document.getElementById('chatInput').value.trim();
+  if (!text) return;
+  document.getElementById('chatInput').value = '';
+  document.querySelectorAll('.chat-quick').forEach(el => el.remove());
+
+  const body = document.getElementById('chatBody');
+
+  const uDiv = document.createElement('div');
+  uDiv.className = 'chat-msg user';
+  uDiv.style.background = `linear-gradient(135deg,rgba(20,20,8,.8),rgba(30,28,10,.6))`;
+  uDiv.style.border = `1px solid rgba(212,175,55,.2)`;
+  uDiv.textContent = text;
+  body.appendChild(uDiv);
+
+  const typing = document.createElement('div');
+  typing.className = 'chat-typing';
+  typing.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  body.appendChild(typing);
+  body.scrollTop = body.scrollHeight;
+
+  fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-company-id': companyId },
+    body: JSON.stringify({ message: text, demo: true, history: demoHistory })
+  }).then(r => r.json()).then(d => {
+    typing.remove();
+    if (d.history) demoHistory = d.history;
+    const reply = d.error ? 'Lo siento, hubo un error. Intenta de nuevo.' : d.reply;
+    const aDiv = document.createElement('div');
+    aDiv.className = 'chat-msg agent';
+    aDiv.innerHTML = linkify(reply);
+    body.appendChild(aDiv);
+    body.scrollTop = body.scrollHeight;
+  }).catch(() => {
+    typing.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'chat-msg agent';
+    errDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+    body.appendChild(errDiv);
+    body.scrollTop = body.scrollHeight;
+  });
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function linkify(s){ return escH(s).replace(/\n/g,'<br>').replace(/(https?:\/\/[^\s<>"&]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">$1</a>'); }
+</script>
 </body>
 </html>
