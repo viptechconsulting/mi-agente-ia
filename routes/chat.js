@@ -694,17 +694,35 @@ export async function processMessage({ companyId, message, conversationId, visit
                 setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
               }
             } else if (cfg.calendarProvider === 'ghl') {
-              const { cancelAppointment } = await import('../services/ghl.js')
-              const cancelled = await cancelAppointment(cfg.ghl.api_key, appointment_id)
-              resultContent = JSON.stringify({ ok: true, appointment: cancelled })
-              setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+              const { getAppointments, cancelAppointment } = await import('../services/ghl.js')
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              const current = (await getAppointments(cfg.ghl.api_key, cfg.ghl.location_id, now, in90)).find(a => a.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.startTime, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede cancelar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                const cancelled = await cancelAppointment(cfg.ghl.api_key, appointment_id)
+                resultContent = JSON.stringify({ ok: true, appointment: cancelled })
+                setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+              }
             } else if (cfg.calendarProvider === 'google') {
-              const { getValidAccessToken, deleteEvent } = await import('../services/google-calendar.js')
+              const { getValidAccessToken, getEvents, deleteEvent } = await import('../services/google-calendar.js')
               const token = await getValidAccessToken(cfg)
               saveConfig(companyId, cfg)
-              await deleteEvent(token, cfg.googleCalendar.calendar_id, appointment_id)
-              resultContent = JSON.stringify({ ok: true })
-              setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              const current = (await getEvents(token, cfg.googleCalendar.calendar_id, now, in90)).find(e => e.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.start?.dateTime, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede cancelar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                await deleteEvent(token, cfg.googleCalendar.calendar_id, appointment_id)
+                resultContent = JSON.stringify({ ok: true })
+                setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+              }
             } else {
               resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
             }
