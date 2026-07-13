@@ -320,9 +320,10 @@ export async function sendInstagram(accessToken, recipientId, text) {
 // ============================================================
 export async function sendSMS(cfg, phone, text) {
   if (!cfg.twilio?.accountSid) return
+  const e164Phone = phone.startsWith('+') ? phone : `+${phone}`
   try {
     const { sendSMS: twilioSend } = await import('../services/twilio.js')
-    await twilioSend(cfg.twilio.accountSid, cfg.twilio.authToken, cfg.twilio.fromNumber, phone, text)
+    await twilioSend(cfg.twilio.accountSid, cfg.twilio.authToken, cfg.twilio.fromNumber, e164Phone, text)
   } catch (err) { console.error('SMS send error:', err.message) }
 }
 
