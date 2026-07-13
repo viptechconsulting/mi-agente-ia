@@ -17,6 +17,7 @@ import { getServices, searchAvailability, createBooking, getLocations } from '..
 import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/medspa-response-schema.js'
 import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
 import { loadState as loadMedspaState, saveState as saveMedspaState, setDoNotContact } from '../services/medspa-state.js'
+import { canModifyAppointment } from '../services/appointments.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -49,6 +50,56 @@ const SQUARE_BOOK_APPOINTMENT_TOOL = {
       note: { type: 'string', description: 'Nota adicional (opcional)' }
     },
     required: ['service_variation_id', 'service_variation_version', 'requested_date', 'requested_time', 'customer_name', 'customer_phone']
+  }
+}
+
+// ============================================================
+// APPOINTMENT MANAGEMENT TOOLS (reschedule/cancel) — provider-agnostic,
+// gated on cfg.calendarProvider (see canModifyAppointment / tool handlers below)
+// ============================================================
+const FIND_MY_APPOINTMENTS_TOOL = {
+  name: 'find_my_appointments',
+  description: 'Busca las citas futuras del cliente que está escribiendo ahora mismo (por su teléfono). Úsalo siempre antes de reagendar o cancelar, para saber cuál es su cita.',
+  input_schema: { type: 'object', properties: {}, required: [] }
+}
+
+const CHECK_AVAILABILITY_TOOL = {
+  name: 'check_availability',
+  description: 'Verifica si un horario propuesto está realmente libre antes de reagendar una cita a ese horario. Siempre pásale el appointment_id de la cita que se está moviendo (de find_my_appointments) para que compare contra el servicio/ubicación correctos y no la cuente como choque contra sí misma.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      appointment_id: { type: 'string', description: 'id de la cita que se está reagendando (de find_my_appointments)' },
+      start_iso: { type: 'string', description: 'Fecha/hora propuesta en ISO 8601 (ej: 2026-07-16T15:00:00-04:00)' },
+      duration_minutes: { type: 'number', description: 'Duración de la cita en minutos (usa la de la cita original si no se especifica otra)' }
+    },
+    required: ['appointment_id', 'start_iso', 'duration_minutes']
+  }
+}
+
+const RESCHEDULE_APPOINTMENT_TOOL = {
+  name: 'reschedule_appointment',
+  description: 'Mueve una cita existente a un nuevo horario YA VERIFICADO con check_availability. Solo llama esto después de que el cliente confirmó el nuevo horario exacto.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      appointment_id: { type: 'string', description: 'id de la cita (de find_my_appointments)' },
+      new_start_iso: { type: 'string', description: 'Nuevo inicio en ISO 8601' },
+      new_end_iso: { type: 'string', description: 'Nuevo fin en ISO 8601 (mantén la misma duración que la cita original)' }
+    },
+    required: ['appointment_id', 'new_start_iso', 'new_end_iso']
+  }
+}
+
+const CANCEL_APPOINTMENT_TOOL = {
+  name: 'cancel_appointment',
+  description: 'Cancela una cita existente. Solo llama esto después de que el cliente lo confirmó explícitamente (ej. respondió "sí" a "¿confirmas que quieres cancelar tu cita del [fecha]?").',
+  input_schema: {
+    type: 'object',
+    properties: {
+      appointment_id: { type: 'string', description: 'id de la cita (de find_my_appointments)' }
+    },
+    required: ['appointment_id']
   }
 }
 
@@ -184,15 +235,21 @@ async function sendNotification({ type, conversationId, companyId }) {
   if (!mailer) return
   if (type === 'lead' && !cfg.notifyOnLead) return
   if (type === 'escalation' && !cfg.notifyOnEscalation) return
+  if (type === 'reschedule' && !cfg.notifyOnReschedule) return
+  if (type === 'cancel' && !cfg.notifyOnCancel) return
 
   const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) || {}
   const msgs = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id').all(conversationId)
   const channel = conv.channel === 'whatsapp' ? '💬 WhatsApp' : '🌐 Web'
   const accent = cfg.accentColor || '#D4AF37'
 
-  const subject = type === 'lead'
-    ? `🎯 Nuevo lead capturado — ${cfg.businessName || 'Agente'}`
-    : `🚨 Conversación escalada — ${cfg.businessName || 'Agente'}`
+  const SUBJECTS = {
+    lead: `🎯 Nuevo lead capturado — ${cfg.businessName || 'Agente'}`,
+    escalation: `🚨 Conversación escalada — ${cfg.businessName || 'Agente'}`,
+    reschedule: `📅 Cita reagendada por el bot — ${cfg.businessName || 'Agente'}`,
+    cancel: `❌ Cita cancelada por el bot — ${cfg.businessName || 'Agente'}`,
+  }
+  const subject = SUBJECTS[type] || SUBJECTS.escalation
 
   const transcript = msgs.map(m => {
     const who = m.role === 'user' ? 'Cliente' : 'Agente'
@@ -212,7 +269,7 @@ async function sendNotification({ type, conversationId, companyId }) {
   const html = `
   <div style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:0 auto;background:#fafafa;padding:24px">
     <div style="background:#0a0a0a;color:#fff;padding:22px;border-radius:10px;border-left:4px solid ${accent}">
-      <div style="color:${accent};font-size:11px;letter-spacing:2px">${type === 'lead' ? 'NUEVO LEAD' : 'ESCALAMIENTO'}</div>
+      <div style="color:${accent};font-size:11px;letter-spacing:2px">${ { lead: 'NUEVO LEAD', escalation: 'ESCALAMIENTO', reschedule: 'CITA REAGENDADA', cancel: 'CITA CANCELADA' }[type] || 'AVISO' }</div>
       <h1 style="margin:8px 0 4px;font-size:22px;font-weight:600">${cfg.businessName || 'Agente'}</h1>
       <div style="color:#aaa;font-size:13px">${channel} · ${new Date().toLocaleString('es-MX')}</div>
     </div>
@@ -409,6 +466,11 @@ export async function processMessage({ companyId, message, conversationId, visit
     ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
     : ''
 
+  const hasCalendarProvider = ['square', 'ghl', 'google'].includes(cfg.calendarProvider)
+  const appointmentsSystemBlock = hasCalendarProvider
+    ? `\n\nPUEDES REAGENDAR Y CANCELAR CITAS. Flujo OBLIGATORIO:\n1) Llama a find_my_appointments para ver las citas futuras del cliente.\n2) Si hay una sola, confírmala por fecha/hora antes de continuar. Si hay varias, pregunta cuál. Si no hay ninguna, dilo — no inventes una cita.\n3) Para reagendar: pide la nueva fecha/hora, llama a check_availability, y si no está libre ofrece la alternativa más cercana. Solo llama a reschedule_appointment después de que el cliente confirme el horario exacto ya verificado.\n4) Para cancelar: pide confirmación explícita ("¿confirmas que quieres cancelar tu cita del [fecha]?") antes de llamar a cancel_appointment.\nNUNCA reagendes ni canceles sin esa confirmación explícita del cliente. Si find_my_appointments o reschedule_appointment/cancel_appointment devuelven un error, dile al cliente que hubo un problema técnico y que el equipo lo confirma manualmente — nunca digas que ya quedó hecho si la herramienta falló.`
+    : ''
+
   // Med Spa vertical: forces structured output via respond_to_patient instead
   // of raw text. Phase 1 scoping: mutually exclusive with Commerce/Square tools
   // in the same call (tool_choice forces exactly one tool) — Phase 2 will
@@ -424,12 +486,13 @@ export async function processMessage({ companyId, message, conversationId, visit
   } else {
     if (hasCommercePro) activeTools.push(SEARCH_PRODUCTS_TOOL)
     if (hasSquare) activeTools.push(SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL)
+    if (hasCalendarProvider) activeTools.push(FIND_MY_APPOINTMENTS_TOOL, CHECK_AVAILABILITY_TOOL, RESCHEDULE_APPOINTMENT_TOOL, CANCEL_APPOINTMENT_TOOL)
   }
 
   const callParams = {
     model: cfg.model || 'claude-haiku-4-5-20251001',
     max_tokens: (hasCommercePro || hasSquare || isMedspa) ? 800 : 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + medspaSystemBlock,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock,
     messages: (isMedspa ? windowHistory(history, 20, 16) : history).map(m => ({ role: m.role, content: m.content }))
   }
   if (activeTools.length > 0) callParams.tools = activeTools
@@ -499,6 +562,155 @@ export async function processMessage({ companyId, message, conversationId, visit
           })
           console.log('[Square] booked:', result.bookingId, result.confirmedTime)
           resultContent = JSON.stringify(result)
+        } else if (block.name === 'find_my_appointments') {
+          const phone = visitorId?.startsWith('wa:') ? visitorId.slice(3) : (conv.lead_phone || '').replace(/\D/g, '')
+          if (!phone) { resultContent = JSON.stringify({ error: 'No se pudo determinar el teléfono del cliente' }) }
+          else if (cfg.calendarProvider === 'square') {
+            const { getBookings, getCustomers, normalizeBooking } = await import('../services/square.js')
+            const token = cfg.square.access_token
+            const customers = await getCustomers(token)
+            const match = customers.find(c => (c.phone_number || '').replace(/\D/g, '').endsWith(phone.slice(-10)))
+            const now = new Date().toISOString()
+            const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+            const bookings = match ? (await getBookings(token, now, in90)).filter(b => b.customer_id === match.id) : []
+            resultContent = JSON.stringify({ appointments: bookings.map(normalizeBooking) })
+          } else if (cfg.calendarProvider === 'ghl') {
+            const { getAppointments, getContact } = await import('../services/ghl.js')
+            const now = new Date().toISOString()
+            const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+            const appts = await getAppointments(cfg.ghl.api_key, cfg.ghl.location_id, now, in90)
+            const matched = []
+            for (const a of appts) {
+              try {
+                const contact = await getContact(cfg.ghl.api_key, a.contactId)
+                if ((contact.phone || '').replace(/\D/g, '').endsWith(phone.slice(-10))) matched.push(a)
+              } catch {}
+            }
+            resultContent = JSON.stringify({ appointments: matched.map(a => ({ id: a.id, startTime: a.startTime, title: a.title })) })
+          } else if (cfg.calendarProvider === 'google') {
+            const { getValidAccessToken, findEventsByPhone } = await import('../services/google-calendar.js')
+            const token = await getValidAccessToken(cfg)
+            saveConfig(companyId, cfg) // persist a possibly-refreshed access_token/expires_at
+            const events = await findEventsByPhone(token, cfg.googleCalendar.calendar_id, phone)
+            resultContent = JSON.stringify({ appointments: events.map(e => ({ id: e.id, startTime: e.start?.dateTime, title: e.summary })) })
+          } else {
+            resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
+          }
+        } else if (block.name === 'check_availability') {
+          const { appointment_id, start_iso, duration_minutes } = block.input
+          const endISO = new Date(new Date(start_iso).getTime() + duration_minutes * 60000).toISOString()
+          if (cfg.calendarProvider === 'square') {
+            const { getBookings, searchAvailability } = await import('../services/square.js')
+            const token = cfg.square.access_token
+            const now = new Date().toISOString()
+            const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+            const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
+            if (!current) { resultContent = JSON.stringify({ error: 'Cita no encontrada' }) }
+            else {
+              const segment = current.appointment_segments?.[0]
+              const slots = await searchAvailability(token, {
+                serviceVariationId: segment?.service_variation_id,
+                startAt: start_iso,
+                endAt: endISO,
+                locationId: current.location_id
+              })
+              const available = slots.some(s => Math.abs(new Date(s.startAt).getTime() - new Date(start_iso).getTime()) < 60_000)
+              resultContent = JSON.stringify({ available })
+            }
+          } else if (cfg.calendarProvider === 'ghl') {
+            const { getAppointments } = await import('../services/ghl.js')
+            const windowStart = new Date(new Date(start_iso).getTime() - 60 * 60 * 1000).toISOString()
+            const windowEnd = new Date(new Date(endISO).getTime() + 60 * 60 * 1000).toISOString()
+            const nearby = await getAppointments(cfg.ghl.api_key, cfg.ghl.location_id, windowStart, windowEnd)
+            const requestedStart = new Date(start_iso).getTime()
+            const requestedEnd = new Date(endISO).getTime()
+            const conflict = nearby.some(a => {
+              if (a.id === appointment_id) return false // don't count the appointment being moved as a conflict with itself
+              const aStart = new Date(a.startTime).getTime()
+              const aEnd = new Date(a.endTime || a.startTime).getTime()
+              return aStart < requestedEnd && aEnd > requestedStart
+            })
+            resultContent = JSON.stringify({ available: !conflict })
+          } else if (cfg.calendarProvider === 'google') {
+            const { getValidAccessToken, checkFreeBusy } = await import('../services/google-calendar.js')
+            const token = await getValidAccessToken(cfg)
+            saveConfig(companyId, cfg)
+            const available = await checkFreeBusy(token, cfg.googleCalendar.calendar_id, start_iso, endISO)
+            resultContent = JSON.stringify({ available })
+          } else {
+            resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
+          }
+        } else if (block.name === 'reschedule_appointment') {
+          const { appointment_id, new_start_iso, new_end_iso } = block.input
+          try {
+            const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+            const policy = canModifyAppointment({ startTimeISO: new_start_iso, minNoticeHours })
+            if (!policy.allowed) {
+              resultContent = JSON.stringify({ error: `No se puede reagendar con menos de ${minNoticeHours} horas de anticipación` })
+            } else if (cfg.calendarProvider === 'square') {
+              const { getBookings, updateBooking } = await import('../services/square.js')
+              const token = cfg.square.access_token
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const updated = await updateBooking(token, appointment_id, { startAt: new_start_iso, version: current.version })
+              resultContent = JSON.stringify({ ok: true, booking: updated })
+              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+            } else if (cfg.calendarProvider === 'ghl') {
+              const { updateAppointment } = await import('../services/ghl.js')
+              const updated = await updateAppointment(cfg.ghl.api_key, appointment_id, { startTime: new_start_iso, endTime: new_end_iso })
+              resultContent = JSON.stringify({ ok: true, appointment: updated })
+              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+            } else if (cfg.calendarProvider === 'google') {
+              const { getValidAccessToken, updateEvent } = await import('../services/google-calendar.js')
+              const token = await getValidAccessToken(cfg)
+              saveConfig(companyId, cfg)
+              const updated = await updateEvent(token, cfg.googleCalendar.calendar_id, appointment_id, { startISO: new_start_iso, endISO: new_end_iso })
+              resultContent = JSON.stringify({ ok: true, event: updated })
+              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+            } else {
+              resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
+            }
+          } catch (err) {
+            resultContent = JSON.stringify({ error: err.message })
+          }
+        } else if (block.name === 'cancel_appointment') {
+          const { appointment_id } = block.input
+          try {
+            if (cfg.calendarProvider === 'square') {
+              const { getBookings, cancelBooking } = await import('../services/square.js')
+              const token = cfg.square.access_token
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.start_at, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede cancelar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                const cancelled = await cancelBooking(token, appointment_id, current.version)
+                resultContent = JSON.stringify({ ok: true, booking: cancelled })
+                setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+              }
+            } else if (cfg.calendarProvider === 'ghl') {
+              const { cancelAppointment } = await import('../services/ghl.js')
+              const cancelled = await cancelAppointment(cfg.ghl.api_key, appointment_id)
+              resultContent = JSON.stringify({ ok: true, appointment: cancelled })
+              setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+            } else if (cfg.calendarProvider === 'google') {
+              const { getValidAccessToken, deleteEvent } = await import('../services/google-calendar.js')
+              const token = await getValidAccessToken(cfg)
+              saveConfig(companyId, cfg)
+              await deleteEvent(token, cfg.googleCalendar.calendar_id, appointment_id)
+              resultContent = JSON.stringify({ ok: true })
+              setImmediate(() => sendNotification({ type: 'cancel', conversationId: convId, companyId }))
+            } else {
+              resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
+            }
+          } catch (err) {
+            resultContent = JSON.stringify({ error: err.message })
+          }
         } else {
           resultContent = JSON.stringify({ error: `Herramienta desconocida: ${block.name}` })
         }
