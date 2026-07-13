@@ -55,6 +55,30 @@ export async function getAppointments(apiKey, locationId, startISO, endISO) {
   return d.events || d.appointments || []
 }
 
+// Reschedule: move an existing appointment to a new start/end time (ISO strings)
+export async function updateAppointment(apiKey, eventId, { startTime, endTime }) {
+  const r = await fetch(`${GHL_BASE}/calendars/events/appointments/${eventId}`, {
+    method: 'PUT',
+    headers: h(apiKey),
+    body: JSON.stringify({ startTime, endTime })
+  })
+  if (!r.ok) throw new Error(`GHL updateAppointment ${r.status}`)
+  const d = await r.json()
+  return d.appointment || d
+}
+
+// Cancel: mark the appointment as cancelled (keeps the record, doesn't delete it)
+export async function cancelAppointment(apiKey, eventId) {
+  const r = await fetch(`${GHL_BASE}/calendars/events/appointments/${eventId}`, {
+    method: 'PUT',
+    headers: h(apiKey),
+    body: JSON.stringify({ appointmentStatus: 'cancelled' })
+  })
+  if (!r.ok) throw new Error(`GHL cancelAppointment ${r.status}`)
+  const d = await r.json()
+  return d.appointment || d
+}
+
 // Get a single contact by ID
 export async function getContact(apiKey, contactId) {
   const r = await fetch(`${GHL_BASE}/contacts/${contactId}`, { headers: h(apiKey) })
