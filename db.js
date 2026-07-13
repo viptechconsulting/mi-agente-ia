@@ -123,6 +123,9 @@ export const defaultConfig = {
   notifyEmail: '',
   notifyOnLead: true,
   notifyOnEscalation: true,
+  notifyOnReschedule: true,
+  notifyOnCancel: true,
+  calendarProvider: null, // 'square' | 'ghl' | 'google' | null — which calendar API to use for reschedule/cancel tools
   smtpHost: '',
   smtpPort: 587,
   smtpUser: '',
