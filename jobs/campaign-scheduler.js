@@ -3,7 +3,7 @@
 
 import { db, loadConfig } from '../db.js'
 import { getAllContacts, getAppointments, getContact, normalizePhone, fillTemplate } from '../services/ghl.js'
-import { sendWhatsApp } from '../routes/chat.js'
+import { sendWhatsApp, sendSMS } from '../routes/chat.js'
 
 // ────────────────────────────────────────────────────────────
 // DB table (idempotent)
@@ -226,7 +226,9 @@ async function runAppointmentReminders(companyId, cfg, apiKey, locationId, citas
         fecha: apptDate.toLocaleDateString('es-US', { weekday:'long', month:'long', day:'numeric' }),
         hora:  apptDate.toLocaleTimeString('es-US', { hour:'2-digit', minute:'2-digit' })
       })
-      await send(cfg, normalizePhone(c.phone || ''), msg, companyId, a.contactId, type, 'whatsapp', a.id)
+      const normalized = normalizePhone(c.phone || '')
+      await send(cfg, normalized, msg, companyId, a.contactId, type, 'whatsapp', a.id)
+      await sendSMS(cfg, normalized, msg)
     }
   }
 

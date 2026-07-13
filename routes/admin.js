@@ -770,7 +770,7 @@ adminRouter.post('/webhooks/ghl/:token', async (req, res) => {
   if (!appointment?.contactId || !appointment?.id) return
   try {
     const { getContact, normalizePhone, fillTemplate } = await import('../services/ghl.js')
-    const { sendWhatsApp: sendWA } = await import('../routes/chat.js')
+    const { sendWhatsApp: sendWA, sendSMS } = await import('../routes/chat.js')
     const citas = cfg.citas || {}
     const businessName = cfg.businessName || cfg.name || ''
     const apptDate = new Date(appointment.startTime || appointment.start || Date.now())
@@ -794,12 +794,16 @@ adminRouter.post('/webhooks/ghl/:token', async (req, res) => {
       const dup = db.prepare('SELECT 1 FROM campaign_log WHERE company_id=? AND appointment_id=? AND campaign_type=?')
         .get(company.id, appointment.id, 'cita_confirm')
       if (!dup) {
-        await sendWA(cfg, phone, fillTemplate(citas.confirm.message, vars))
+        const confirmMsg = fillTemplate(citas.confirm.message, vars)
+        await sendWA(cfg, phone, confirmMsg)
+        await sendSMS(cfg, phone, confirmMsg)
         logRow.run(company.id, appointment.contactId, 'cita_confirm', appointment.id, 'whatsapp', 'sent', null)
       }
     }
     if (isDelete && citas.cancel?.enabled) {
-      await sendWA(cfg, phone, fillTemplate(citas.cancel.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars))
+      const cancelMsg = fillTemplate(citas.cancel.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars)
+      await sendWA(cfg, phone, cancelMsg)
+      await sendSMS(cfg, phone, cancelMsg)
       logRow.run(company.id, appointment.contactId, 'cita_cancel', appointment.id, 'whatsapp', 'sent', null)
     }
   } catch(e) { console.error('[ghl-webhook]', e.message) }
@@ -992,7 +996,7 @@ adminRouter.post('/webhooks/generic/:token', async (req, res) => {
   if (!contact.phone) return
 
   try {
-    const { sendWhatsApp } = await import('../routes/chat.js')
+    const { sendWhatsApp, sendSMS } = await import('../routes/chat.js')
     const { fillTemplate, normalizePhone } = await import('../services/ghl.js')
     const phone = normalizePhone(contact.phone)
     if (!phone) return
@@ -1012,12 +1016,16 @@ adminRouter.post('/webhooks/generic/:token', async (req, res) => {
       const dup = db.prepare('SELECT 1 FROM campaign_log WHERE company_id=? AND appointment_id=? AND campaign_type=?')
         .get(company.id, appt.id, 'cita_confirm')
       if (!dup) {
-        await sendWhatsApp(cfg, phone, fillTemplate(citas.confirm.message, vars))
+        const confirmMsg = fillTemplate(citas.confirm.message, vars)
+        await sendWhatsApp(cfg, phone, confirmMsg)
+        await sendSMS(cfg, phone, confirmMsg)
         logStmt.run(company.id, contact.phone, 'cita_confirm', appt.id, 'whatsapp', 'sent', null)
       }
     }
     if (isCancel && citas.cancel?.enabled) {
-      await sendWhatsApp(cfg, phone, fillTemplate(citas.cancel?.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars))
+      const cancelMsg = fillTemplate(citas.cancel?.message || 'Hola {nombre}, tu cita fue cancelada. Escríbenos para reagendar.', vars)
+      await sendWhatsApp(cfg, phone, cancelMsg)
+      await sendSMS(cfg, phone, cancelMsg)
       logStmt.run(company.id, contact.phone, 'cita_cancel', appt.id, 'whatsapp', 'sent', null)
     }
   } catch(e) { console.error('[generic-webhook]', e.message) }
