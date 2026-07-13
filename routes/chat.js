@@ -466,17 +466,21 @@ export async function processMessage({ companyId, message, conversationId, visit
     ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
     : ''
 
-  const hasCalendarProvider = ['square', 'ghl', 'google'].includes(cfg.calendarProvider)
-  const appointmentsSystemBlock = hasCalendarProvider
-    ? `\n\nPUEDES REAGENDAR Y CANCELAR CITAS. Flujo OBLIGATORIO:\n1) Llama a find_my_appointments para ver las citas futuras del cliente.\n2) Si hay una sola, confírmala por fecha/hora antes de continuar. Si hay varias, pregunta cuál. Si no hay ninguna, dilo — no inventes una cita.\n3) Para reagendar: pide la nueva fecha/hora, llama a check_availability, y si no está libre ofrece la alternativa más cercana. Solo llama a reschedule_appointment después de que el cliente confirme el horario exacto ya verificado.\n4) Para cancelar: pide confirmación explícita ("¿confirmas que quieres cancelar tu cita del [fecha]?") antes de llamar a cancel_appointment.\nNUNCA reagendes ni canceles sin esa confirmación explícita del cliente. Si find_my_appointments o reschedule_appointment/cancel_appointment devuelven un error, dile al cliente que hubo un problema técnico y que el equipo lo confirma manualmente — nunca digas que ya quedó hecho si la herramienta falló.`
-    : ''
-
   // Med Spa vertical: forces structured output via respond_to_patient instead
   // of raw text. Phase 1 scoping: mutually exclusive with Commerce/Square tools
   // in the same call (tool_choice forces exactly one tool) — Phase 2 will
   // generalize this into a "terminal tool" pattern that composes with the
   // GHL booking tool. See docs/superpowers/plans for the medspa design.
   const isMedspa = cfg.industry === 'medspa'
+
+  const hasCalendarProvider = ['square', 'ghl', 'google'].includes(cfg.calendarProvider)
+  // Medspa forces tool_choice: respond_to_patient below, so it structurally cannot call
+  // find_my_appointments/reschedule_appointment/cancel_appointment (only registered in the
+  // non-medspa branch of activeTools) — never advertise them in the medspa prompt either.
+  const appointmentsSystemBlock = (hasCalendarProvider && !isMedspa)
+    ? `\n\nPUEDES REAGENDAR Y CANCELAR CITAS. Flujo OBLIGATORIO:\n1) Llama a find_my_appointments para ver las citas futuras del cliente.\n2) Si hay una sola, confírmala por fecha/hora antes de continuar. Si hay varias, pregunta cuál. Si no hay ninguna, dilo — no inventes una cita.\n3) Para reagendar: pide la nueva fecha/hora, llama a check_availability, y si no está libre ofrece la alternativa más cercana. Solo llama a reschedule_appointment después de que el cliente confirme el horario exacto ya verificado.\n4) Para cancelar: pide confirmación explícita ("¿confirmas que quieres cancelar tu cita del [fecha]?") antes de llamar a cancel_appointment.\nNUNCA reagendes ni canceles sin esa confirmación explícita del cliente. Si find_my_appointments o reschedule_appointment/cancel_appointment devuelven un error, dile al cliente que hubo un problema técnico y que el equipo lo confirma manualmente — nunca digas que ya quedó hecho si la herramienta falló.`
+    : ''
+
   let medspaState = isMedspa ? loadMedspaState(convId) : null
   const medspaSystemBlock = isMedspa ? buildMedspaPromptModule(cfg, medspaState) : ''
 
@@ -643,32 +647,57 @@ export async function processMessage({ companyId, message, conversationId, visit
         } else if (block.name === 'reschedule_appointment') {
           const { appointment_id, new_start_iso, new_end_iso } = block.input
           try {
-            const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
-            const policy = canModifyAppointment({ startTimeISO: new_start_iso, minNoticeHours })
-            if (!policy.allowed) {
-              resultContent = JSON.stringify({ error: `No se puede reagendar con menos de ${minNoticeHours} horas de anticipación` })
-            } else if (cfg.calendarProvider === 'square') {
+            if (cfg.calendarProvider === 'square') {
               const { getBookings, updateBooking } = await import('../services/square.js')
               const token = cfg.square.access_token
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
               const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
               if (!current) throw new Error('Cita no encontrada')
-              const updated = await updateBooking(token, appointment_id, { startAt: new_start_iso, version: current.version })
-              resultContent = JSON.stringify({ ok: true, booking: updated })
-              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.start_at, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede reagendar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                const updated = await updateBooking(token, appointment_id, { startAt: new_start_iso, version: current.version })
+                resultContent = JSON.stringify({ ok: true, booking: updated })
+                setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              }
             } else if (cfg.calendarProvider === 'ghl') {
-              const { updateAppointment } = await import('../services/ghl.js')
-              const updated = await updateAppointment(cfg.ghl.api_key, appointment_id, { startTime: new_start_iso, endTime: new_end_iso })
-              resultContent = JSON.stringify({ ok: true, appointment: updated })
-              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              const { getAppointments, updateAppointment } = await import('../services/ghl.js')
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
+              const current = (await getAppointments(cfg.ghl.api_key, cfg.ghl.location_id, now, in90)).find(a => a.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.startTime, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede reagendar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                const updated = await updateAppointment(cfg.ghl.api_key, appointment_id, { startTime: new_start_iso, endTime: new_end_iso })
+                resultContent = JSON.stringify({ ok: true, appointment: updated })
+                setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              }
             } else if (cfg.calendarProvider === 'google') {
-              const { getValidAccessToken, updateEvent } = await import('../services/google-calendar.js')
+              const { getValidAccessToken, getEvents, updateEvent } = await import('../services/google-calendar.js')
               const token = await getValidAccessToken(cfg)
               saveConfig(companyId, cfg)
-              const updated = await updateEvent(token, cfg.googleCalendar.calendar_id, appointment_id, { startISO: new_start_iso, endISO: new_end_iso })
-              resultContent = JSON.stringify({ ok: true, event: updated })
-              setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              const now = new Date().toISOString()
+              const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
+              const current = (await getEvents(token, cfg.googleCalendar.calendar_id, now, in90)).find(e => e.id === appointment_id)
+              if (!current) throw new Error('Cita no encontrada')
+              const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
+              const policy = canModifyAppointment({ startTimeISO: current.start?.dateTime, minNoticeHours })
+              if (!policy.allowed) { resultContent = JSON.stringify({ error: `No se puede reagendar con menos de ${minNoticeHours} horas de anticipación` }) }
+              else {
+                const updated = await updateEvent(token, cfg.googleCalendar.calendar_id, appointment_id, { startISO: new_start_iso, endISO: new_end_iso })
+                resultContent = JSON.stringify({ ok: true, event: updated })
+                setImmediate(() => sendNotification({ type: 'reschedule', conversationId: convId, companyId }))
+              }
             } else {
               resultContent = JSON.stringify({ error: 'Esta empresa no tiene un proveedor de calendario soportado' })
             }
@@ -683,6 +712,8 @@ export async function processMessage({ companyId, message, conversationId, visit
               const token = cfg.square.access_token
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
               const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
               if (!current) throw new Error('Cita no encontrada')
               const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
@@ -697,6 +728,8 @@ export async function processMessage({ companyId, message, conversationId, visit
               const { getAppointments, cancelAppointment } = await import('../services/ghl.js')
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
               const current = (await getAppointments(cfg.ghl.api_key, cfg.ghl.location_id, now, in90)).find(a => a.id === appointment_id)
               if (!current) throw new Error('Cita no encontrada')
               const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
@@ -713,6 +746,8 @@ export async function processMessage({ companyId, message, conversationId, visit
               saveConfig(companyId, cfg)
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+              // appointment_id is trusted from the model's own find_my_appointments call earlier in
+              // this conversation; it is not independently re-verified against the requester's phone here.
               const current = (await getEvents(token, cfg.googleCalendar.calendar_id, now, in90)).find(e => e.id === appointment_id)
               if (!current) throw new Error('Cita no encontrada')
               const minNoticeHours = cfg.citas?.minNoticeHours ?? 4
