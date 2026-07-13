@@ -316,6 +316,17 @@ export async function sendInstagram(accessToken, recipientId, text) {
 }
 
 // ============================================================
+// TWILIO SMS — dual-send alongside WhatsApp for appointment messages only
+// ============================================================
+export async function sendSMS(cfg, phone, text) {
+  if (!cfg.twilio?.accountSid) return
+  try {
+    const { sendSMS: twilioSend } = await import('../services/twilio.js')
+    await twilioSend(cfg.twilio.accountSid, cfg.twilio.authToken, cfg.twilio.fromNumber, phone, text)
+  } catch (err) { console.error('SMS send error:', err.message) }
+}
+
+// ============================================================
 // WEB CHAT ALERT — notify owner on WhatsApp when a new web chat starts
 // ============================================================
 async function sendWebChatAlert(companyId, conversationId, firstMessage) {
