@@ -715,6 +715,38 @@ adminRouter.delete('/ghl/disconnect', requireAdmin, withCompany, (req, res) => {
   res.json({ ok: true })
 })
 
+// ============================================================
+// TWILIO SMS INTEGRATION
+// ============================================================
+
+adminRouter.get('/twilio/status', requireAdmin, withCompany, (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  const t = cfg.twilio || {}
+  res.json({ connected: !!(t.accountSid && t.authToken && t.fromNumber), fromNumber: t.fromNumber || null, connected_at: t.connected_at || null })
+})
+
+adminRouter.post('/twilio/test', requireAdmin, withCompany, async (req, res) => {
+  const { accountSid, authToken, fromNumber } = req.body
+  if (!accountSid || !authToken || !fromNumber) return res.status(400).json({ error: 'Falta Account SID, Auth Token o número From' })
+  try {
+    const { getAccountInfo } = await import('../services/twilio.js')
+    const account = await getAccountInfo(accountSid, authToken)
+    const cfg = loadConfig(req.company.id)
+    cfg.twilio = { accountSid, authToken, fromNumber, connected_at: new Date().toISOString() }
+    saveConfig(req.company.id, cfg)
+    res.json({ ok: true, name: account.friendly_name || 'Twilio' })
+  } catch (e) {
+    res.json({ ok: false, error: e.message })
+  }
+})
+
+adminRouter.delete('/twilio/disconnect', requireAdmin, withCompany, (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  delete cfg.twilio
+  saveConfig(req.company.id, cfg)
+  res.json({ ok: true })
+})
+
 adminRouter.get('/campaigns/stats', requireAdmin, withCompany, (req, res) => {
   try {
     const since = new Date(); since.setDate(1); since.setHours(0,0,0,0)
