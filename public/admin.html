@@ -1844,6 +1844,30 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
    </div>
   </div>
 
+  <!-- CALENDAR PROVIDER SELECTOR -->
+  <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px">
+   <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Proveedor de calendario (reagendar/cancelar por chat)</div>
+   <select id="calendar-provider-select" onchange="saveCalendarProvider()" style="width:100%;padding:8px;border-radius:8px">
+    <option value="">Ninguno (el bot escala a un humano)</option>
+    <option value="square">Square</option>
+    <option value="ghl">GoHighLevel</option>
+    <option value="google">Google Calendar</option>
+   </select>
+  </div>
+
+  <!-- GOOGLE CALENDAR CONNECTION PANEL -->
+  <div id="google-banner" style="background:rgba(59,165,255,.05);border:1px solid rgba(59,165,255,.18);border-radius:12px;padding:16px 18px;margin-bottom:14px">
+   <div style="display:flex;align-items:center;gap:10px">
+    <div id="google-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0"></div>
+    <div style="flex:1">
+     <div style="font-size:13px;font-weight:600;color:var(--text)">Google Calendar</div>
+     <div id="google-status-txt" style="font-size:11px;color:var(--muted);margin-top:2px">Cargando…</div>
+    </div>
+    <button id="btn-google-connect" onclick="connectGoogleCalendar()" style="display:none;font-size:12px;padding:6px 14px">Conectar Google Calendar</button>
+    <button id="btn-google-disconnect" onclick="disconnectGoogleCalendar()" style="display:none;font-size:12px;padding:6px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;cursor:pointer">Desconectar</button>
+   </div>
+  </div>
+
   <!-- QBO CONNECTION PANEL -->
   <div id="qbo-banner" style="background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.18);border-radius:12px;padding:16px 18px;margin-bottom:20px">
    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -3067,7 +3091,7 @@ function tab(name) {
  if (name === 'knowledge') loadDocs();
  if (name === 'dashboard') loadDashboard();
  if (name === 'training') loadTraining();
- if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus() }
+ if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus(); loadGoogleStatus(); loadCalendarProvider() }
  if (name === 'citas') loadCitas();
  if (name === 'companies') loadCompaniesList();
  if (name === 'demos') loadDemos();
@@ -5170,6 +5194,48 @@ async function disconnectSquare() {
   await api('/api/square/disconnect', { method: 'DELETE' })
   loadSquareStatus()
   toast('Square desconectado')
+}
+
+// ────────────────────────────────────────────────────────────
+// Calendar provider + Google Calendar Integration
+// ────────────────────────────────────────────────────────────
+async function loadCalendarProvider() {
+  const cfg = await api(`/api/config?companyId=${activeCompanyId}`)
+  document.getElementById('calendar-provider-select').value = cfg.calendarProvider || ''
+}
+async function saveCalendarProvider() {
+  const provider = document.getElementById('calendar-provider-select').value || null
+  await api('/api/calendar-provider', { method: 'POST', body: JSON.stringify({ provider }) })
+}
+
+async function loadGoogleStatus() {
+  try {
+    const r = await api('/api/google-calendar/status')
+    const dot  = document.getElementById('google-dot')
+    const txt  = document.getElementById('google-status-txt')
+    const btnC = document.getElementById('btn-google-connect')
+    const btnD = document.getElementById('btn-google-disconnect')
+    if (r.connected) {
+      dot.style.background = '#22c55e'
+      txt.textContent = 'Conectado · Google Calendar activo'
+      btnC.style.display = 'none'
+      btnD.style.display = 'inline-block'
+    } else {
+      dot.style.background = '#6b7280'
+      txt.textContent = 'No conectado'
+      btnC.style.display = 'inline-block'
+      btnD.style.display = 'none'
+    }
+  } catch (e) { console.error('[Google Calendar status]', e.message) }
+}
+function connectGoogleCalendar() {
+  const url = `/api/google-calendar/connect?companyId=${activeCompanyId}&adminPassword=${encodeURIComponent(password)}&adminEmail=${encodeURIComponent(adminEmail)}`
+  window.open(url, '_blank')
+}
+async function disconnectGoogleCalendar() {
+  if (!confirm('¿Desconectar Google Calendar?')) return
+  await api('/api/google-calendar/disconnect', { method: 'DELETE' })
+  loadGoogleStatus()
 }
 
 // ────────────────────────────────────────────────────────────

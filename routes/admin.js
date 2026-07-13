@@ -822,6 +822,64 @@ adminRouter.delete('/square/disconnect', requireAdmin, withCompany, async (req, 
 })
 
 // ============================================================
+// GOOGLE CALENDAR INTEGRATION
+// ============================================================
+
+adminRouter.get('/google-calendar/status', requireAdmin, withCompany, async (req, res) => {
+  const cfg = loadConfig(req.company.id)
+  res.json({
+    connected: !!(cfg.googleCalendar?.refresh_token),
+    calendar_id: cfg.googleCalendar?.calendar_id || null
+  })
+})
+
+adminRouter.get('/google-calendar/connect', requireAdmin, withCompany, async (req, res) => {
+  const { hasCredentials, getOAuthUrl } = await import('../services/google-calendar.js')
+  if (!hasCredentials()) return res.status(503).json({ error: 'Faltan GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET en el servidor' })
+  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  res.redirect(getOAuthUrl(state))
+})
+
+adminRouter.get('/google-calendar/callback', async (req, res) => {
+  const { code, state, error } = req.query
+  if (error) return res.redirect('/admin?msg=google_denied')
+  try {
+    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const { exchangeCode } = await import('../services/google-calendar.js')
+    const tokens = await exchangeCode(code)
+    const cfg = loadConfig(cid)
+    cfg.googleCalendar = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: Date.now() + (tokens.expires_in * 1000),
+      calendar_id: 'primary',
+      connected_at: new Date().toISOString()
+    }
+    saveConfig(cid, cfg)
+    res.redirect('/admin?msg=google_ok')
+  } catch (e) {
+    console.error('[google-calendar-callback]', e.message)
+    res.redirect('/admin?msg=google_error')
+  }
+})
+
+adminRouter.delete('/google-calendar/disconnect', requireAdmin, withCompany, async (req, res) => {
+  saveConfig(req.company.id, { googleCalendar: null })
+  res.json({ ok: true })
+})
+
+adminRouter.post('/calendar-provider', requireAdmin, withCompany, async (req, res) => {
+  const { provider } = req.body
+  if (![null, 'square', 'ghl', 'google'].includes(provider)) {
+    return res.status(400).json({ error: 'Proveedor inválido' })
+  }
+  const cfg = loadConfig(req.company.id)
+  cfg.calendarProvider = provider
+  saveConfig(req.company.id, cfg)
+  res.json({ ok: true })
+})
+
+// ============================================================
 // QUICKBOOKS INTEGRATION
 // ============================================================
 
@@ -942,17 +1000,22 @@ adminRouter.get('/server-config/integrations', requireAdmin, (req, res) => {
     square_app_secret:  getServerSetting('square_app_secret') ? '••••••••' : (process.env.SQUARE_APP_SECRET ? '••••••••' : ''),
     qbo_client_id:      getServerSetting('qbo_client_id') || process.env.QBO_CLIENT_ID || '',
     qbo_client_secret:  getServerSetting('qbo_client_secret') ? '••••••••' : (process.env.QBO_CLIENT_SECRET ? '••••••••' : ''),
+    google_client_id:      getServerSetting('google_client_id') || process.env.GOOGLE_CLIENT_ID || '',
+    google_client_secret:  getServerSetting('google_client_secret') ? '••••••••' : (process.env.GOOGLE_CLIENT_SECRET ? '••••••••' : ''),
     square_configured:  !!(getServerSetting('square_app_id') || process.env.SQUARE_APP_ID),
     qbo_configured:     !!(getServerSetting('qbo_client_id') || process.env.QBO_CLIENT_ID),
+    google_configured:  !!(getServerSetting('google_client_id') || process.env.GOOGLE_CLIENT_ID),
   })
 })
 
 adminRouter.post('/server-config/integrations', requireAdmin, (req, res) => {
-  const { square_app_id, square_app_secret, qbo_client_id, qbo_client_secret } = req.body
+  const { square_app_id, square_app_secret, qbo_client_id, qbo_client_secret, google_client_id, google_client_secret } = req.body
   if (square_app_id    !== undefined) setServerSetting('square_app_id',    square_app_id)
   if (square_app_secret !== undefined && square_app_secret !== '••••••••') setServerSetting('square_app_secret', square_app_secret)
   if (qbo_client_id    !== undefined) setServerSetting('qbo_client_id',    qbo_client_id)
   if (qbo_client_secret !== undefined && qbo_client_secret !== '••••••••') setServerSetting('qbo_client_secret', qbo_client_secret)
+  if (google_client_id    !== undefined) setServerSetting('google_client_id',    google_client_id)
+  if (google_client_secret !== undefined && google_client_secret !== '••••••••') setServerSetting('google_client_secret', google_client_secret)
   res.json({ ok: true })
 })
 
