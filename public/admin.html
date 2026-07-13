@@ -1797,6 +1797,42 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
    </div>
   </div>
 
+  <!-- TWILIO SMS CONNECTION PANEL -->
+  <div id="twilio-banner" style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.18);border-radius:12px;padding:16px 18px;margin-bottom:20px">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px">
+     <div id="twilio-dot" style="width:9px;height:9px;border-radius:50%;background:#6b7280;flex-shrink:0;transition:background .3s"></div>
+     <div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">Twilio — SMS</div>
+      <div id="twilio-status-txt" style="font-size:11px;color:var(--muted);margin-top:2px">No conectado · Los recordatorios de cita también se mandan por SMS si conectas Twilio</div>
+     </div>
+    </div>
+    <div style="display:flex;gap:8px">
+     <button id="btn-twilio-connect" onclick="toggleTwilioForm()" style="font-size:12px;padding:6px 14px">Conectar Twilio</button>
+     <button id="btn-twilio-disconnect" onclick="disconnectTwilio()" style="display:none;font-size:12px;padding:6px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:8px;cursor:pointer">Desconectar</button>
+    </div>
+   </div>
+   <div id="twilio-form" style="display:none;margin-top:14px;border-top:1px solid rgba(239,68,68,.1);padding-top:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end">
+     <div>
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Account SID</label>
+      <input id="twilio-account-sid" type="text" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style="font-size:12px;width:100%">
+     </div>
+     <div>
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Auth Token</label>
+      <input id="twilio-auth-token" type="password" placeholder="••••••••••••••••••••••••••••••••" style="font-size:12px;width:100%">
+     </div>
+     <div>
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Número From</label>
+      <input id="twilio-from-number" type="text" placeholder="+17865551234" style="font-size:12px;width:100%">
+     </div>
+     <button onclick="testTwilioConn()" style="font-size:12px;padding:7px 14px;white-space:nowrap">Probar y guardar</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">En Twilio Console → Account → API keys &amp; tokens</div>
+    <div id="twilio-test-result" style="display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:8px"></div>
+   </div>
+  </div>
+
   <!-- CREDENTIALS PANEL — super admin only -->
   <div id="server-creds-panel" style="display:none;background:rgba(250,204,21,.05);border:1px solid rgba(250,204,21,.2);border-radius:12px;padding:16px 18px;margin-bottom:14px">
    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -3091,7 +3127,7 @@ function tab(name) {
  if (name === 'knowledge') loadDocs();
  if (name === 'dashboard') loadDashboard();
  if (name === 'training') loadTraining();
- if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus(); loadGoogleStatus(); loadCalendarProvider() }
+ if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus(); loadGoogleStatus(); loadCalendarProvider(); loadTwilioStatus() }
  if (name === 'citas') loadCitas();
  if (name === 'companies') loadCompaniesList();
  if (name === 'demos') loadDemos();
@@ -5103,6 +5139,69 @@ async function disconnectGhl() {
   await api('/api/ghl/disconnect', { method: 'DELETE' })
   loadGhlStatus()
   toast('GHL desconectado')
+}
+
+async function loadTwilioStatus() {
+  try {
+    const r = await api('/api/twilio/status')
+    const dot = document.getElementById('twilio-dot')
+    const txt = document.getElementById('twilio-status-txt')
+    const btnCon = document.getElementById('btn-twilio-connect')
+    const btnDis = document.getElementById('btn-twilio-disconnect')
+    if (r.connected) {
+      dot.style.background = '#4ade80'
+      txt.textContent = `Conectado · ${r.fromNumber} · desde ${r.connected_at ? new Date(r.connected_at).toLocaleDateString() : 'hoy'}`
+      btnCon.style.display = 'none'
+      btnDis.style.display = 'inline-flex'
+    } else {
+      dot.style.background = '#6b7280'
+      txt.textContent = 'No conectado · Los recordatorios de cita también se mandan por SMS si conectas Twilio'
+      btnCon.style.display = 'inline-flex'
+      btnDis.style.display = 'none'
+    }
+  } catch (e) {}
+}
+
+function toggleTwilioForm() {
+  const f = document.getElementById('twilio-form')
+  f.style.display = f.style.display === 'none' ? 'block' : 'none'
+}
+
+async function testTwilioConn() {
+  const accountSid = document.getElementById('twilio-account-sid').value.trim()
+  const authToken  = document.getElementById('twilio-auth-token').value.trim()
+  const fromNumber = document.getElementById('twilio-from-number').value.trim()
+  const res = document.getElementById('twilio-test-result')
+  if (!accountSid || !authToken || !fromNumber) { toast('Completa Account SID, Auth Token y número From'); return }
+  res.style.display = 'block'
+  res.style.background = 'rgba(100,100,100,.15)'
+  res.textContent = 'Probando conexión...'
+  try {
+    const r = await api('/api/twilio/test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ accountSid, authToken, fromNumber }) })
+    if (r.ok) {
+      res.style.background = 'rgba(74,222,128,.1)'
+      res.style.color = '#4ade80'
+      res.textContent = `✓ Conectado · ${r.name}`
+      document.getElementById('twilio-form').style.display = 'none'
+      loadTwilioStatus()
+      toast('Twilio conectado correctamente')
+    } else {
+      res.style.background = 'rgba(239,68,68,.1)'
+      res.style.color = '#ef4444'
+      res.textContent = `✗ Error: ${r.error}`
+    }
+  } catch (e) {
+    res.style.background = 'rgba(239,68,68,.1)'
+    res.style.color = '#ef4444'
+    res.textContent = `✗ ${e.message}`
+  }
+}
+
+async function disconnectTwilio() {
+  if (!confirm('¿Desconectar Twilio? Los recordatorios de cita dejarán de mandarse por SMS.')) return
+  await api('/api/twilio/disconnect', { method: 'DELETE' })
+  loadTwilioStatus()
+  toast('Twilio desconectado')
 }
 
 function loadGhlWebhookUrl() {
