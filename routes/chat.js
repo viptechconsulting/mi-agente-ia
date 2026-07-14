@@ -1065,7 +1065,7 @@ async function runRetargeting() {
       const resp = await client.messages.create({
         model: cfg.model || 'claude-haiku-4-5-20251001',
         max_tokens: 120,
-        messages: [{ role: 'user', content: `Eres "${cfg.agentName || 'Asistente'}" de "${cfg.businessName}". Escribe UN mensaje de seguimiento corto y natural para retomar esta conversación. Sin emojis, sin listas, máximo 2 oraciones:\n\n${context}` }]
+        messages: [{ role: 'user', content: `Eres "${cfg.agentName || 'Asistente'}" de "${cfg.businessName}". Escribe UN mensaje de seguimiento corto y natural para retomar esta conversación. Responde en el mismo idioma que el cliente usó en la conversación de abajo — nunca cambies de idioma. Sin emojis, sin listas, máximo 2 oraciones:\n\n${context}` }]
       })
       const retargetMsg = resp.content[0].text.trim()
       if (conv.channel === 'whatsapp') {
