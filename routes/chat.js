@@ -542,7 +542,7 @@ export async function processMessage({ companyId, message, conversationId, visit
   }
   if (activeTools.length > 0) callParams.tools = activeTools
   if (isMedspa) callParams.tool_choice = { type: 'tool', name: 'respond_to_patient' }
-  if (isLynkroLead) callParams.tool_choice = { type: 'tool', name: 'respond_to_lead' }
+  else if (isLynkroLead) callParams.tool_choice = { type: 'tool', name: 'respond_to_lead' }
 
   let response = await client.messages.create(callParams)
   const discussedProductIds = []
@@ -885,6 +885,17 @@ export async function processMessage({ companyId, message, conversationId, visit
       leadState = saveLeadState(convId, { qualified_notified: true })
       setImmediate(() => sendNotification({ type: 'qualified_lead', conversationId: convId, companyId }))
     }
+    if (leadResult.next_state === 'DO_NOT_CONTACT') {
+      setDoNotContact(convId)
+    }
+    if (leadResult.handoff_required) {
+      const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
+      db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId)
+      if (!c.escalated_notified) {
+        db.prepare('UPDATE conversations SET escalated_notified = 1 WHERE id = ?').run(convId)
+        setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId, companyId }))
+      }
+    }
   } else if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
     const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
     db.prepare('UPDATE conversations SET unresolved = 1 WHERE id = ?').run(convId)
@@ -1109,6 +1120,7 @@ export async function runLynkroFollowUp() {
     WHERE company_id = ?
       AND channel IN ('whatsapp','instagram')
       AND human_mode = 0
+      AND do_not_contact = 0
   `).all(LYNKRO_COMPANY_ID)
 
   const cfg = loadConfig(LYNKRO_COMPANY_ID)
