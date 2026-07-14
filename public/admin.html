@@ -2696,20 +2696,22 @@ function render() {
  updateModelOptions();
  document.getElementById('embedCode').value =
  `<script src="${location.origin}/widget.js" data-api="${location.origin}" data-company="${activeCompanyId}"><\/script>`;
- // Share link — usa share_token si existe, si no el token de company directamente
- const shareLinkEl = document.getElementById('shareLink');
- if (shareLinkEl) {
-  const co = companies.find(c => c.id === activeCompanyId);
-  const tok = co?.share_token || '';
-  shareLinkEl.value = tok ? `${location.origin}/demo/${tok}` : `${location.origin}/chat?company=${activeCompanyId}`;
- }
+ // Share link — usa share_token si existe; si no, lo genera en el servidor
+ if (document.getElementById('shareLink')) updateShareLink();
 }
 
-function updateShareLink() {
+async function updateShareLink() {
  const el = document.getElementById('shareLink');
  if (!el) return;
  const co = companies.find(c => c.id === activeCompanyId);
- const tok = co?.share_token || '';
+ let tok = co?.share_token || '';
+ if (!tok) {
+  try {
+   const r = await api('/api/company/share-token', { method: 'POST' });
+   tok = r.share_token || '';
+   if (co) co.share_token = tok;
+  } catch (e) { console.error('[shareLink]', e.message) }
+ }
  el.value = tok ? `${location.origin}/demo/${tok}` : `${location.origin}/chat?company=${activeCompanyId}`;
 }
 
