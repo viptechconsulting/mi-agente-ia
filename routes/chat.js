@@ -18,9 +18,16 @@ import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/meds
 import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
 import { loadState as loadMedspaState, saveState as saveMedspaState, setDoNotContact } from '../services/medspa-state.js'
 import { canModifyAppointment } from '../services/appointments.js'
+import { RESPOND_TO_LEAD_TOOL, validateAgentResponse as validateLeadResponse } from '../services/lynkro-lead-schema.js'
+import { buildLynkroLeadPromptModule } from '../services/lynkro-lead-prompt.js'
+import { loadState as loadLeadState, saveState as saveLeadState, shouldNotifyQualified } from '../services/lynkro-lead-state.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
+
+// Lynkro's own company — used both by the lead-qualification vertical
+// (processMessage, below) and by the LYNKRO_FU follow-up job further down.
+const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -484,21 +491,27 @@ export async function processMessage({ companyId, message, conversationId, visit
   // generalize this into a "terminal tool" pattern that composes with the
   // GHL booking tool. See docs/superpowers/plans for the medspa design.
   const isMedspa = cfg.industry === 'medspa'
+  const isLynkroLead = companyId === LYNKRO_COMPANY_ID
 
   const hasCalendarProvider = ['square', 'ghl', 'google'].includes(cfg.calendarProvider)
   // Medspa forces tool_choice: respond_to_patient below, so it structurally cannot call
   // find_my_appointments/reschedule_appointment/cancel_appointment (only registered in the
   // non-medspa branch of activeTools) — never advertise them in the medspa prompt either.
-  const appointmentsSystemBlock = (hasCalendarProvider && !isMedspa)
+  const appointmentsSystemBlock = (hasCalendarProvider && !isMedspa && !isLynkroLead)
     ? `\n\nPUEDES REAGENDAR Y CANCELAR CITAS. Flujo OBLIGATORIO:\n1) Llama a find_my_appointments para ver las citas futuras del cliente.\n2) Si hay una sola, confírmala por fecha/hora antes de continuar. Si hay varias, pregunta cuál. Si no hay ninguna, dilo — no inventes una cita.\n3) Para reagendar: pide la nueva fecha/hora, llama a check_availability, y si no está libre ofrece la alternativa más cercana. Solo llama a reschedule_appointment después de que el cliente confirme el horario exacto ya verificado.\n4) Para cancelar: pide confirmación explícita ("¿confirmas que quieres cancelar tu cita del [fecha]?") antes de llamar a cancel_appointment.\nNUNCA reagendes ni canceles sin esa confirmación explícita del cliente. Si find_my_appointments o reschedule_appointment/cancel_appointment devuelven un error, dile al cliente que hubo un problema técnico y que el equipo lo confirma manualmente — nunca digas que ya quedó hecho si la herramienta falló.`
     : ''
 
   let medspaState = isMedspa ? loadMedspaState(convId) : null
   const medspaSystemBlock = isMedspa ? buildMedspaPromptModule(cfg, medspaState) : ''
 
+  let leadState = isLynkroLead ? loadLeadState(convId) : null
+  const leadSystemBlock = isLynkroLead ? buildLynkroLeadPromptModule(leadState) : ''
+
   const activeTools = []
   if (isMedspa) {
     activeTools.push(RESPOND_TO_PATIENT_TOOL)
+  } else if (isLynkroLead) {
+    activeTools.push(RESPOND_TO_LEAD_TOOL)
   } else {
     if (hasCommercePro) activeTools.push(SEARCH_PRODUCTS_TOOL)
     if (hasSquare) activeTools.push(SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL)
@@ -507,12 +520,13 @@ export async function processMessage({ companyId, message, conversationId, visit
 
   const callParams = {
     model: cfg.model || 'claude-haiku-4-5-20251001',
-    max_tokens: (hasCommercePro || hasSquare || isMedspa) ? 800 : 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock,
+    max_tokens: (hasCommercePro || hasSquare || isMedspa || isLynkroLead) ? 800 : 350,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock + leadSystemBlock,
     messages: (isMedspa ? windowHistory(history, 20, 16) : history).map(m => ({ role: m.role, content: m.content }))
   }
   if (activeTools.length > 0) callParams.tools = activeTools
   if (isMedspa) callParams.tool_choice = { type: 'tool', name: 'respond_to_patient' }
+  if (isLynkroLead) callParams.tool_choice = { type: 'tool', name: 'respond_to_lead' }
 
   let response = await client.messages.create(callParams)
   const discussedProductIds = []
@@ -543,9 +557,30 @@ export async function processMessage({ companyId, message, conversationId, visit
     }
   }
 
-  // Tool-use loop (max 3 iterations to prevent runaway) — skipped for medspa (see above)
+  // Lynkro lead qualification: same forced tool_choice pattern as medspa.
+  let leadResult = null
+  if (isLynkroLead) {
+    const block = response.content.find(b => b.type === 'tool_use' && b.name === 'respond_to_lead')
+    if (block) {
+      const { valid, errors } = validateLeadResponse(block.input)
+      if (!valid) console.warn('[lynkro-lead] respond_to_lead validation errors:', errors)
+      leadResult = block.input
+    } else {
+      // Defensive fallback — should not happen with tool_choice forced, but never crash the reply path.
+      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+      console.warn('[lynkro-lead] model did not call respond_to_lead, falling back to raw text')
+      leadResult = {
+        message_to_user: text || 'Dame un momento, ya te ayudo.',
+        next_state: leadState.current_state,
+        handoff_required: false,
+        conversation_summary_update: leadState.conversation_summary
+      }
+    }
+  }
+
+  // Tool-use loop (max 3 iterations to prevent runaway) — skipped for medspa/lynkro-lead (see above)
   let iterations = 0
-  while (!isMedspa && response.stop_reason === 'tool_use' && iterations < 3) {
+  while (!isMedspa && !isLynkroLead && response.stop_reason === 'tool_use' && iterations < 3) {
     iterations++
     const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
     const toolResults = []
@@ -795,7 +830,7 @@ export async function processMessage({ companyId, message, conversationId, visit
     response = await client.messages.create(callParams)
   }
 
-  const reply = isMedspa ? medspaResult.message_to_user : response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+  const reply = isMedspa ? medspaResult.message_to_user : isLynkroLead ? leadResult.message_to_user : response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
 
   // Track products discussed in this conversation
   if (discussedProductIds.length > 0) {
@@ -827,6 +862,12 @@ export async function processMessage({ companyId, message, conversationId, visit
         db.prepare('UPDATE conversations SET escalated_notified = 1 WHERE id = ?').run(convId)
         setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId, companyId }))
       }
+    }
+  } else if (isLynkroLead) {
+    leadState = saveLeadState(convId, leadResult)
+    if (shouldNotifyQualified(leadState)) {
+      leadState = saveLeadState(convId, { qualified_notified: true })
+      setImmediate(() => sendNotification({ type: 'qualified_lead', conversationId: convId, companyId }))
     }
   } else if (/no (tengo|sé|conozco)|no puedo (ayudart|responder)|contacta(r)? (al|con) (el )?(equipo|negocio)|pasar tu consulta/i.test(reply)) {
     const c = db.prepare('SELECT escalated_notified FROM conversations WHERE id = ?').get(convId)
@@ -1022,7 +1063,6 @@ setInterval(runRetargeting, 30 * 60 * 1000) // check every 30 min
 // ============================================================
 // LYNKRO FOLLOW-UP JOB — qualification flow follow-ups
 // ============================================================
-const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
 
 // Phases: early = calificación (bot_count 1-2), mid = shock factor mostrado (3), late = demo ofrecida (4+)
 const LYNKRO_FU = {
