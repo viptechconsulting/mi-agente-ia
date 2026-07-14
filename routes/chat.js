@@ -277,8 +277,7 @@ async function sendNotification({ type, conversationId, companyId }) {
 
   let qualifiedLeadInfo = ''
   if (type === 'qualified_lead') {
-    const { loadState: loadLeadStateForEmail } = await import('../services/lynkro-lead-state.js')
-    const leadState = loadLeadStateForEmail(conversationId)
+    const leadState = loadLeadState(conversationId)
     qualifiedLeadInfo = `<tr><td style="padding:14px;background:#0a0a0a;border-radius:8px;color:#fff">
         <div style="color:${accent};font-size:11px;letter-spacing:2px;margin-bottom:8px">DATOS PARA EL DEMO</div>
         <div>🏢 <b>${leadState.business_type || 'Tipo de negocio no capturado'}</b></div>
