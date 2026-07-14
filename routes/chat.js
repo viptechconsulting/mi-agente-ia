@@ -244,6 +244,7 @@ async function sendNotification({ type, conversationId, companyId }) {
   if (type === 'escalation' && !cfg.notifyOnEscalation) return
   if (type === 'reschedule' && !cfg.notifyOnReschedule) return
   if (type === 'cancel' && !cfg.notifyOnCancel) return
+  if (type === 'qualified_lead' && !cfg.notifyOnQualifiedLead) return
 
   const conv = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) || {}
   const msgs = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id').all(conversationId)
@@ -255,6 +256,7 @@ async function sendNotification({ type, conversationId, companyId }) {
     escalation: `🚨 Conversación escalada — ${cfg.businessName || 'Agente'}`,
     reschedule: `📅 Cita reagendada por el bot — ${cfg.businessName || 'Agente'}`,
     cancel: `❌ Cita cancelada por el bot — ${cfg.businessName || 'Agente'}`,
+    qualified_lead: `🔥 Lead calificado por Meta Ads — ${cfg.businessName || 'Agente'}`,
   }
   const subject = SUBJECTS[type] || SUBJECTS.escalation
 
@@ -273,15 +275,30 @@ async function sendNotification({ type, conversationId, companyId }) {
         <div style="color:#888;font-size:12px;margin-top:6px">${conv.visitor_id || ''}</div>
       </td></tr><tr><td style="height:14px"></td></tr>` : ''
 
+  let qualifiedLeadInfo = ''
+  if (type === 'qualified_lead') {
+    const { loadState: loadLeadStateForEmail } = await import('../services/lynkro-lead-state.js')
+    const leadState = loadLeadStateForEmail(conversationId)
+    qualifiedLeadInfo = `<tr><td style="padding:14px;background:#0a0a0a;border-radius:8px;color:#fff">
+        <div style="color:${accent};font-size:11px;letter-spacing:2px;margin-bottom:8px">DATOS PARA EL DEMO</div>
+        <div>🏢 <b>${leadState.business_type || 'Tipo de negocio no capturado'}</b></div>
+        <div>💰 Ticket promedio: <b>${leadState.avg_ticket || 'no capturado'}</b></div>
+        <div>📊 Volumen: <b>${leadState.volume_level || 'no capturado'}</b></div>
+        ${leadState.captured_fields?.website ? `<div>🌐 <b>${leadState.captured_fields.website}</b></div>` : ''}
+        ${leadState.captured_fields?.instagram ? `<div>📷 <b>${leadState.captured_fields.instagram}</b></div>` : ''}
+      </td></tr><tr><td style="height:14px"></td></tr>`
+  }
+
   const html = `
   <div style="font-family:-apple-system,Arial,sans-serif;max-width:640px;margin:0 auto;background:#fafafa;padding:24px">
     <div style="background:#0a0a0a;color:#fff;padding:22px;border-radius:10px;border-left:4px solid ${accent}">
-      <div style="color:${accent};font-size:11px;letter-spacing:2px">${ { lead: 'NUEVO LEAD', escalation: 'ESCALAMIENTO', reschedule: 'CITA REAGENDADA', cancel: 'CITA CANCELADA' }[type] || 'AVISO' }</div>
+      <div style="color:${accent};font-size:11px;letter-spacing:2px">${ { lead: 'NUEVO LEAD', escalation: 'ESCALAMIENTO', reschedule: 'CITA REAGENDADA', cancel: 'CITA CANCELADA', qualified_lead: 'LEAD CALIFICADO' }[type] || 'AVISO' }</div>
       <h1 style="margin:8px 0 4px;font-size:22px;font-weight:600">${cfg.businessName || 'Agente'}</h1>
       <div style="color:#aaa;font-size:13px">${channel} · ${new Date().toLocaleString('es-MX')}</div>
     </div>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
       ${leadInfo}
+      ${qualifiedLeadInfo}
       <tr><td style="color:#666;font-size:12px;letter-spacing:1px;padding:0 0 8px">TRANSCRIPCIÓN</td></tr>
       ${transcript}
     </table>
