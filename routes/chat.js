@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import QRCode from 'qrcode'
 import nodemailer from 'nodemailer'
 import Anthropic from '@anthropic-ai/sdk'
-import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } from '@whiskeysockets/baileys'
+import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadMediaMessage } from '@whiskeysockets/baileys'
 import { fileURLToPath } from 'url'
 import { requireAdmin, withCompany } from '../middleware/auth.js'
 import {
@@ -21,6 +21,7 @@ import { canModifyAppointment } from '../services/appointments.js'
 import { RESPOND_TO_LEAD_TOOL, validateAgentResponse as validateLeadResponse } from '../services/lynkro-lead-schema.js'
 import { buildLynkroLeadPromptModule } from '../services/lynkro-lead-prompt.js'
 import { loadState as loadLeadState, saveState as saveLeadState, shouldNotifyQualified } from '../services/lynkro-lead-state.js'
+import { transcribeAudioBuffer } from '../services/transcribe.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
@@ -962,13 +963,27 @@ export async function startBuiltinWhatsApp(companyId) {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return
       for (const msg of messages) {
-        const text = msg.message?.conversation
+        if (!msg.message) continue
+        const remoteJid = msg.key.remoteJid
+        if (remoteJid.endsWith('@g.us')) continue
+
+        let text = msg.message?.conversation
           || msg.message?.extendedTextMessage?.text
           || msg.message?.ephemeralMessage?.message?.conversation
           || null
-        if (!text?.trim() || !msg.message) continue
-        const remoteJid = msg.key.remoteJid
-        if (remoteJid.endsWith('@g.us')) continue
+
+        const audioMsg = msg.message?.audioMessage || msg.message?.ephemeralMessage?.message?.audioMessage
+        if (!text?.trim() && audioMsg && !msg.key.fromMe) {
+          try {
+            const buffer = await downloadMediaMessage(msg, 'buffer', {})
+            text = await transcribeAudioBuffer(buffer, audioMsg.mimetype)
+            if (text?.trim()) console.log(`[WA:${companyId}] Nota de voz transcrita: "${text.slice(0, 80)}"`)
+          } catch (err) {
+            console.error(`[WA:${companyId}] Error transcribiendo audio:`, err.message)
+          }
+        }
+
+        if (!text?.trim()) continue
         const phone = remoteJid.replace('@s.whatsapp.net', '')
         const visitorId = `wa:${phone}`
 
