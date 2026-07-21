@@ -7,7 +7,7 @@ import nodemailer from 'nodemailer'
 import Anthropic from '@anthropic-ai/sdk'
 import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadMediaMessage } from '@whiskeysockets/baileys'
 import { fileURLToPath } from 'url'
-import { requireAdmin, withCompany } from '../middleware/auth.js'
+import { requireAdmin, withCompany, signState, verifyState } from '../middleware/auth.js'
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
   listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
@@ -31,6 +31,24 @@ const rootDir = path.join(__dirname, '..')
 const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+// Retries transient failures (network blips, rate limits, Anthropic 5xx) so a
+// single hiccup doesn't leave an inbound message with zero reply.
+async function createMessageWithRetry(params, retries = 2) {
+  let lastErr
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await client.messages.create(params)
+    } catch (err) {
+      lastErr = err
+      const status = err?.status || err?.response?.status
+      const retryable = !status || status === 429 || status >= 500
+      if (!retryable || i === retries) throw err
+      await new Promise(r => setTimeout(r, 500 * (i + 1)))
+    }
+  }
+  throw lastErr
+}
 
 // ============================================================
 // SQUARE BOOKING TOOLS
@@ -545,7 +563,7 @@ export async function processMessage({ companyId, message, conversationId, visit
   if (isMedspa) callParams.tool_choice = { type: 'tool', name: 'respond_to_patient' }
   else if (isLynkroLead) callParams.tool_choice = { type: 'tool', name: 'respond_to_lead' }
 
-  let response = await client.messages.create(callParams)
+  let response = await createMessageWithRetry(callParams)
   const discussedProductIds = []
 
   // Med Spa: forced tool_choice guarantees the structured block on the first
@@ -920,6 +938,90 @@ function getWaConn(companyId) {
   return waConnections.get(companyId)
 }
 
+// ============================================================
+// DECRYPT FAILURE ALERT — libsignal drops undecryptable WhatsApp messages
+// silently (no reply attempted, nothing saved to DB). Notify admin so a
+// lost message doesn't go unnoticed like the 2026-07-15/16 incident.
+// ============================================================
+// ============================================================
+// CRITICAL ALERT — two channels, deliberately: WhatsApp alone is
+// what's failing when these fire, so an email (independent of the
+// WA socket entirely) is the only channel guaranteed to still work.
+// ============================================================
+const CRITICAL_ALERT_COOLDOWNS = {}
+const CRITICAL_ALERT_COOLDOWN_MS = 5 * 60 * 1000
+
+// Best-effort acknowledgment sent to the customer when processMessage throws,
+// so a real lead never sits in total silence even when the AI reply fails.
+const FALLBACK_REPLY = {
+  'español': 'Recibimos tu mensaje, en breve te responderemos. 🙂',
+  'inglés': "We've received your message and will reply shortly. 🙂",
+  'portugués': 'Recebemos sua mensagem, em breve responderemos. 🙂',
+  'francés': 'Nous avons reçu votre message, nous répondrons bientôt. 🙂',
+  'hebreo': 'קיבלנו את הודעתך, נחזור אליך בקרוב. 🙂',
+  'italiano': 'Abbiamo ricevuto il tuo messaggio, ti risponderemo presto. 🙂',
+  'alemán': 'Wir haben deine Nachricht erhalten und antworten dir in Kürze. 🙂'
+}
+
+async function sendCriticalAlert(kind, message) {
+  console.log(`[CriticalAlert] Disparado: "${kind}"`)
+  const now = Date.now()
+  if (now - (CRITICAL_ALERT_COOLDOWNS[kind] || 0) < CRITICAL_ALERT_COOLDOWN_MS) {
+    console.log(`[CriticalAlert] Suprimido por cooldown: "${kind}"`)
+    return
+  }
+  CRITICAL_ALERT_COOLDOWNS[kind] = now
+  let cfg
+  try {
+    cfg = loadConfig(LYNKRO_COMPANY_ID)
+  } catch (err) {
+    console.log('[CriticalAlert] loadConfig falló:', err.message)
+    return
+  }
+  const fullText = `⚠️ ${kind}\n\n${message}\n\n🕐 ${new Date().toISOString()}`
+
+  try {
+    const alertPhone = (cfg.webAlertPhone || '').replace(/\D/g, '')
+    const conn = [...waConnections.values()].find(c => c.state?.status === 'open' && c.sock)
+    if (alertPhone && conn) await conn.sock.sendMessage(`${alertPhone}@s.whatsapp.net`, { text: fullText })
+  } catch (err) { console.log('[CriticalAlert] Canal WhatsApp falló:', err.message) }
+
+  try {
+    const mailer = getMailer(cfg)
+    if (mailer) {
+      await mailer.sendMail({
+        from: cfg.smtpFrom || cfg.smtpUser,
+        to: cfg.notifyEmail,
+        subject: `⚠️ ${kind} — Lynkro`,
+        html: `<pre style="font-family:monospace;white-space:pre-wrap;font-size:14px">${fullText.replace(/</g, '&lt;')}</pre>`
+      })
+    }
+  } catch (err) { console.log('[CriticalAlert] Canal email falló:', err.message) }
+
+  console.log(`[CriticalAlert] "${kind}" enviado`)
+}
+
+const _origConsoleError = console.error.bind(console)
+console.error = (...args) => {
+  _origConsoleError(...args)
+  try {
+    if (args.some(a => typeof a === 'string' && a.includes('Failed to decrypt message with any known session'))) {
+      _origConsoleError('[CriticalAlert] Patrón de decrypt failure detectado, disparando alerta...')
+      sendCriticalAlert(
+        'Fallo de descifrado en WhatsApp (Bad MAC)',
+        'Un mensaje entrante no pudo procesarse (sesión corrupta) y no recibió respuesta automática. Revisa el WhatsApp del negocio afectado por si alguien quedó sin respuesta.'
+      ).catch(err => _origConsoleError('[CriticalAlert] sendCriticalAlert rechazó:', err?.message))
+    }
+  } catch (err) {
+    _origConsoleError('[CriticalAlert] Error en el interceptor de console.error:', err?.message)
+  }
+}
+_origConsoleError('[CriticalAlert] Interceptor de console.error instalado')
+sendCriticalAlert(
+  'DIAGNÓSTICO — arranque del sistema',
+  'Mensaje de prueba automático para confirmar que las alertas críticas (WhatsApp + email) funcionan tras este despliegue. Si ves esto, el canal funciona.'
+).catch(err => _origConsoleError('[CriticalAlert] Diagnóstico de arranque falló:', err?.message))
+
 export async function startBuiltinWhatsApp(companyId) {
   const conn = getWaConn(companyId)
   const authDir = path.join(waBaseDir, companyId)
@@ -940,21 +1042,25 @@ export async function startBuiltinWhatsApp(companyId) {
 
     sock.ev.on('creds.update', saveCreds)
 
+    conn._stateSince = Date.now()
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         const dataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 1, errorCorrectionLevel: 'M' })
         conn.state = { status: 'qr', qr: dataUrl, phone: null }
+        conn._stateSince = Date.now()
         console.log(`[WA:${companyId}] QR listo`)
       }
       if (connection === 'open') {
         const phone = sock.user?.id?.split(':')[0] || sock.user?.id?.split('@')[0] || null
         conn.state = { status: 'open', qr: null, phone }
+        conn._stateSince = Date.now()
         console.log(`[WA:${companyId}] Conectado: ${phone}`)
       }
       if (connection === 'close') {
         const code = lastDisconnect?.error?.output?.statusCode
         const loggedOut = code === DisconnectReason.loggedOut
         conn.state = { status: loggedOut ? 'logged_out' : 'disconnected', qr: null, phone: null }
+        conn._stateSince = Date.now()
         console.log(`[WA:${companyId}] Desconectado código:${code} reintento:${!loggedOut}`)
         if (!loggedOut) setTimeout(() => startBuiltinWhatsApp(companyId), 5000)
       }
@@ -1036,7 +1142,18 @@ export async function startBuiltinWhatsApp(companyId) {
         try {
           const result = await processMessage({ companyId, message: text.trim(), visitorId, channel: 'whatsapp' })
           if (result?.reply) await sock.sendMessage(remoteJid, { text: result.reply })
-        } catch (err) { console.error(`[WA:${companyId}] Error:`, err.message) }
+        } catch (err) {
+          console.error(`[WA:${companyId}] Error:`, err.message)
+          sendCriticalAlert(
+            'Mensaje de WhatsApp sin respuesta automática',
+            `Empresa: ${companyId}\nDe: ${phone}\nMensaje: "${text.trim().slice(0, 200)}"\nError: ${err.message}`
+          ).catch(() => {})
+          try {
+            const fallbackCfg = loadConfig(companyId)
+            const fallback = FALLBACK_REPLY[fallbackCfg.language] || FALLBACK_REPLY['español']
+            await sock.sendMessage(remoteJid, { text: fallback })
+          } catch {}
+        }
       }
     })
   } catch (err) {
@@ -1045,6 +1162,65 @@ export async function startBuiltinWhatsApp(companyId) {
     setTimeout(() => startBuiltinWhatsApp(companyId), 10000)
   }
 }
+
+// ============================================================
+// WA HEALTH CHECK — Baileys' 'open' state doesn't guarantee the
+// underlying socket is still alive; a zombie socket can sit in
+// state 'open' forever with no close event firing, silently
+// dropping every incoming message with zero trace. Every few
+// minutes, probe each "open" connection with a lightweight
+// presence update; if it doesn't complete in time, force-close
+// the socket so the existing close-handler reconnect logic
+// (already deduped, single path) takes over — never call
+// startBuiltinWhatsApp directly here to avoid a second socket
+// racing the one the close handler will spawn.
+// ============================================================
+const WA_HEALTH_CHECK_INTERVAL_MS = 30 * 1000
+const WA_HEALTH_CHECK_TIMEOUT_MS = 8 * 1000
+// If a connection sits in any non-'open' state (connecting/disconnected/qr)
+// this long without ever reaching 'open' or a fresh 'close' event, something
+// got stuck between reconnect attempts — e.g. makeWASocket() itself hanging
+// mid-handshake, which never fires connection.update at all, so neither the
+// close-handler's setTimeout nor the health check (which only watches 'open'
+// connections) would ever notice on their own.
+const WA_STUCK_THRESHOLD_MS = 2 * 60 * 1000
+
+async function checkWaConnHealth(companyId, conn) {
+  if (conn.state?.status !== 'open' || !conn.sock) return
+  try {
+    await Promise.race([
+      conn.sock.sendPresenceUpdate('available'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), WA_HEALTH_CHECK_TIMEOUT_MS))
+    ])
+  } catch (err) {
+    console.log(`[WA:${companyId}] Health check falló (${err.message}) — cerrando socket zombie para forzar reconexión`)
+    try { conn.sock?.end(new Error('health-check-failed')) } catch (e) { console.error(`[WA:${companyId}] Error cerrando socket zombie:`, e.message) }
+  }
+}
+
+function checkWaStuckReconnect(companyId, conn) {
+  if (conn.state?.status === 'open' || conn.state?.status === 'logged_out') return
+  const stuckFor = Date.now() - (conn._stateSince || 0)
+  if (stuckFor < WA_STUCK_THRESHOLD_MS) return
+  conn._stateSince = Date.now() // reset immediately so a slow restart can't retrigger this every cycle
+  console.log(`[WA:${companyId}] Atascado en estado "${conn.state?.status}" por ${Math.round(stuckFor / 1000)}s — forzando reinicio`)
+  if (conn.sock) {
+    try { conn.sock.end(new Error('stuck-reconnect-watchdog')) } catch (e) { console.error(`[WA:${companyId}] Error cerrando socket atascado:`, e.message) }
+  } else {
+    // No socket was ever created for this cycle (e.g. makeWASocket() itself
+    // hung) — nothing will emit a close event to trigger the normal reconnect
+    // path, so this is the one case where calling startBuiltinWhatsApp
+    // directly here is safe: there's no live socket it could race against.
+    startBuiltinWhatsApp(companyId).catch(err => console.error(`[WA:${companyId}] Error reiniciando tras atasco:`, err.message))
+  }
+}
+
+setInterval(() => {
+  for (const [companyId, conn] of waConnections) {
+    checkWaConnHealth(companyId, conn).catch(err => console.error(`[WA:${companyId}] Error en health check:`, err.message))
+    checkWaStuckReconnect(companyId, conn)
+  }
+}, WA_HEALTH_CHECK_INTERVAL_MS)
 
 // Auto-start companies that have saved auth
 try {
@@ -1204,13 +1380,13 @@ chatRouter.get('/inbox/conversations', requireAdmin, (req, res) => {
   for (const co of allCompanies) {
     const convs = db.prepare(`
       SELECT c.id, c.visitor_id, c.channel, c.human_mode, c.created_at, c.updated_at,
-        '${co.id}' as company_id, '${co.name.replace(/'/g,"''")}' as company_name,
+        ? as company_id, ? as company_name,
         (SELECT role    FROM messages WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) as last_role,
         (SELECT content FROM messages WHERE conversation_id=c.id ORDER BY created_at DESC LIMIT 1) as last_content
       FROM conversations c
       WHERE c.company_id=? AND c.channel='web'
       ORDER BY c.updated_at DESC LIMIT 50
-    `).all(co.id)
+    `).all(co.id, co.name, co.id)
     rows.push(...convs)
   }
   rows.sort((a, b) => b.updated_at - a.updated_at)
@@ -1610,18 +1786,24 @@ chatRouter.get('/instagram/connect', requireAdmin, withCompany, (req, res) => {
   if (!igAppId || !igAppSecret)
     return res.status(400).send('<h3 style="font-family:sans-serif;color:#c00">Credenciales de Instagram no configuradas en el servidor.</h3>')
   const redirectUri = `https://${req.get('host')}/api/instagram/callback`
-  const state = Buffer.from(JSON.stringify({ companyId: req.company.id })).toString('base64url')
+  const state = signState({ companyId: req.company.id })
   const scope = 'instagram_business_basic,instagram_business_manage_messages'
   const url = `https://www.instagram.com/oauth/authorize?client_id=${igAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`
   res.redirect(url)
 })
 
+// Safely embeds a value inside an inline <script> block as a JS string literal.
+function jsStringLiteral(v) {
+  return JSON.stringify(String(v ?? '')).replace(/</g, '\\u003C')
+}
+
 // OAuth step 2: Instagram redirects back with code
 chatRouter.get('/instagram/callback', async (req, res) => {
   const { code, state, error } = req.query
-  if (error || !code || !state) return res.send(`<script>window.opener?.postMessage({igError:'${error||'cancelled'}'}, '*'); window.close();</script>`)
-  let companyId
-  try { companyId = JSON.parse(Buffer.from(state, 'base64url').toString()).companyId } catch { return res.send('Estado inválido') }
+  if (error || !code || !state) return res.send(`<script>window.opener?.postMessage({igError:${jsStringLiteral(error || 'cancelled')}}, '*'); window.close();</script>`)
+  const parsed = verifyState(state)
+  if (!parsed) return res.send('Estado inválido')
+  const { companyId } = parsed
   const igAppId = process.env.IG_APP_ID
   const igAppSecret = process.env.IG_APP_SECRET
   if (!igAppId || !igAppSecret) return res.send('Credenciales no configuradas')
@@ -1651,10 +1833,10 @@ chatRouter.get('/instagram/callback', async (req, res) => {
     const verifyToken = cfg.igVerifyToken || 'lynkro123'
     saveConfig(companyId, { igAccessToken: accessToken, igPageId: igUserId, igUsername, igVerifyToken: verifyToken })
     console.log('[Instagram OAuth] saved - user:', igUsername, 'id:', igUserId)
-    res.send(`<script>window.opener?.postMessage({igOk:true,igUsername:'${igUsername}',igPageId:'${igUserId}'}, '*'); window.close();</script>`)
+    res.send(`<script>window.opener?.postMessage({igOk:true,igUsername:${jsStringLiteral(igUsername)},igPageId:${jsStringLiteral(igUserId)}}, '*'); window.close();</script>`)
   } catch (err) {
     console.error('[Instagram OAuth]', err.message)
-    res.send(`<script>window.opener?.postMessage({igError:'${err.message.replace(/'/g,"\\'")}'},'*'); window.close();</script>`)
+    res.send(`<script>window.opener?.postMessage({igError:${jsStringLiteral(err.message)}},'*'); window.close();</script>`)
   }
 })
 

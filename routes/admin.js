@@ -1,6 +1,7 @@
 import express from 'express'
 import path from 'path'
 import fs from 'fs'
+import dns from 'dns'
 import multer from 'multer'
 import crypto from 'crypto'
 import { fileURLToPath } from 'url'
@@ -8,7 +9,7 @@ import { createRequire } from 'module'
 import Anthropic from '@anthropic-ai/sdk'
 import PDFDocument from 'pdfkit'
 import nodemailer from 'nodemailer'
-import { requireAdmin, requireSuperAdmin, withCompany } from '../middleware/auth.js'
+import { requireAdmin, requireSuperAdmin, withCompany, verifyCredentials, createSession, revokeSession, signState, verifyState } from '../middleware/auth.js'
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
   listCompanies, getCompany, getCompanyByToken, createCompany, updateCompanyMeta, deleteCompany,
@@ -134,8 +135,58 @@ export const adminRouter = express.Router()
 // ============================================================
 // PUBLIC: widget config
 // ============================================================
-adminRouter.get('/config/public', withCompany, (req, res) => {
+
+// Translate description + quickReplies into cfg.language, cached on the
+// company record (config._i18n[lang]) so the AI call only runs once per
+// company/language until the source text actually changes.
+async function getTranslatedContent(company) {
+  const cfg = company.config
+  const lang = cfg.language
+  const original = { description: cfg.description || '', quickReplies: cfg.quickReplies || [] }
+  if (!lang || lang === 'español') return original
+
+  const cache = cfg._i18n?.[lang]
+  const sourceMatches = cache
+    && cache.sourceDescription === original.description
+    && JSON.stringify(cache.sourceQuickReplies || []) === JSON.stringify(original.quickReplies)
+  if (sourceMatches) return { description: cache.description, quickReplies: cache.quickReplies }
+
+  if (!original.description && !original.quickReplies.length) return original
+
+  try {
+    const prompt = `Traduce al ${lang} los siguientes textos de un negocio, manteniendo el mismo tono, longitud y formato. Responde ÚNICAMENTE con JSON válido, sin texto adicional, con esta estructura exacta:
+{"description": "texto traducido", "quickReplies": [{"label": "etiqueta traducida", "message": "mensaje traducido"}]}
+
+TEXTOS ORIGINALES (español):
+description: ${JSON.stringify(original.description)}
+quickReplies: ${JSON.stringify(original.quickReplies)}`
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }]
+    })
+    const raw = msg.content[0].text.trim()
+    const start = raw.indexOf('{')
+    const end = raw.lastIndexOf('}')
+    if (start === -1 || end === -1) throw new Error('No JSON in translation response')
+    const parsed = JSON.parse(raw.slice(start, end + 1))
+    const translated = {
+      description: parsed.description || original.description,
+      quickReplies: Array.isArray(parsed.quickReplies) && parsed.quickReplies.length ? parsed.quickReplies : original.quickReplies
+    }
+    saveConfig(company.id, {
+      _i18n: { ...(cfg._i18n || {}), [lang]: { sourceDescription: original.description, sourceQuickReplies: original.quickReplies, ...translated } }
+    })
+    return translated
+  } catch (err) {
+    console.error('[i18n translate] Error:', err.message)
+    return original
+  }
+}
+
+adminRouter.get('/config/public', withCompany, async (req, res) => {
   const cfg = req.company.config
+  const { quickReplies } = await getTranslatedContent(req.company)
   res.json({
     companyId: req.company.id,
     slug: req.company.slug,
@@ -148,7 +199,8 @@ adminRouter.get('/config/public', withCompany, (req, res) => {
     logoUrl: cfg.logoUrl,
     avatarUrl: cfg.avatarUrl,
     widgetPosition: cfg.widgetPosition,
-    quickReplies: cfg.quickReplies || []
+    quickReplies,
+    language: cfg.language || 'español'
   })
 })
 
@@ -235,27 +287,32 @@ adminRouter.post('/company/regenerate-share-token', requireAdmin, withCompany, (
 })
 
 // Public config by token (used by the demo page widget)
-adminRouter.get('/demo/config/:token', (req, res) => {
+adminRouter.get('/demo/config/:token', async (req, res) => {
   const c = getCompanyByToken(req.params.token)
   if (!c) return res.status(404).json({ error: 'Demo no encontrada' })
   if (!c.active) return res.status(403).json({ error: 'Desactivada' })
-  if (c.expires_at && Date.now() > c.expires_at) return res.status(403).json({ error: 'Expirada' })
+  if (c.expires_at && Date.now() > c.expires_at) {
+    return res.status(403).json({ error: c.demo ? 'Expirada' : 'Tu enlace ha expirado. Si quieres que sea reactivado, por favor envía un email a hello@lynkro.io' })
+  }
   const cfg = c.config
+  const { description, quickReplies } = await getTranslatedContent(c)
   res.json({
     companyId: c.id,
     shareToken: c.share_token,
     businessName: cfg.businessName,
-    description: cfg.description,
+    description,
     agentName: cfg.agentName,
     welcomeMessage: cfg.welcomeMessage,
+    welcomeMessageEn: cfg.welcomeMessageEn || '',
     accentColor: cfg.accentColor,
     bgColor: cfg.bgColor,
     userBubbleColor: cfg.userBubbleColor,
     logoUrl: cfg.logoUrl,
     avatarUrl: cfg.avatarUrl,
     widgetPosition: cfg.widgetPosition,
-    quickReplies: cfg.quickReplies || [],
-    expiresAt: c.expires_at
+    quickReplies,
+    expiresAt: c.expires_at,
+    language: cfg.language || 'español'
   })
 })
 
@@ -273,6 +330,27 @@ adminRouter.delete('/companies/:id', requireSuperAdmin, (req, res) => {
 // ============================================================
 // AUTH / USERS
 // ============================================================
+
+// Exchanges real credentials for a short-lived opaque session token.
+// The client stores only this token (never the password) — see admin.html login().
+adminRouter.post('/auth/login', express.json(), (req, res) => {
+  const { email, password } = req.body || {}
+  const normalizedEmail = String(email || '').toLowerCase().trim()
+  const result = verifyCredentials(String(password || ''), normalizedEmail)
+  if (!result) {
+    console.warn(JSON.stringify({ event: 'auth_failure', ip: req.ip, path: req.originalUrl, email: normalizedEmail || null, ts: new Date().toISOString() }))
+    return res.status(401).json({ error: 'No autorizado' })
+  }
+  const token = createSession(result)
+  res.json({ token, isSuperAdmin: result.isSuperAdmin })
+})
+
+adminRouter.post('/auth/logout', requireAdmin, (req, res) => {
+  const token = req.headers['x-admin-password'] || req.query.adminPassword
+  if (token) revokeSession(token)
+  res.json({ ok: true })
+})
+
 adminRouter.get('/auth/me', requireAdmin, (req, res) => {
   res.json({
     isSuperAdmin: req.isSuperAdmin || false,
@@ -361,14 +439,48 @@ adminRouter.post('/docs/pdf', requireAdmin, withCompany, upload.single('file'), 
   } catch (err) { console.error(err); res.status(500).json({ error: err.message }) }
 })
 
+function isPrivateOrReservedIp(ip) {
+  return /^10\.|^127\.|^169\.254\.|^192\.168\.|^0\.|^172\.(1[6-9]|2\d|3[01])\./.test(ip) || ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd')
+}
+
+async function assertPublicUrl(parsedUrl) {
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('Protocolo no permitido')
+  let address
+  try { ({ address } = await dns.promises.lookup(parsedUrl.hostname)) }
+  catch { throw new Error('No se pudo resolver el host') }
+  if (isPrivateOrReservedIp(address)) throw new Error('Host no permitido')
+}
+
+// Fetches a URL while re-validating every redirect hop against internal/private
+// addresses, instead of either blindly following redirects (SSRF) or rejecting
+// them outright (breaks ordinary http->https / www redirects).
+async function safeFetch(startUrl, maxRedirects = 5) {
+  let current = startUrl
+  for (let i = 0; i <= maxRedirects; i++) {
+    await assertPublicUrl(current)
+    const resp = await fetch(current, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgenteScraper/1.0)' },
+      signal: AbortSignal.timeout(20000),
+      redirect: 'manual'
+    })
+    if ([301, 302, 303, 307, 308].includes(resp.status)) {
+      const location = resp.headers.get('location')
+      if (!location) return resp
+      current = new URL(location, current)
+      continue
+    }
+    return resp
+  }
+  throw new Error('Demasiadas redirecciones')
+}
+
 adminRouter.post('/docs/url', requireAdmin, withCompany, async (req, res) => {
   const { url, title } = req.body
   if (!url) return res.status(400).json({ error: 'Falta URL' })
+  let parsedUrl
+  try { parsedUrl = new URL(url) } catch { return res.status(400).json({ error: 'URL inválida' }) }
   try {
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AgenteScraper/1.0)' },
-      signal: AbortSignal.timeout(20000)
-    })
+    const resp = await safeFetch(parsedUrl)
     if (!resp.ok) return res.status(400).json({ error: `La página respondió HTTP ${resp.status}` })
     const html = await resp.text()
 
@@ -572,11 +684,8 @@ adminRouter.get('/report/weekly.json', requireAdmin, withCompany, async (req, re
   res.json(await buildReportData(req.company.id, parseInt(req.query.days) || 7))
 })
 
-adminRouter.get('/report/weekly.pdf', async (req, res) => {
-  if (req.query.pw !== process.env.ADMIN_PASSWORD) return res.status(401).send('No autorizado')
-  const companyId = req.query.companyId || req.query.slug || 'default'
-  const company = getCompany(companyId)
-  if (!company) return res.status(404).send('Empresa no encontrada')
+adminRouter.get('/report/weekly.pdf', requireAdmin, withCompany, async (req, res) => {
+  const company = req.company
   const days = parseInt(req.query.days) || 7
   const data = await buildReportData(company.id, days)
   const doc = new PDFDocument({ margin: 50, size: 'A4' })
@@ -759,13 +868,30 @@ adminRouter.get('/campaigns/stats', requireAdmin, withCompany, (req, res) => {
   } catch(e) { res.json({ rows: [], total: 0 }) }
 })
 
-// GHL webhook — appointment created/deleted (no auth, public)
+// Optional HMAC check on top of the path token, gated behind a per-company
+// `webhookSigningSecret` in config. When unset (the default for every
+// existing company), behavior is unchanged — path-token-only auth.
+// Note: verifies against JSON.stringify(req.body) rather than the exact raw
+// bytes (the body is already parsed by the global express.json() middleware
+// by the time it reaches here), so the sender must serialize the payload
+// the same way. Good enough for an opt-in feature; a byte-exact raw-body
+// check would require moving these routes ahead of the global JSON parser.
+function verifyOptionalWebhookSignature(req, cfg) {
+  if (!cfg.webhookSigningSecret) return true
+  const sig = req.headers['x-webhook-signature'] || ''
+  const expected = crypto.createHmac('sha256', cfg.webhookSigningSecret).update(JSON.stringify(req.body || {})).digest('hex')
+  const a = Buffer.from(String(sig)), b = Buffer.from(expected)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+// GHL webhook — appointment created/deleted (path-token auth; optional HMAC — see above)
 adminRouter.post('/webhooks/ghl/:token', async (req, res) => {
   res.json({ ok: true })
   const company = getCompanyByToken(req.params.token)
   if (!company) return
   const cfg = loadConfig(company.id)
   if (!cfg.ghl?.api_key) return
+  if (!verifyOptionalWebhookSignature(req, cfg)) { console.warn('[ghl-webhook] invalid signature for company', company.id); return }
   const { type, appointment } = req.body || {}
   if (!appointment?.contactId || !appointment?.id) return
   try {
@@ -826,7 +952,7 @@ adminRouter.get('/square/status', requireAdmin, withCompany, async (req, res) =>
 adminRouter.get('/square/connect', requireAdmin, withCompany, async (req, res) => {
   const { hasCredentials, getOAuthUrl } = await import('../services/square.js')
   if (!hasCredentials()) return res.status(503).json({ error: 'Faltan SQUARE_APP_ID / SQUARE_APP_SECRET en el servidor' })
-  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  const state = signState({ cid: req.company.id })
   res.redirect(getOAuthUrl(state))
 })
 
@@ -834,7 +960,9 @@ adminRouter.get('/square/callback', async (req, res) => {
   const { code, state, error } = req.query
   if (error) return res.redirect('/admin?msg=square_denied')
   try {
-    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const parsed = verifyState(state)
+    if (!parsed) return res.redirect('/admin?msg=square_error')
+    const { cid } = parsed
     const { exchangeCode } = await import('../services/square.js')
     const tokens = await exchangeCode(code)
     const cfg = loadConfig(cid)
@@ -872,7 +1000,7 @@ adminRouter.get('/google-calendar/status', requireAdmin, withCompany, async (req
 adminRouter.get('/google-calendar/connect', requireAdmin, withCompany, async (req, res) => {
   const { hasCredentials, getOAuthUrl } = await import('../services/google-calendar.js')
   if (!hasCredentials()) return res.status(503).json({ error: 'Faltan GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET en el servidor' })
-  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  const state = signState({ cid: req.company.id })
   res.redirect(getOAuthUrl(state))
 })
 
@@ -880,7 +1008,9 @@ adminRouter.get('/google-calendar/callback', async (req, res) => {
   const { code, state, error } = req.query
   if (error) return res.redirect('/admin?msg=google_denied')
   try {
-    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const parsed = verifyState(state)
+    if (!parsed) return res.redirect('/admin?msg=google_error')
+    const { cid } = parsed
     const { exchangeCode } = await import('../services/google-calendar.js')
     const tokens = await exchangeCode(code)
     const cfg = loadConfig(cid)
@@ -933,7 +1063,7 @@ adminRouter.get('/qbo/status', requireAdmin, withCompany, async (req, res) => {
 adminRouter.get('/qbo/connect', requireAdmin, withCompany, async (req, res) => {
   const { hasCredentials, getOAuthUrl } = await import('../services/qbo.js')
   if (!hasCredentials()) return res.status(503).json({ error: 'Faltan QBO_CLIENT_ID / QBO_CLIENT_SECRET en el servidor' })
-  const state = Buffer.from(JSON.stringify({ cid: req.company.id, ts: Date.now() })).toString('base64url')
+  const state = signState({ cid: req.company.id })
   res.redirect(getOAuthUrl(state))
 })
 
@@ -941,7 +1071,9 @@ adminRouter.get('/qbo/callback', async (req, res) => {
   const { code, state, realmId, error } = req.query
   if (error) return res.redirect('/admin?msg=qbo_denied')
   try {
-    const { cid } = JSON.parse(Buffer.from(state, 'base64url').toString())
+    const parsed = verifyState(state)
+    if (!parsed) return res.redirect('/admin?msg=qbo_error')
+    const { cid } = parsed
     const { exchangeCode, getCustomers } = await import('../services/qbo.js')
     const tokens = await exchangeCode(code)
     const cfg = loadConfig(cid)
@@ -976,6 +1108,7 @@ adminRouter.post('/webhooks/generic/:token', async (req, res) => {
   const company = getCompanyByToken(req.params.token)
   if (!company) return
   const cfg = loadConfig(company.id)
+  if (!verifyOptionalWebhookSignature(req, cfg)) { console.warn('[generic-webhook] invalid signature for company', company.id); return }
   const body = req.body || {}
 
   // Flexible field extraction — handles multiple payload shapes

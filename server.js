@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -22,6 +23,13 @@ const app = express();
 const assetsDir = path.join(__dirname, 'data', 'assets');
 if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
 app.use('/assets', express.static(assetsDir, { maxAge: '1h' }));
+
+// Webhook routes that verify an HMAC signature over the raw request body
+// MUST be reached before the global express.json() parser below — once a
+// body-parser has consumed the body, a later express.raw() on these routes
+// becomes a no-op and signature verification always fails (see CN-019).
+app.use('/api/commerce/webhooks', webhookRouter);
+app.use('/api/billing/stripe/webhook', express.raw({ type: 'application/json' }));
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -61,9 +69,25 @@ db.exec(`CREATE TABLE IF NOT EXISTS users (
 applyCommerceSchema(db);
 
 // ============================================================
+// RATE LIMITING
+// ============================================================
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Demasiados intentos, intenta de nuevo más tarde' }
+});
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Demasiadas solicitudes, intenta de nuevo en un momento' }
+});
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/chat', chatLimiter);
+
+// ============================================================
 // MOUNT ROUTERS
 // ============================================================
-app.use('/api/commerce/webhooks', webhookRouter);
+// (webhookRouter and the Stripe webhook path are mounted earlier, ahead of express.json())
 app.use('/api/commerce', commerceRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api', adminRouter);
@@ -520,8 +544,19 @@ app.get('/demo/:token', (req, res) => {
   const c = getCompanyByToken(req.params.token);
   if (!c) return res.status(404).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8;background:#0B0F14;padding:40px">Demo no encontrada</h1><style>body{background:#0B0F14;margin:0}</style>');
   if (!c.active) return res.status(403).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8">Demo desactivada</h1>');
-  if (c.expires_at && Date.now() > c.expires_at) return res.status(403).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8">Demo expirada</h1>');
+  if (c.expires_at && Date.now() > c.expires_at) {
+    if (c.demo) return res.status(403).send('<h1 style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8">Demo expirada</h1>');
+    return res.status(403).send('<div style="font-family:sans-serif;text-align:center;margin-top:80px;color:#9FB0C8;background:#0B0F14;min-height:100vh;padding:40px 20px"><h1 style="font-size:22px">Tu enlace ha expirado</h1><p style="font-size:15px;margin-top:12px">Si quieres que sea reactivado, por favor envía un email a <a href="mailto:hello@lynkro.io" style="color:#27F59B;text-decoration:none">hello@lynkro.io</a></p></div><style>body{background:#0B0F14;margin:0}</style>');
+  }
   res.sendFile(path.join(__dirname, 'public', 'demo.html'));
+});
+
+// Centralized error handler — must be registered last. Prevents stack
+// traces / internal paths from leaking to clients on any unhandled route error.
+app.use((err, req, res, next) => {
+  console.error('[unhandled-error]', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;

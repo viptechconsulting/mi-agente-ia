@@ -1,5 +1,11 @@
+import { timingSafeEqual } from 'crypto'
+
 export function verifyGHLSignature(headerSecret, expectedSecret) {
-  return headerSecret === expectedSecret
+  if (!expectedSecret) return false // never accept when no secret is configured
+  const a = Buffer.from(String(headerSecret || ''))
+  const b = Buffer.from(String(expectedSecret))
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
 }
 
 export function extractEmailFromGHLPayload(payload) {

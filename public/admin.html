@@ -2632,13 +2632,21 @@ async function _doLogin(pw, email) {
  render();
 }
 
-function login() {
+async function login() {
  const pw = document.getElementById('pw').value;
  const email = (document.getElementById('adminEmail')?.value || '').trim();
- _doLogin(pw, email).catch(() => toast('Email o contraseña incorrectos'));
+ try {
+  const { token } = await fetch('/api/auth/login', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({ password: pw, email })
+  }).then(r => { if (!r.ok) throw new Error('auth'); return r.json(); });
+  await _doLogin(token, email);
+ } catch (e) { toast('Email o contraseña incorrectos'); }
 }
 
 function logout() {
+ fetch('/api/auth/logout', { method: 'POST', headers: { 'x-admin-password': password } }).catch(() => {});
  sessionStorage.removeItem('ai_pw');
  sessionStorage.removeItem('ai_email');
  sessionStorage.removeItem('ai_active_company');
@@ -2929,7 +2937,7 @@ function updateHandoffSlider() {
 
 function downloadReport() {
  const days = document.getElementById('reportDays').value;
- window.open(`/api/report/weekly.pdf?days=${days}&pw=${encodeURIComponent(password)}`, '_blank');
+ window.open(`/api/report/weekly.pdf?days=${days}&adminPassword=${encodeURIComponent(password)}&adminEmail=${encodeURIComponent(adminEmail)}`, '_blank');
 }
 
 function previewReport() {
@@ -4877,10 +4885,11 @@ async function loadAnalytics() {
     set('an-rate', data.conversion_rate)
     const topList = document.getElementById('top-products-list')
     if (topList && data.top_products?.length) {
+      const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
       topList.innerHTML = data.top_products.map(p =>
         `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #1a1a1a;max-width:480px;gap:12px">
-          <span style="color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.title}</span>
-          <span style="color:#22c55e;font-weight:700;font-size:13px;white-space:nowrap">${p.currency || 'USD'} ${Number(p.price).toLocaleString()}</span>
+          <span style="color:#ccc;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(p.title)}</span>
+          <span style="color:#22c55e;font-weight:700;font-size:13px;white-space:nowrap">${escH(p.currency || 'USD')} ${Number(p.price).toLocaleString()}</span>
           <span style="color:#888;white-space:nowrap">${p.count}× · <span style="color:${p.stock_status==='instock'?'#22c55e':'#ef4444'}">${p.stock_status==='instock'?'✓':'✗'}</span></span>
          </div>`
       ).join('')
