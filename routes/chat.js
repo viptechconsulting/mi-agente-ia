@@ -1,6 +1,7 @@
 import express from 'express'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 import crypto from 'crypto'
 import QRCode from 'qrcode'
 import nodemailer from 'nodemailer'
@@ -939,6 +940,57 @@ function getWaConn(companyId) {
 }
 
 // ============================================================
+// WA SESSION LOCK — Signal Protocol sessions get corrupted (Bad MAC on
+// specific contacts, silently dropped messages) if two processes ever
+// hold a live Baileys socket for the same company's WhatsApp at once.
+// This happens for real: `docker service update` doesn't stop the old
+// Swarm task the instant the new one starts, so both auto-start every
+// company's WhatsApp on boot and briefly race for the same session
+// (confirmed root cause of the 2026-07-13/16 corruption incidents).
+// waConnections is per-process memory, so it can't prevent this on its
+// own — this lock lives in the shared SQLite DB (same volume both
+// containers mount) so it works across container instances, not just
+// within one process. Whoever holds a live (non-stale) lock for a
+// companyId is the only process allowed to open that socket.
+// ============================================================
+const WA_LOCK_HOLDER = `${os.hostname()}:${process.pid}`
+const WA_LOCK_STALE_MS = 90 * 1000 // ~3 missed heartbeats (health check runs every 30s)
+
+function waLockKey(companyId) { return `wa_lock:${companyId}` }
+
+// Atomic acquire-or-renew: succeeds if no lock exists, if we already hold
+// it (renew), or if the existing holder's heartbeat is stale (assume
+// dead/replaced). `changes > 0` tells us whether we actually got it —
+// this single UPSERT is the only place the decision is made, so there's
+// no read-then-write race window between two processes.
+function tryAcquireWaLock(companyId) {
+  const now = Date.now()
+  const value = JSON.stringify({ holder: WA_LOCK_HOLDER, heartbeatAt: now })
+  const result = db.prepare(`
+    INSERT INTO server_config (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    WHERE json_extract(server_config.value, '$.holder') = ?
+       OR json_extract(server_config.value, '$.heartbeatAt') < ?
+  `).run(waLockKey(companyId), value, WA_LOCK_HOLDER, now - WA_LOCK_STALE_MS)
+  return result.changes > 0
+}
+
+function releaseWaLock(companyId) {
+  db.prepare(`DELETE FROM server_config WHERE key = ? AND json_extract(value, '$.holder') = ?`)
+    .run(waLockKey(companyId), WA_LOCK_HOLDER)
+}
+
+// Release every lock this process holds on graceful shutdown (Swarm sends
+// SIGTERM before SIGKILL on every deploy) so the replacement task can grab
+// WhatsApp immediately instead of waiting out WA_LOCK_STALE_MS with nobody
+// connected. Registering this listener suppresses Node's default
+// terminate-on-SIGTERM behavior, so it must call process.exit() itself.
+process.on('SIGTERM', () => {
+  for (const companyId of waConnections.keys()) releaseWaLock(companyId)
+  process.exit(0)
+})
+
+// ============================================================
 // DECRYPT FAILURE ALERT — libsignal drops undecryptable WhatsApp messages
 // silently (no reply attempted, nothing saved to DB). Notify admin so a
 // lost message doesn't go unnoticed like the 2026-07-15/16 incident.
@@ -1024,6 +1076,10 @@ sendCriticalAlert(
 
 export async function startBuiltinWhatsApp(companyId) {
   const conn = getWaConn(companyId)
+  if (!tryAcquireWaLock(companyId)) {
+    console.log(`[WA:${companyId}] No se inicia: otro proceso ya tiene la sesión activa (lock ocupado) — se reintentará solo si ese lock queda obsoleto`)
+    return
+  }
   const authDir = path.join(waBaseDir, companyId)
   try {
     fs.mkdirSync(authDir, { recursive: true })
@@ -1062,6 +1118,7 @@ export async function startBuiltinWhatsApp(companyId) {
         conn.state = { status: loggedOut ? 'logged_out' : 'disconnected', qr: null, phone: null }
         conn._stateSince = Date.now()
         console.log(`[WA:${companyId}] Desconectado código:${code} reintento:${!loggedOut}`)
+        if (loggedOut) releaseWaLock(companyId) // done with this company on this process — let a fresh login (or another process) take the lock immediately
         if (!loggedOut) setTimeout(() => startBuiltinWhatsApp(companyId), 5000)
       }
     })
@@ -1217,9 +1274,25 @@ function checkWaStuckReconnect(companyId, conn) {
 
 setInterval(() => {
   for (const [companyId, conn] of waConnections) {
+    if (conn.state?.status === 'logged_out') continue
+    tryAcquireWaLock(companyId) // renew heartbeat so another process can't mistake us for dead
     checkWaConnHealth(companyId, conn).catch(err => console.error(`[WA:${companyId}] Error en health check:`, err.message))
     checkWaStuckReconnect(companyId, conn)
   }
+  // Retry companies whose lock was held by someone else last time we tried
+  // (e.g. the old task during a deploy overlap) — once that lock goes
+  // stale, this is what actually recovers the connection, since nothing
+  // else calls startBuiltinWhatsApp again for a company that never got
+  // a socket in the first place.
+  try {
+    if (fs.existsSync(waBaseDir)) {
+      for (const cid of fs.readdirSync(waBaseDir)) {
+        if (!fs.existsSync(path.join(waBaseDir, cid, 'creds.json'))) continue
+        const conn = waConnections.get(cid)
+        if (!conn || !conn.sock) startBuiltinWhatsApp(cid).catch(err => console.error(`[WA:${cid}] Error reintentando arranque:`, err.message))
+      }
+    }
+  } catch {}
 }, WA_HEALTH_CHECK_INTERVAL_MS)
 
 // Auto-start companies that have saved auth
