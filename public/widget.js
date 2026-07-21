@@ -49,8 +49,25 @@
     userBubbleColor: '#0ea5e9',
     widgetPosition: 'right',
     logoUrl: '', avatarUrl: '',
-    quickReplies: []
+    quickReplies: [],
+    language: 'español'
   };
+
+  // ── UI language (from Personalidad → Idioma por defecto) ───────
+  const I18N = {
+    'español':   { openChat: 'Abrir chat', online: '● En línea', placeholder: 'Escribe un mensaje...', send: 'Enviar', welcome: '¡Hola! ¿En qué te puedo ayudar?', error: 'Hubo un error, intenta de nuevo.', handoff: 'En un momento te atendemos. 🙂', connError: 'No pude conectarme. Revisa tu conexión.' },
+    'inglés':    { openChat: 'Open chat', online: '● Online', placeholder: 'Type a message...', send: 'Send', welcome: 'Hi! How can I help you today?', error: 'Something went wrong, please try again.', handoff: "We'll be with you in a moment. 🙂", connError: "Couldn't connect. Please check your connection." },
+    'portugués': { openChat: 'Abrir chat', online: '● Online', placeholder: 'Digite uma mensagem...', send: 'Enviar', welcome: 'Olá! Como posso ajudar?', error: 'Ocorreu um erro, tente novamente.', handoff: 'Em um momento te atenderemos. 🙂', connError: 'Não foi possível conectar. Verifique sua conexão.' },
+    'francés':   { openChat: 'Ouvrir le chat', online: '● En ligne', placeholder: 'Écrivez un message...', send: 'Envoyer', welcome: 'Bonjour ! Comment puis-je vous aider ?', error: "Une erreur s'est produite, veuillez réessayer.", handoff: 'Nous serons avec vous dans un instant. 🙂', connError: 'Connexion impossible. Vérifiez votre connexion.' },
+    'hebreo':    { openChat: 'פתח צ׳אט', online: '● מחובר', placeholder: 'הקלד הודעה...', send: 'שלח', welcome: 'שלום! איך אפשר לעזור?', error: 'אירעה שגיאה, נסה שוב.', handoff: 'נהיה איתך בעוד רגע. 🙂', connError: 'לא ניתן להתחבר. בדוק את החיבור שלך.', rtl: true },
+    'italiano':  { openChat: 'Apri chat', online: '● Online', placeholder: 'Scrivi un messaggio...', send: 'Invia', welcome: 'Ciao! Come posso aiutarti?', error: 'Si è verificato un errore, riprova.', handoff: 'Ti risponderemo a breve. 🙂', connError: 'Impossibile connettersi. Controlla la tua connessione.' },
+    'alemán':    { openChat: 'Chat öffnen', online: '● Online', placeholder: 'Nachricht schreiben...', send: 'Senden', welcome: 'Hallo! Wie kann ich dir helfen?', error: 'Es ist ein Fehler aufgetreten, bitte versuche es erneut.', handoff: 'Wir sind gleich für dich da. 🙂', connError: 'Verbindung fehlgeschlagen. Bitte überprüfe deine Verbindung.' }
+  };
+  function t() { return I18N[cfg.language] || I18N['español']; }
+  function pickWelcome() {
+    if (cfg.language === 'inglés' && cfg.welcomeMessageEn) return cfg.welcomeMessageEn;
+    return cfg.welcomeMessage || t().welcome;
+  }
 
   // ── Inject styles ───────────────────────────────────────────
   const style = document.createElement('style');
@@ -107,6 +124,10 @@
       border-bottom-right-radius:4px}
     .ai-bubble.bot{align-self:flex-start;background:#fff;color:#111;
       border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .ai-cta-btn{display:inline-block;margin-top:8px;padding:9px 16px;
+      background:var(--ai-accent,#0ea5e9);color:#fff;border-radius:20px;
+      font-size:13px;font-weight:600;text-decoration:none;align-self:flex-start}
+    .ai-cta-btn:hover{opacity:.9}
     .ai-row{display:flex;align-items:flex-end;gap:6px;align-self:flex-start;max-width:100%}
     .ai-row-av{width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0}
     .ai-row-av-def{width:26px;height:26px;border-radius:50%;background:var(--ai-accent,#0ea5e9);
@@ -200,6 +221,13 @@
     greeting.className = side === 'left' ? 'left' : '';
     if (side === 'left') { launcher.style.left = '24px'; launcher.style.right = 'auto'; }
     else { launcher.style.right = '24px'; launcher.style.left = 'auto'; }
+    const i18n = t();
+    launcher.setAttribute('aria-label', i18n.openChat);
+    document.querySelector('.ai-head-status').textContent = i18n.online;
+    inputEl.setAttribute('placeholder', i18n.placeholder);
+    sendBtn.setAttribute('aria-label', i18n.send);
+    panel.setAttribute('dir', i18n.rtl ? 'rtl' : 'ltr');
+    greeting.setAttribute('dir', i18n.rtl ? 'rtl' : 'ltr');
     document.getElementById('ai-head-name').textContent = cfg.businessName || 'Asistente';
     if (cfg.avatarUrl) {
       const src = cfg.avatarUrl.startsWith('http') ? cfg.avatarUrl : API + cfg.avatarUrl;
@@ -217,7 +245,7 @@
     return esc.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">$1</a>');
   }
 
-  function addBubble(role, text) {
+  function addBubble(role, text, button) {
     const avatarSrc = cfg.avatarUrl ? (cfg.avatarUrl.startsWith('http') ? cfg.avatarUrl : API + cfg.avatarUrl) : '';
     if (role === 'bot') {
       const row = document.createElement('div');
@@ -227,7 +255,18 @@
       } else {
         row.innerHTML = `<div class="ai-row-av-def"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z"/></svg></div><div class="ai-bubble bot"></div>`;
       }
-      row.querySelector('.ai-bubble').innerHTML = linkify(text);
+      const bubble = row.querySelector('.ai-bubble');
+      bubble.innerHTML = linkify(text);
+      if (button && button.url) {
+        const a = document.createElement('a');
+        a.className = 'ai-cta-btn';
+        a.href = button.url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = button.label || button.url;
+        bubble.appendChild(document.createElement('br'));
+        bubble.appendChild(a);
+      }
       msgsEl.appendChild(row);
     } else {
       const el = document.createElement('div');
@@ -269,7 +308,7 @@
     greeting.style.display = 'none';
     badge.classList.remove('show');
     if (!msgsEl.children.length) {
-      addBubble('bot', cfg.welcomeMessage || '¡Hola! ¿En qué te puedo ayudar?');
+      addBubble('bot', pickWelcome());
       renderQuickReplies();
     }
     setTimeout(() => inputEl.focus(), 200);
@@ -288,7 +327,7 @@
     setTimeout(() => {
       if (isOpen || greetingShown) return;
       greetingShown = true;
-      document.getElementById('ai-gtext').textContent = cfg.welcomeMessage || '¡Hola! ¿En qué te puedo ayudar?';
+      document.getElementById('ai-gtext').textContent = pickWelcome();
       greeting.style.display = 'block';
       badge.classList.add('show');
       greeting.addEventListener('click', e => {
@@ -327,22 +366,22 @@
       });
       const data = await r.json();
       typing.remove();
-      if (data.error) addBubble('bot', 'Hubo un error, intenta de nuevo.');
+      if (data.error) addBubble('bot', t().error);
       else {
         conversationId = data.conversationId;
         sessionStorage.setItem('ai_conv_id', conversationId);
         lastMessageAt = Date.now();
         if (data.reply) {
-          addBubble('bot', data.reply);
+          addBubble('bot', data.reply, data.button);
           if (!isOpen) badge.classList.add('show');
         } else {
-          addBubble('bot', 'En un momento te atendemos. 🙂');
+          addBubble('bot', t().handoff);
         }
         startPolling();
       }
     } catch {
       typing.remove();
-      addBubble('bot', 'No pude conectarme. Revisa tu conexión.');
+      addBubble('bot', t().connError);
     }
     sendBtn.disabled = false;
     inputEl.disabled = false;
