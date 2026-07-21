@@ -1,8 +1,20 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { matchKeywordTrigger } from '../services/keyword-trigger.js'
+import crypto from 'crypto'
+import { db } from '../db.js'
+import {
+  matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow
+} from '../services/keyword-trigger.js'
 
 function cfgWith(triggers) { return { keywordTriggers: triggers } }
+
+function makeConversation() {
+  const id = crypto.randomUUID()
+  const now = Date.now()
+  db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, 'test-visitor', 'web', now, now, 'test-company')
+  return id
+}
 
 describe('matchKeywordTrigger', () => {
   test('matchType contains: coincide si la palabra aparece en cualquier parte', () => {
@@ -51,5 +63,42 @@ describe('matchKeywordTrigger', () => {
     const result = matchKeywordTrigger(cfg, 'cuál es el precio')
     assert.equal(result.index, 1)
     assert.equal(result.trigger.response, 'b')
+  })
+})
+
+describe('keyword trigger flow state', () => {
+  test('sin flujo activo, getActiveTriggerFlow retorna null', () => {
+    const convId = makeConversation()
+    assert.equal(getActiveTriggerFlow(convId), null)
+  })
+
+  test('startTriggerFlow guarda triggerIndex y arranca en step 1', () => {
+    const convId = makeConversation()
+    startTriggerFlow(convId, 2)
+    assert.deepEqual(getActiveTriggerFlow(convId), { triggerIndex: 2, step: 1 })
+  })
+
+  test('advanceTriggerFlow avanza el step sin tocar triggerIndex', () => {
+    const convId = makeConversation()
+    startTriggerFlow(convId, 0)
+    advanceTriggerFlow(convId, 2)
+    assert.deepEqual(getActiveTriggerFlow(convId), { triggerIndex: 0, step: 2 })
+  })
+
+  test('clearTriggerFlow borra el estado', () => {
+    const convId = makeConversation()
+    startTriggerFlow(convId, 0)
+    clearTriggerFlow(convId)
+    assert.equal(getActiveTriggerFlow(convId), null)
+  })
+
+  test('convive con flow_state usado por otra feature sin pisarlo (namespace leadQuali)', () => {
+    const convId = makeConversation()
+    db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify({ leadQuali: { current_state: 'OPENING' } }), convId)
+    startTriggerFlow(convId, 0)
+    const row = db.prepare('SELECT flow_state FROM conversations WHERE id = ?').get(convId)
+    const blob = JSON.parse(row.flow_state)
+    assert.deepEqual(blob.leadQuali, { current_state: 'OPENING' })
+    assert.deepEqual(blob.keywordTrigger, { triggerIndex: 0, step: 1 })
   })
 })

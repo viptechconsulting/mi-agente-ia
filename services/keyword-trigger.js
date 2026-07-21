@@ -1,3 +1,5 @@
+import { db } from '../db.js'
+
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -17,4 +19,41 @@ export function matchKeywordTrigger(cfg, text) {
     }
   }
   return null
+}
+
+function parseFlowState(raw) {
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return {} }
+}
+
+function loadFlowBlob(conversationId) {
+  const row = db.prepare('SELECT flow_state FROM conversations WHERE id = ?').get(conversationId)
+  return parseFlowState(row?.flow_state)
+}
+
+function saveFlowBlob(conversationId, blob) {
+  db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(blob), conversationId)
+}
+
+export function getActiveTriggerFlow(conversationId) {
+  return loadFlowBlob(conversationId).keywordTrigger || null
+}
+
+export function startTriggerFlow(conversationId, triggerIndex) {
+  const blob = loadFlowBlob(conversationId)
+  blob.keywordTrigger = { triggerIndex, step: 1 }
+  saveFlowBlob(conversationId, blob)
+}
+
+export function advanceTriggerFlow(conversationId, nextStep) {
+  const blob = loadFlowBlob(conversationId)
+  if (!blob.keywordTrigger) return
+  blob.keywordTrigger.step = nextStep
+  saveFlowBlob(conversationId, blob)
+}
+
+export function clearTriggerFlow(conversationId) {
+  const blob = loadFlowBlob(conversationId)
+  delete blob.keywordTrigger
+  saveFlowBlob(conversationId, blob)
 }
