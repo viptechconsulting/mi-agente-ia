@@ -14,6 +14,7 @@ import {
   listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
 } from '../db.js'
 import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
+import { matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow } from '../services/keyword-trigger.js'
 import { getServices, searchAvailability, createBooking, getLocations } from '../services/square.js'
 import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/medspa-response-schema.js'
 import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
@@ -458,6 +459,36 @@ export async function processMessage({ companyId, message, conversationId, visit
 
   // Human takeover — skip AI
   if (conv.human_mode) return { reply: null, conversationId: convId }
+
+  // Keyword triggers — deterministic match/flow, bypasses the LLM entirely
+  const activeFlow = getActiveTriggerFlow(convId)
+  if (activeFlow) {
+    const t = cfg.keywordTriggers?.[activeFlow.triggerIndex]
+    const steps = t?.steps || []
+    const stepMsg = steps[activeFlow.step]
+    if (stepMsg) {
+      if (activeFlow.step >= steps.length - 1) clearTriggerFlow(convId)
+      else advanceTriggerFlow(convId, activeFlow.step + 1)
+      const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', stepMsg.message, Date.now())
+      return { conversationId: convId, reply: stepMsg.message, button: null, messageId: info.lastInsertRowid }
+    }
+    clearTriggerFlow(convId) // el activador fue editado/borrado mientras el flujo estaba en curso
+  } else {
+    const match = matchKeywordTrigger(cfg, message)
+    if (match) {
+      const { trigger, index } = match
+      if (trigger.type === 'flow' && trigger.steps?.length) {
+        startTriggerFlow(convId, index)
+        const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', trigger.steps[0].message, Date.now())
+        return { conversationId: convId, reply: trigger.steps[0].message, button: null, messageId: info.lastInsertRowid }
+      }
+      if (trigger.response) {
+        const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', trigger.response, Date.now())
+        return { conversationId: convId, reply: trigger.response, button: trigger.button || null, messageId: info.lastInsertRowid }
+      }
+    }
+  }
+
   let newLead = false
   if (contacts.emails[0] && !conv.lead_email) {
     db.prepare('UPDATE conversations SET lead_email = ? WHERE id = ?').run(contacts.emails[0], convId)
@@ -924,7 +955,7 @@ export async function processMessage({ companyId, message, conversationId, visit
       setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId, companyId }))
     }
   }
-  return { conversationId: convId, reply, messageId: info.lastInsertRowid }
+  return { conversationId: convId, reply, button: null, messageId: info.lastInsertRowid }
 }
 
 // ============================================================
