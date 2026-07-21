@@ -92,6 +92,12 @@ describe('keyword trigger flow state', () => {
     assert.equal(getActiveTriggerFlow(convId), null)
   })
 
+  test('advanceTriggerFlow on non-existent flow is a no-op', () => {
+    const convId = makeConversation()
+    advanceTriggerFlow(convId, 5) // Should not throw or persist anything
+    assert.equal(getActiveTriggerFlow(convId), null)
+  })
+
   test('convive con flow_state usado por otra feature sin pisarlo (namespace leadQuali)', () => {
     const convId = makeConversation()
     db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify({ leadQuali: { current_state: 'OPENING' } }), convId)
