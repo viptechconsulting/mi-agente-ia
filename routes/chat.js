@@ -1229,7 +1229,12 @@ export async function startBuiltinWhatsApp(companyId) {
 
         try {
           const result = await processMessage({ companyId, message: text.trim(), visitorId, channel: 'whatsapp' })
-          if (result?.reply) await sock.sendMessage(remoteJid, { text: result.reply })
+          if (result?.reply) {
+            const waText = result.button
+              ? `${result.reply}\n\n👉 *${result.button.label}*\n${result.button.url}`
+              : result.reply
+            await sock.sendMessage(remoteJid, { text: waText })
+          }
         } catch (err) {
           console.error(`[WA:${companyId}] Error:`, err.message)
           sendCriticalAlert(
