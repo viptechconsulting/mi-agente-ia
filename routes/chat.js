@@ -359,6 +359,32 @@ export async function sendInstagram(accessToken, recipientId, text) {
   if (d.error) console.error('[Instagram send]', d.error.message)
 }
 
+// Keyword-trigger button on Instagram via Meta's official "button template".
+// Falls back to plain text (link inline) if the template call fails, so a
+// customer never ends up with no reply because of a button-API error.
+export async function sendInstagramButton(accessToken, recipientId, text, button) {
+  if (!accessToken || !recipientId) return
+  if (!button?.url || !button?.label) return sendInstagram(accessToken, recipientId, text)
+  const r = await fetch(`https://graph.instagram.com/v21.0/me/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      messaging_type: 'RESPONSE',
+      message: { attachment: { type: 'template', payload: {
+        template_type: 'button',
+        text,
+        buttons: [{ type: 'web_url', url: button.url, title: String(button.label).slice(0, 20) }]
+      } } }
+    })
+  })
+  const d = await r.json().catch(() => ({}))
+  if (d.error) {
+    console.error('[Instagram button send]', d.error.message)
+    await sendInstagram(accessToken, recipientId, `${text}\n\n${button.label}: ${button.url}`)
+  }
+}
+
 // ============================================================
 // TWILIO SMS — dual-send alongside WhatsApp for appointment messages only
 // ============================================================
@@ -1016,7 +1042,22 @@ function releaseWaLock(companyId) {
 // WhatsApp immediately instead of waiting out WA_LOCK_STALE_MS with nobody
 // connected. Registering this listener suppresses Node's default
 // terminate-on-SIGTERM behavior, so it must call process.exit() itself.
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
+  // Close every live socket BEFORE releasing the lock. Swarm uses start-first
+  // deploys, so the replacement task is already trying to acquire this lock;
+  // if we release it while our WebSocket is still draining, both processes
+  // briefly hold a live socket on the same device → 440 conflict storm that can
+  // crash the new task (observed 2026-07-22). Ending the socket first and
+  // waiting for it to actually close means the new task only connects once the
+  // device is genuinely free. sock.end() closes the WS WITHOUT logging out
+  // (unlike sock.logout()), so no QR re-link is needed.
+  try {
+    for (const conn of waConnections.values()) {
+      try { conn.sock?.end(undefined) } catch {}
+    }
+    // Let the WS close frames flush — bounded well under Swarm's ~10s stop grace.
+    await new Promise(r => setTimeout(r, 3000))
+  } catch {}
   for (const companyId of waConnections.keys()) releaseWaLock(companyId)
   process.exit(0)
 })
@@ -1105,6 +1146,90 @@ sendCriticalAlert(
   'Mensaje de prueba automático para confirmar que las alertas críticas (WhatsApp + email) funcionan tras este despliegue. Si ves esto, el canal funciona.'
 ).catch(err => _origConsoleError('[CriticalAlert] Diagnóstico de arranque falló:', err?.message))
 
+// ============================================================
+// CRASH GUARD — Baileys throws uncaught errors during connection churn
+// (e.g. a query 'Timed Out' Boom during a 440-conflict storm on deploy,
+// observed 2026-07-22) that would otherwise kill PID 1 and drop WhatsApp
+// for ~90s until a replacement task waits out the lock staleness. These are
+// transient socket/protocol errors — log them but keep the process alive;
+// the existing reconnect logic recovers. Only truly unknown errors are
+// allowed to bring the process down (Swarm then restarts it cleanly).
+// ============================================================
+function isRecoverableWaError(err) {
+  const msg = (err && (err.message || String(err))) || ''
+  const code = err?.output?.statusCode ?? err?.statusCode
+  return /Timed Out|Connection Closed|Connection Terminated|conflict|Stream Errored|rate-overlimit|not-authorized|Bad MAC|decrypt/i.test(msg)
+    || [DisconnectReason.timedOut, DisconnectReason.connectionClosed, DisconnectReason.connectionLost, 440, 428, 515].includes(code)
+}
+process.on('unhandledRejection', (reason) => {
+  _origConsoleError('[CrashGuard] unhandledRejection:', reason?.message || reason)
+})
+process.on('uncaughtException', (err) => {
+  _origConsoleError('[CrashGuard] uncaughtException:', err?.message || err)
+  if (!isRecoverableWaError(err)) {
+    sendCriticalAlert('Excepción no capturada en el servidor', String(err?.stack || err?.message || err).slice(0, 600))
+      .catch(() => {})
+    setTimeout(() => process.exit(1), 1500) // let the alert flush, then let Swarm restart clean
+  }
+})
+
+// ============================================================
+// AUTO-HEAL — a WhatsApp message that fails to decrypt (Bad MAC / corrupt
+// Signal session) arrives as a CIPHERTEXT stub with no content and is dropped
+// silently. Baileys' own sendRetryRequest handles transient cases, but a
+// PERMANENTLY corrupt session keeps failing every retry forever (the exact
+// symptom behind the 2026-06/07 lost-lead incidents). Track decrypt failures
+// per contact; once one crosses the threshold, delete that contact's session
+// (cache + disk via the cacheable keystore) so their NEXT message re-negotiates
+// a fresh session from scratch — no human, no QR, no restart.
+// ============================================================
+const WA_BADMAC_THRESHOLD = 3            // failures before we intervene (lets Baileys retry first)
+const WA_BADMAC_WINDOW_MS = 10 * 60 * 1000
+const WA_BADMAC_RESET_COOLDOWN_MS = 10 * 60 * 1000 // don't thrash the same contact
+const _badMacHits = new Map()            // `${companyId}:${user}` -> [timestamps]
+const _lastSessionReset = new Map()      // `${companyId}:${user}` -> ts
+
+async function resetCorruptSession(companyId, conn, remoteJid) {
+  try {
+    const user = String(remoteJid).split('@')[0].split(':')[0]
+    const authDir = path.join(waBaseDir, companyId)
+    let addrs = []
+    try {
+      addrs = fs.readdirSync(authDir)
+        .filter(f => f.startsWith(`session-${user}.`) && f.endsWith('.json'))
+        .map(f => f.slice('session-'.length, -'.json'.length))
+    } catch {}
+    if (!addrs.length) addrs = [`${user}.0`] // fallback: at least the primary device
+    if (conn._sigKeys) {
+      const del = {}
+      for (const a of addrs) del[a] = null
+      await conn._sigKeys.set({ session: del }) // evicts in-memory cache AND deletes files
+    }
+    console.log(`[WA:${companyId}] Auto-heal: sesión reseteada para ${user} (${addrs.length} addr) — re-negocia al próximo mensaje`)
+    sendCriticalAlert(
+      'Auto-reparación de sesión WhatsApp',
+      `Se detectó corrupción persistente (Bad MAC) del contacto ${user} (empresa ${companyId}). Su sesión se reseteó automáticamente; el próximo mensaje de ese contacto re-negociará una sesión nueva y debería procesarse con normalidad.`
+    ).catch(() => {})
+  } catch (err) {
+    console.log(`[WA:${companyId}] Auto-heal falló para ${remoteJid}:`, err.message)
+  }
+}
+
+function recordBadMacAndMaybeHeal(companyId, conn, remoteJid) {
+  const user = String(remoteJid).split('@')[0].split(':')[0]
+  const key = `${companyId}:${user}`
+  const now = Date.now()
+  const hits = (_badMacHits.get(key) || []).filter(t => now - t < WA_BADMAC_WINDOW_MS)
+  hits.push(now)
+  _badMacHits.set(key, hits)
+  const lastReset = _lastSessionReset.get(key) || 0
+  if (hits.length >= WA_BADMAC_THRESHOLD && now - lastReset > WA_BADMAC_RESET_COOLDOWN_MS) {
+    _lastSessionReset.set(key, now)
+    _badMacHits.set(key, [])
+    resetCorruptSession(companyId, conn, remoteJid)
+  }
+}
+
 export async function startBuiltinWhatsApp(companyId) {
   const conn = getWaConn(companyId)
   if (!tryAcquireWaLock(companyId)) {
@@ -1117,9 +1242,13 @@ export async function startBuiltinWhatsApp(companyId) {
     const { state, saveCreds } = await useMultiFileAuthState(authDir)
     const { version } = await fetchLatestBaileysVersion()
 
+    // Keep a direct reference to the cacheable signal keystore so the auto-heal
+    // path can evict a corrupted contact's session (cache + disk) on demand.
+    const sigKeys = makeCacheableSignalKeyStore(state.keys, SILENT_LOGGER)
+    conn._sigKeys = sigKeys
     const sock = makeWASocket({
       version,
-      auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, SILENT_LOGGER) },
+      auth: { creds: state.creds, keys: sigKeys },
       printQRInTerminal: false,
       logger: SILENT_LOGGER,
       browser: ['Mi Agente IA', 'Chrome', '120.0.0'],
@@ -1157,6 +1286,15 @@ export async function startBuiltinWhatsApp(companyId) {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return
       for (const msg of messages) {
+        // Auto-heal: a message that failed to decrypt (Bad MAC / corrupt session)
+        // comes through as a CIPHERTEXT stub (StubType 2) with no decrypted
+        // content — msg.message is null, so it would be skipped below. Track it
+        // per contact BEFORE that skip; persistent failures trigger a session
+        // reset so the contact's next message re-negotiates cleanly.
+        if (msg.messageStubType === 2 && msg.key?.remoteJid && !msg.key.fromMe) {
+          const badJid = msg.key.remoteJid
+          if (!badJid.endsWith('@g.us')) recordBadMacAndMaybeHeal(companyId, conn, badJid)
+        }
         if (!msg.message) continue
         const remoteJid = msg.key.remoteJid
         if (remoteJid.endsWith('@g.us')) continue
@@ -2006,7 +2144,10 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
 
       try {
         const result = await processMessage({ companyId: company.id, message: text, visitorId: `ig:${senderId}`, channel: 'instagram' })
-        if (result?.reply) await sendInstagram(cfg.igAccessToken, senderId, result.reply)
+        if (result?.reply) {
+          if (result.button) await sendInstagramButton(cfg.igAccessToken, senderId, result.reply, result.button)
+          else await sendInstagram(cfg.igAccessToken, senderId, result.reply)
+        }
       } catch (err) { console.error('[Instagram]', err.message) }
     }
   }
