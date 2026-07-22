@@ -1232,10 +1232,17 @@ function recordBadMacAndMaybeHeal(companyId, conn, remoteJid) {
 
 export async function startBuiltinWhatsApp(companyId) {
   const conn = getWaConn(companyId)
+  // Reentry guard: the 30s watchdog (checkWaStuckReconnect) and the retry loop
+  // can both call this for the same company in the same tick. conn.sock isn't
+  // assigned until after two awaits below, so both would pass a `!conn.sock`
+  // check and create a SECOND live socket — two sockets on one session fight
+  // forever over a 440 conflict. The DB lock doesn't help (same holder → true).
+  if (conn._starting) return
   if (!tryAcquireWaLock(companyId)) {
     console.log(`[WA:${companyId}] No se inicia: otro proceso ya tiene la sesión activa (lock ocupado) — se reintentará solo si ese lock queda obsoleto`)
     return
   }
+  conn._starting = true
   const authDir = path.join(waBaseDir, companyId)
   try {
     fs.mkdirSync(authDir, { recursive: true })
@@ -1391,6 +1398,8 @@ export async function startBuiltinWhatsApp(companyId) {
     console.error(`[WA:${companyId}] Error iniciando:`, err.message)
     conn.state.status = 'disconnected'
     setTimeout(() => startBuiltinWhatsApp(companyId), 10000)
+  } finally {
+    conn._starting = false
   }
 }
 
@@ -1431,13 +1440,19 @@ async function checkWaConnHealth(companyId, conn) {
 
 function checkWaStuckReconnect(companyId, conn) {
   if (conn.state?.status === 'open' || conn.state?.status === 'logged_out') return
-  const stuckFor = Date.now() - (conn._stateSince || 0)
+  // A lock-blocked company at boot lands in 'waiting'/'connecting' with
+  // _stateSince never stamped. `Date.now() - 0` then reads as ~55 years, so the
+  // watchdog would force-restart immediately and spawn a duplicate socket.
+  // Stamp it now and let the next cycles measure a real age instead.
+  if (!conn._stateSince) { conn._stateSince = Date.now(); return }
+  const stuckFor = Date.now() - conn._stateSince
   if (stuckFor < WA_STUCK_THRESHOLD_MS) return
   conn._stateSince = Date.now() // reset immediately so a slow restart can't retrigger this every cycle
   console.log(`[WA:${companyId}] Atascado en estado "${conn.state?.status}" por ${Math.round(stuckFor / 1000)}s — forzando reinicio`)
   if (conn.sock) {
     try { conn.sock.end(new Error('stuck-reconnect-watchdog')) } catch (e) { console.error(`[WA:${companyId}] Error cerrando socket atascado:`, e.message) }
   } else {
+    conn._starting = false // clear any stale in-flight guard so this recovery restart isn't blocked
     // No socket was ever created for this cycle (e.g. makeWASocket() itself
     // hung) — nothing will emit a close event to trigger the normal reconnect
     // path, so this is the one case where calling startBuiltinWhatsApp
