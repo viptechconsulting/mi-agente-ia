@@ -4265,7 +4265,14 @@ function renderTriggers() {
    // Response textarea (shown when type=response)
    '<div id="tresponse_' + i + '" style="' + (isFlow ? 'display:none' : '') + '">' +
    '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Respuesta automática</label>' +
-   '<textarea style="min-height:80px" placeholder="Escribe el mensaje que se enviará cuando el lead use esta palabra..." data-ti="' + i + '" data-field="response">' + (t.response||'') + '</textarea></div>' +
+   '<textarea style="min-height:80px" placeholder="Escribe el mensaje que se enviará cuando el lead use esta palabra..." data-ti="' + i + '" data-field="response">' + (t.response||'') + '</textarea>' +
+   // Optional button with link (ManyChat-style) — response type only
+   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#aaa;margin-top:10px">' +
+   '<input type="checkbox" id="thasbtn_' + i + '" onchange="toggleTriggerButton(' + i + ')"' + (t.button ? ' checked' : '') + ' style="width:auto;margin:0"> Agregar botón con enlace</label>' +
+   '<div id="tbtnfields_' + i + '" style="margin-top:8px;gap:6px;grid-template-columns:1fr;' + (t.button ? 'display:grid' : 'display:none') + '">' +
+   '<input type="text" id="tbtnlabel_' + i + '" placeholder="Texto del botón (ej: Ver más)" value="' + String((t.button&&t.button.label)||'').replace(/"/g,'&quot;') + '" oninput="updateTriggerButton(' + i + ')">' +
+   '<input type="text" id="tbtnurl_' + i + '" placeholder="https://..." value="' + String((t.button&&t.button.url)||'').replace(/"/g,'&quot;') + '" oninput="updateTriggerButton(' + i + ')">' +
+   '</div></div>' +
 
    // Flow steps (shown when type=flow)
    '<div id="tflow_' + i + '" style="' + (!isFlow ? 'display:none' : '') + '">' +
@@ -4302,6 +4309,7 @@ function renderTriggers() {
 
 function setTriggerType(i, type) {
  config.keywordTriggers[i].type = type;
+ if (type === 'flow') config.keywordTriggers[i].button = null; // botón solo aplica a "Respuesta automática"
  document.getElementById('tresponse_' + i).style.display = type === 'flow' ? 'none' : '';
  document.getElementById('tflow_' + i).style.display = type === 'flow' ? '' : 'none';
  // Update radio label styles
@@ -4363,7 +4371,28 @@ function removeTrigger(i) {
  config.keywordTriggers.splice(i, 1);
  renderTriggers();
 }
-function saveTriggers() { save(); }
+function toggleTriggerButton(i) {
+ const on = document.getElementById('thasbtn_' + i).checked;
+ document.getElementById('tbtnfields_' + i).style.display = on ? 'grid' : 'none';
+ if (on) updateTriggerButton(i);
+ else config.keywordTriggers[i].button = null;
+}
+function updateTriggerButton(i) {
+ const label = (document.getElementById('tbtnlabel_' + i).value || '').trim();
+ const url = (document.getElementById('tbtnurl_' + i).value || '').trim();
+ config.keywordTriggers[i].button = { label: label, url: url };
+}
+function saveTriggers() {
+ const triggers = config.keywordTriggers || [];
+ for (let i = 0; i < triggers.length; i++) {
+  const t = triggers[i];
+  if (t.type !== 'flow' && t.button) {
+   if (!t.button.label || !t.button.url) { toast('El botón del activador "' + (t.label || (i+1)) + '" necesita texto y enlace'); return; }
+   if (!/^https?:\/\//i.test(t.button.url)) { toast('El enlace del botón de "' + (t.label || (i+1)) + '" debe empezar con http:// o https://'); return; }
+  }
+ }
+ save();
+}
 
 function toast(msg) {
  const t = document.getElementById('toast');
