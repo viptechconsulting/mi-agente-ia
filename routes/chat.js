@@ -332,6 +332,13 @@ async function sendNotification({ type, conversationId, companyId }) {
 // ============================================================
 // WHATSAPP EXTERNAL (Evolution API)
 // ============================================================
+// A company is on the Evolution API transport (not the in-process builtin
+// Baileys socket) once it has all three connection fields configured. This is
+// the per-company switch: presence of Evolution config IS the signal.
+export function usesEvolution(cfg) {
+  return !!(cfg && cfg.waBaseUrl && cfg.waInstance && cfg.waApiKey)
+}
+
 export async function sendWhatsApp(cfg, phone, text) {
   if (!cfg.waBaseUrl || !cfg.waInstance || !cfg.waApiKey) return
   const url = `${cfg.waBaseUrl.replace(/\/$/, '')}/message/sendText/${cfg.waInstance}`
@@ -1232,6 +1239,11 @@ function recordBadMacAndMaybeHeal(companyId, conn, remoteJid) {
 
 export async function startBuiltinWhatsApp(companyId) {
   const conn = getWaConn(companyId)
+  // Company migrated to Evolution API transport → never open the in-process
+  // builtin socket for it. A single WhatsApp number linked to BOTH builtin and
+  // Evolution would double-receive (duplicate replies) and 440-conflict. This
+  // one gate covers every caller: boot-loop, 30s retry-loop, watchdog, QR endpoint.
+  if (usesEvolution(loadConfig(companyId))) return
   // Reentry guard: the 30s watchdog (checkWaStuckReconnect) and the retry loop
   // can both call this for the same company in the same tick. conn.sock isn't
   // assigned until after two awaits below, so both would pass a `!conn.sock`
