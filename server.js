@@ -20,6 +20,9 @@ import './jobs/sync-scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Behind Traefik/Easypanel: trust the reverse proxy so express-rate-limit reads
+// the real client IP from X-Forwarded-For instead of throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+app.set('trust proxy', 1);
 const assetsDir = path.join(__dirname, 'data', 'assets');
 if (!fs.existsSync(assetsDir)) fs.mkdirSync(assetsDir, { recursive: true });
 app.use('/assets', express.static(assetsDir, { maxAge: '1h' }));
