@@ -352,6 +352,24 @@ export async function sendWhatsApp(cfg, phone, text) {
   } catch (err) { console.error('WA send error:', err.message) }
 }
 
+// Download a media message (e.g. a voice note) from Evolution as a Buffer.
+// Evolution keeps the encrypted media in its own store; POST the message key to
+// getBase64FromMediaMessage and it returns the decrypted bytes as base64.
+export async function fetchEvolutionMediaBuffer(cfg, data) {
+  if (!cfg.waBaseUrl || !cfg.waInstance || !cfg.waApiKey || !data?.key) return null
+  const url = `${cfg.waBaseUrl.replace(/\/$/, '')}/chat/getBase64FromMediaMessage/${cfg.waInstance}`
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': cfg.waApiKey },
+      body: JSON.stringify({ message: { key: data.key }, convertToMp4: false })
+    })
+    if (!r.ok) { console.error('Evolution media fetch failed:', r.status, await r.text().catch(() => '')); return null }
+    const j = await r.json().catch(() => ({}))
+    return j.base64 ? Buffer.from(j.base64, 'base64') : null
+  } catch (err) { console.error('Evolution media fetch error:', err.message); return null }
+}
+
 // ============================================================
 // INSTAGRAM
 // ============================================================
@@ -1915,28 +1933,91 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
     const instance = ev.instance || ev.instanceName
     const company = findCompanyByWaInstance(instance) || getCompany('default')
     if (!company) return
+    const cfg = company.config
     const data = ev.data || ev
     const jid = data?.key?.remoteJid || ''
     if (!jid || jid.includes('@g.us')) return
     const phone = jid.split('@')[0]
+    const visitorId = `wa:${phone}`
+
+    let text = data.message?.conversation
+      || data.message?.extendedTextMessage?.text
+      || data.message?.ephemeralMessage?.message?.conversation
+      || data.message?.imageMessage?.caption || ''
+
+    // Commands sent FROM the business phone (fromMe)
     if (data?.key?.fromMe) {
-      // Business initiated — create conversation with human_mode=1 so AI won't respond when client replies
-      const visitorIdOut = `wa:${phone}`
-      const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = 'whatsapp' AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorIdOut, company.id)
+      const cmd = text.trim()
+      if (cmd === '*' || cmd === '**') {
+        const conv = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND company_id = ? AND channel = 'whatsapp' ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
+        if (conv) {
+          const mode = cmd === '*' ? 1 : 0
+          db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
+          console.log(`[WA webhook:${company.id}] human_mode=${mode} para ${visitorId}`)
+        }
+        return
+      }
+      // Business initiated (not a command) — create conversation with human_mode=1 so AI won't respond when client replies
+      const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = 'whatsapp' AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
       if (!existing) {
         const newId = crypto.randomUUID()
         const now = Date.now()
-        db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorIdOut, 'whatsapp', now, now, company.id)
-        console.log('[WA webhook] Business initiated — human_mode=1 for', visitorIdOut)
+        db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorId, 'whatsapp', now, now, company.id)
+        console.log('[WA webhook] Business initiated — human_mode=1 for', visitorId)
       }
       return
     }
-    const text = data.message?.conversation
-      || data.message?.extendedTextMessage?.text
-      || data.message?.imageMessage?.caption || ''
+
+    // Voice note: no text but an audio message → download from Evolution + transcribe
+    const audioMsg = data.message?.audioMessage || data.message?.ephemeralMessage?.message?.audioMessage
+    if (!text.trim() && audioMsg) {
+      try {
+        const buffer = await fetchEvolutionMediaBuffer(cfg, data)
+        if (buffer) {
+          text = await transcribeAudioBuffer(buffer, audioMsg.mimetype)
+          if (text?.trim()) console.log(`[WA webhook:${company.id}] Nota de voz transcrita: "${text.slice(0, 80)}"`)
+        }
+      } catch (err) { console.error(`[WA webhook:${company.id}] Error transcribiendo audio:`, err.message) }
+    }
     if (!text.trim()) return
-    const result = await processMessage({ companyId: company.id, message: text, visitorId: `wa:${phone}`, channel: 'whatsapp' })
-    await sendWhatsApp(company.config, phone, result.reply)
+
+    // Web chat relay — reply (quote) the alert message → #shortId, or manual "#shortId message"
+    const quotedText = data.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation
+      || data.message?.extendedTextMessage?.contextInfo?.quotedMessage?.extendedTextMessage?.text
+      || ''
+    const quotedIdMatch = quotedText.match(/#([a-f0-9]{8})\b/i)
+    const directRelayMatch = text.trim().match(/^#([a-f0-9]{8})\s+([\s\S]+)$/i)
+    if (quotedIdMatch || directRelayMatch) {
+      const shortId = (quotedIdMatch ? quotedIdMatch[1] : directRelayMatch[1]).toLowerCase()
+      const replyText = directRelayMatch ? directRelayMatch[2].trim() : text.trim()
+      const webConv = db.prepare("SELECT id FROM conversations WHERE id LIKE ? AND company_id = ? AND channel = 'web' ORDER BY updated_at DESC LIMIT 1").get(shortId + '%', company.id)
+      if (webConv) {
+        if (replyText === '*') {
+          db.prepare('UPDATE conversations SET human_mode = 1 WHERE id = ?').run(webConv.id)
+          await sendWhatsApp(cfg, phone, `⏸ IA pausada en web chat.`)
+        } else if (replyText === '**') {
+          db.prepare('UPDATE conversations SET human_mode = 0 WHERE id = ?').run(webConv.id)
+          await sendWhatsApp(cfg, phone, `▶ IA reactivada en web chat.`)
+        } else {
+          db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(webConv.id, 'assistant', replyText, Date.now())
+          db.prepare('UPDATE conversations SET updated_at = ?, human_mode = 1 WHERE id = ?').run(Date.now(), webConv.id)
+          await sendWhatsApp(cfg, phone, `✅ Enviado al visitante.`)
+        }
+        console.log(`[WebRelay:${company.id}] Relay ${shortId} → "${replyText.substring(0, 50)}"`)
+      } else {
+        await sendWhatsApp(cfg, phone, `⚠️ No encontré conversación web #${shortId}.`)
+      }
+      return
+    }
+
+    // Normal inbound → AI
+    const result = await processMessage({ companyId: company.id, message: text.trim(), visitorId, channel: 'whatsapp' })
+    if (result?.reply) {
+      const waText = result.button
+        ? `${result.reply}\n\n👉 *${result.button.label}*\n${result.button.url}`
+        : result.reply
+      await sendWhatsApp(cfg, phone, waText)
+    }
   } catch (err) { console.error('WA webhook error:', err) }
 })
 
