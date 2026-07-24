@@ -1979,7 +1979,17 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
         }
       } catch (err) { console.error(`[WA webhook:${company.id}] Error transcribiendo audio:`, err.message) }
     }
-    if (!text.trim()) return
+    if (!text.trim()) {
+      // A voice note we couldn't transcribe (no quota, provider error, empty)
+      // must not leave the lead in silence — ask them to type instead.
+      if (audioMsg) {
+        const fb = cfg.language === 'english'
+          ? "Sorry, I couldn't process your voice note 🙏 Could you type your message instead?"
+          : "Perdón, no pude escuchar tu audio 🙏 ¿Me lo escribís por texto?"
+        await sendWhatsApp(cfg, phone, fb)
+      }
+      return
+    }
 
     // Web chat relay — reply (quote) the alert message → #shortId, or manual "#shortId message"
     const quotedText = data.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation
