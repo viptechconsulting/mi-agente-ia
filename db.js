@@ -94,6 +94,9 @@ softAlter('ALTER TABLE companies ADD COLUMN demo INTEGER DEFAULT 0');
 softAlter('ALTER TABLE companies ADD COLUMN share_token TEXT');
 softAlter('ALTER TABLE companies ADD COLUMN expires_at INTEGER');
 softAlter('ALTER TABLE companies ADD COLUMN parent_company_id TEXT');
+softAlter('ALTER TABLE companies ADD COLUMN commerce_pro_enabled INTEGER DEFAULT 0');
+softAlter('ALTER TABLE companies ADD COLUMN commerce_pro_status TEXT');
+softAlter('ALTER TABLE companies ADD COLUMN commerce_pro_source TEXT');
 softAlter('ALTER TABLE conversations ADD COLUMN human_mode INTEGER DEFAULT 0');
 softAlter('ALTER TABLE conversations ADD COLUMN retargeting_sent INTEGER DEFAULT 0');
 softAlter('ALTER TABLE conversations ADD COLUMN flow_state TEXT');
@@ -275,7 +278,7 @@ export function getCompany(idOrSlug) {
 
 export function getCompanyByToken(token) {
   if (!token) return null;
-  return rowToCompany(db.prepare('SELECT * FROM companies WHERE share_token = ?').get(token));
+  return rowToCompany(db.prepare('SELECT * FROM companies WHERE slug = ? OR share_token = ?').get(token, token));
 }
 
 export function findCompanyByWaInstance(instance) {
