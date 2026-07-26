@@ -13,6 +13,10 @@ export const STATES = [
 
 export const VOLUME_LEVELS = ['BAJO', 'MEDIO', 'ALTO']
 
+// Lead temperature — drives how aggressively we follow up (see LYNKRO_FU).
+// CALIENTE: quiere avanzar ahora. TIBIO: interesado sin urgencia. FRIO: "el mes que viene" / sin prisa.
+export const TEMPERATURES = ['CALIENTE', 'TIBIO', 'FRIO']
+
 export const RESPOND_TO_LEAD_TOOL = {
   name: 'respond_to_lead',
   description: 'Termina SIEMPRE tu turno llamando esta herramienta. message_to_user es lo único que el lead ve — el resto es estado interno para el sistema.',
@@ -24,9 +28,10 @@ export const RESPOND_TO_LEAD_TOOL = {
       business_type: { type: ['string', 'null'], description: 'Tipo de negocio detectado, o null si aún no se sabe.' },
       volume_level: { type: ['string', 'null'], enum: [...VOLUME_LEVELS, null], description: 'Clasificación interna del volumen de mensajes — nunca se le dice directamente al lead, se infiere de su respuesta.' },
       avg_ticket: { type: ['string', 'null'], description: 'Ticket promedio mencionado por el lead, o null si aún no se sabe.' },
+      temperature: { type: ['string', 'null'], enum: [...TEMPERATURES, null], description: 'Temperatura del lead inferida de sus señales: CALIENTE (quiere avanzar/agendar ahora), TIBIO (interesado sin urgencia), FRIO ("el mes que viene", sin prisa). null si aún no hay señal clara.' },
       captured_fields: {
         type: 'object',
-        description: 'Campos nuevos capturados en este turno (website, instagram). Solo incluye lo nuevo/confirmado.',
+        description: 'Campos nuevos capturados/confirmados en este turno. Claves posibles: website, instagram, email, whatsapp. Solo incluye lo nuevo o confirmado en este turno.',
         additionalProperties: true
       },
       handoff_required: { type: 'boolean' },
@@ -46,6 +51,9 @@ export function validateAgentResponse(input) {
   if (!STATES.includes(input?.next_state)) errors.push(`next_state invalid: ${input?.next_state}`)
   if (input?.volume_level != null && !VOLUME_LEVELS.includes(input.volume_level)) {
     errors.push(`volume_level invalid: ${input?.volume_level}`)
+  }
+  if (input?.temperature != null && !TEMPERATURES.includes(input.temperature)) {
+    errors.push(`temperature invalid: ${input?.temperature}`)
   }
   if (typeof input?.handoff_required !== 'boolean') errors.push('handoff_required must be boolean')
   return { valid: errors.length === 0, errors }

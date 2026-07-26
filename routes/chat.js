@@ -1574,19 +1574,20 @@ setInterval(runRetargeting, 30 * 60 * 1000) // check every 30 min
 // LYNKRO FOLLOW-UP JOB — qualification flow follow-ups
 // ============================================================
 
-// Phases: early = calificación (bot_count 1-2), mid = shock factor mostrado (3), late = demo ofrecida (4+)
+// Phases: early = calificación (bot_count 1-2), mid = número de impacto mostrado (3), late = demo ofrecida (4+)
+// Copy agnóstica de rubro y orientada a agendar el próximo paso concreto.
 const LYNKRO_FU = {
   fu1: {
-    early: '¿Pudiste ver mi mensaje? Solo para no hacerte perder tiempo — ¿cuántos mensajes o consultas recibes a la semana en tu clínica que tu equipo no logra responder a tiempo?',
-    mid:   '¿Tiene sentido el número que te mostré? Con solo 5 prospectos perdidos a la semana el impacto mensual es bastante real. ¿Te interesa ver cómo funciona el sistema?',
-    late:  'Hola, ¿pudiste pensarlo? La llamada de 10-15 min es sin compromiso — te muestro el sistema en vivo y si no te sirve no pasa nada. ¿Cómo tienes la agenda esta semana?'
+    early: '¿Alcanzaste a ver mi mensaje? Sin robarte tiempo: ¿cuántos mensajes de clientes sientes que se te quedan sin responder a la semana?',
+    mid:   '¿Qué te pareció el número? Con solo unos pocos mensajes perdidos por semana, el monto al mes suele sorprender. ¿Te muestro cómo lo resolvería el sistema con tu negocio real?',
+    late:  'Quedamos en que te mostraba el sistema en vivo — son 15 min, sin compromiso, y lo ves con tu caso real. ¿Lo agendamos?'
   },
   fu2: {
-    early: 'Sin apuro — si me dices qué tipo de clínica o medspa tienes, te armo el cálculo de cuánto podrías estar dejando sobre la mesa cada mes. No tiene que ser exacto, un estimado alcanza.',
-    mid:   'El número que te mostré es siendo conservador. La mayoría de clínicas pierden más de 5 prospectos a la semana. ¿Le damos 15 minutos para verlo en vivo con tu caso real?',
-    late:  'Sé que estás muy ocupado. Hagamos esto: si me das tu correo te grabo un video de 3 min mostrándote exactamente cómo funciona para tu tipo de clínica. Sin llamadas, sin presión. ¿A qué correo te lo mando?'
+    early: 'Sin apuro. Si me cuentas a qué se dedica tu negocio, te armo el cálculo de cuánto podrías estar dejando sobre la mesa cada mes. Un estimado alcanza.',
+    mid:   'Ese número es siendo conservador — la mayoría deja escapar más de lo que cree. ¿Le damos 15 minutos para verlo en vivo con tu caso?',
+    late:  'Sé que andas ocupado. ¿Lo dejamos agendado y listo? Eliges el horario que te quede y lo vemos en vivo, sin compromiso.'
   },
-  fu3: 'Hola, sé que estás a full con la clínica. Una pregunta rápida para cerrar el tema: ¿sigue siendo prioridad para ti recuperar esos pacientes que se están perdiendo por falta de respuesta, o lo dejamos para otro momento?'
+  fu3: 'Una última para cerrar el tema: ¿sigue siendo prioridad dejar de perder esos clientes que se van sin respuesta, o lo retomamos más adelante?'
 }
 
 export async function runLynkroFollowUp() {
@@ -1621,17 +1622,26 @@ export async function runLynkroFollowUp() {
       const { bot_count } = db.prepare(`SELECT SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as bot_count FROM messages WHERE conversation_id = ?`).get(conv.id)
       const phase = bot_count >= 4 ? 'late' : bot_count === 3 ? 'mid' : 'early'
 
+      // Temperatura del lead (leadQuali.temperature). Un lead FRIO ("el mes que
+      // viene", sin prisa) recibe UN solo seguimiento suave (fu1) y no se le
+      // insiste más; el resto sigue la cadencia completa.
+      const isCold = state.leadQuali?.temperature === 'FRIO'
+
       const elapsed = now - conv.updated_at
       let fuKey = null
       let fuText = null
 
       if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; fuText = LYNKRO_FU.fu1[phase] }
-      else if (elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
-      else if (elapsed >= D3  && elapsed < D7  && !state.fu3) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
+      else if (!isCold && elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
+      else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
       else if (elapsed >= D7  && elapsed < D30 && !state.reactivacion) { state.reactivacion = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
       else if (elapsed >= D30 && !state.nurture) { state.nurture = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
 
       if (!fuKey || !fuText) continue
+
+      // En etapas de demo/cierre (mid/late), adjunta el link de agendamiento para
+      // que el próximo paso quede a un clic — nunca "te contacto" sin acción.
+      if (phase !== 'early' && cfg.bookingUrl) fuText += `\n\nAgenda aquí: ${cfg.bookingUrl}`
 
       if (conv.channel === 'whatsapp') {
         const conn = waConnections.get(conv.company_id)
