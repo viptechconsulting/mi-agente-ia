@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Admin — Chat.Lynkro.io</title>
 <link rel="icon" type="image/png" href="https://lynkro.io/logo1-removebg-preview.png">
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -165,7 +166,21 @@
  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
  .bar-row .label{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
  .bar-row .count{color:var(--text);font-weight:600;min-width:30px;text-align:right;font-size:13px}
- @media(max-width:800px){#sidebar{transform:translateX(-232px);transition:transform .3s}#sidebar.open{transform:none}#main{margin-left:0;padding:20px 16px}#menuToggle{display:flex!important}}
+ @media(max-width:800px){
+   #sidebar{transform:translateX(-232px);transition:transform .3s;box-shadow:2px 0 22px rgba(0,0,0,.45)}
+   #sidebar.open{transform:none}
+   #main{margin-left:0;padding:64px 14px 40px}
+   #menuToggle{display:flex!important}
+   /* stack two-column form grids into a single column */
+   .row{grid-template-columns:1fr!important}
+   /* tables scroll sideways instead of forcing the page wider than the screen */
+   table{display:block;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+   /* keep inputs/controls inside the viewport */
+   input,select,textarea{max-width:100%}
+   /* scrim appears only while the drawer is open; tap it to close */
+   #sidebar.open ~ #scrim{display:block}
+ }
+ #scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150}
  /* ── Admin lang toggle ── */
  .admin-lang-toggle{display:flex;gap:4px;margin-bottom:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:3px}
  .admin-lt-btn{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s;text-transform:none;letter-spacing:0}
@@ -394,6 +409,8 @@
    </button>
   </div>
  </nav>
+
+ <div id="scrim" onclick="document.getElementById('sidebar').classList.remove('open')"></div>
 
  <main id="main">
  <div class="content-wrap">
@@ -5434,6 +5451,7 @@ window.tab = function(t) {
   _origTab(t)
   if (t === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus() }
   if (t === 'citas')    { loadGhlWebhookUrl(); loadGenericWebhookUrl() }
+  document.getElementById('sidebar')?.classList.remove('open') // close the mobile drawer after navigating
 }
 
 </script>
