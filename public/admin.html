@@ -3592,7 +3592,7 @@ function renderLynkroFunnel(d) {
      const name = (l.name || l.phone || '—').toString().replace(/</g,'&lt;');
      const when = l.updated_at ? new Date(l.updated_at).toLocaleString() : '—';
      return `<tr style="border-bottom:1px solid #1a1a1a">
-      <td style="padding:8px 6px"><div style="color:#fff">${name}</div><div style="color:#555;font-size:11px">${(l.phone||'').toString().replace(/</g,'&lt;')} · ${l.channel}</div></td>
+      <td style="padding:8px 6px"><a href="#" onclick="viewConv('${l.id}');return false" style="color:var(--gold);text-decoration:none;font-weight:600">${name} ›</a><div style="color:#555;font-size:11px">${(l.phone||'').toString().replace(/</g,'&lt;')} · ${l.channel}</div></td>
       <td><span style="background:${col}22;color:${col};border:1px solid ${col}55;border-radius:10px;padding:2px 8px;font-size:11px;white-space:nowrap">${l.etapa}</span></td>
       <td style="color:#ccc">${LK_VERT_LABEL[l.vertical]||'—'}</td>
       <td>${l.temperature?LK_TEMP[l.temperature]:'—'}</td>
