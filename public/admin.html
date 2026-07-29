@@ -4531,6 +4531,7 @@ function renderTriggers() {
 function setTriggerType(i, type) {
  config.keywordTriggers[i].type = type;
  if (type !== 'response') config.keywordTriggers[i].button = null; // botón solo aplica a "Respuesta automática"
+ if (type !== 'response') config.keywordTriggers[i].response = ''; // evita que un texto enlatado viejo pise al modo IA/flujo
  document.getElementById('tresponse_' + i).style.display = type === 'response' ? '' : 'none';
  document.getElementById('tflow_' + i).style.display = type === 'flow' ? '' : 'none';
  const aiEl = document.getElementById('tai_' + i); if (aiEl) aiEl.style.display = type === 'ai' ? '' : 'none';

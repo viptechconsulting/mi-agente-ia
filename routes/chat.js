@@ -553,8 +553,7 @@ export async function processMessage({ companyId, message, conversationId, visit
         startTriggerFlow(convId, index)
         const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', trigger.steps[0].message, Date.now())
         return { conversationId: convId, reply: trigger.steps[0].message, button: null, messageId: info.lastInsertRowid }
-      }
-      if (trigger.response) {
+      } else if (trigger.type !== 'ai' && trigger.response) {
         const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', trigger.response, Date.now())
         return { conversationId: convId, reply: trigger.response, button: trigger.button || null, messageId: info.lastInsertRowid }
       }
@@ -652,9 +651,10 @@ export async function processMessage({ companyId, message, conversationId, visit
   const scriptTrigger = getScriptTrigger(convId)
   let triggerScriptBlock = ''
   if (scriptTrigger?.instruction) {
+    const guionComun = `Esta persona entró por una campaña con el GUION de abajo, que TIENE PRIORIDAD sobre las instrucciones generales de apertura y de flujo de más arriba. Para tu PRIMER mensaje usá la apertura del guion (natural, un solo mensaje corto, sin vender). Después seguí las rutas del guion según lo que responda. Si el guion incluye "reglas operativas para manejarlo manualmente" o pasos como "envía el enlace / agenda manualmente", eso son notas para el humano — NO las menciones ni las leas en voz alta; vos solo conversás.`
     triggerScriptBlock = '\n\n' + (scriptTrigger.strict
-      ? `━━━ GUION OBLIGATORIO — SEGUIR AL PIE DE LA LETRA ━━━\n${scriptTrigger.instruction}\n(Cíñete a este guion; no improvises fuera de él.)`
-      : `━━━ GUION DE ESTA CONVERSACIÓN (campaña específica) ━━━\nEsta persona entró por una campaña con este guion. Úsalo como objetivo, contexto y estilo de apertura, conservando tu inteligencia para conversar, calificar y cerrar:\n${scriptTrigger.instruction}`)
+      ? `━━━ GUION OBLIGATORIO — PRIORIDAD MÁXIMA, SEGUIR AL PIE DE LA LETRA ━━━\n${guionComun}\nAdemás, cíñete al texto del guion lo más literal posible; no improvises fuera de él.\n\n${scriptTrigger.instruction}`
+      : `━━━ GUION PRIORITARIO DE ESTA CONVERSACIÓN (campaña específica) ━━━\n${guionComun}\n\n${scriptTrigger.instruction}`)
   }
 
   const activeTools = []
