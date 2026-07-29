@@ -1667,6 +1667,22 @@ export async function runLynkroFollowUp() {
 
       const lq = state.leadQuali || {}
 
+      // (0) Snooze manual ("Retomar en X meses"): mientras dure, silencio total.
+      // Al vencer, un solo mensaje de reactivación y se limpia el snooze.
+      if (state.snooze_until) {
+        if (now < state.snooze_until) continue
+        if (!state.snooze_done) {
+          const msg = reengSituation(lq)
+          await sendLynkroFU(conv, cfg, msg)
+          state.snooze_done = true
+          delete state.snooze_until
+          db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
+          db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', msg, now)
+          console.log(`[Lynkro FU] snooze_resume → ${conv.visitor_id}`)
+          continue
+        }
+      }
+
       // (1) Post-demo (Etapa 4C): 24h después de que un humano marca "Demo hecho"
       // en el dashboard. Independiente del silencio — se envía aunque el lead haya
       // respondido, porque es una invitación a dar feedback del demo.

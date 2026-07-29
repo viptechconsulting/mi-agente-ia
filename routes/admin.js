@@ -683,6 +683,16 @@ function lynkroEtapa(cur, flags) {
   }
 }
 
+// Mapeo etapa → lista operativa del usuario (5 listas del manual).
+function lynkroLista(etapa, snoozeActive, inReeng) {
+  if (snoozeActive) return 'retomar'
+  if (etapa === 'No contactar' || etapa === 'No califica' || etapa === 'Cerrada') return 'no_interesado'
+  if (etapa === 'Demo hecho') return 'demo_completado'
+  if (etapa === 'Demo ofrecido') return 'esperando_demo'
+  if (inReeng) return 'retomar'
+  return 'en_conversacion'
+}
+
 adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res) => {
   if (req.company.id !== LYNKRO_COMPANY_ID) return res.json({ lynkro: false })
   const rows = db.prepare(`
@@ -697,7 +707,10 @@ adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res
   const porTemperatura = { CALIENTE: 0, TIBIO: 0, FRIO: 0, sin: 0 }
   const objeciones = { PRECIO: 0, TIMING: 0, PENSARLO: 0, CONSULTAR: 0, DESCONFIANZA: 0 }
   const followups = { fu1: 0, fu2: 0, fu3: 0, reeng30: 0, reeng60: 0, reeng90: 0, postDemo: 0 }
+  const listas = { en_conversacion: 0, esperando_demo: 0, demo_completado: 0, no_interesado: 0, retomar: 0 }
   const leads = []
+  const now = Date.now()
+  const D30ms = 30 * 24 * 60 * 60 * 1000
 
   for (const r of rows) {
     let fs = {}
@@ -705,7 +718,9 @@ adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res
     const lq = fs.leadQuali || {}
     tiles.conversaciones++
 
-    const userCount = db.prepare("SELECT COUNT(*) c FROM messages WHERE conversation_id = ? AND role='user'").get(r.id).c
+    const um = db.prepare("SELECT COUNT(*) c, MAX(created_at) t FROM messages WHERE conversation_id = ? AND role='user'").get(r.id)
+    const userCount = um.c
+    const lastUserAt = um.t || r.updated_at
     if (userCount >= 2) tiles.respondieron++   // engaged más allá del primer mensaje
 
     const qualified = (lq.volume_level === 'MEDIO' || lq.volume_level === 'ALTO') && !!lq.captured_fields?.website && !!lq.captured_fields?.instagram
@@ -721,12 +736,20 @@ adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res
     for (const k of ['fu1', 'fu2', 'fu3', 'reeng30', 'reeng60', 'reeng90']) if (fs[k]) followups[k]++
     if (fs.post_demo_sent) followups.postDemo++
 
+    const etapa = lynkroEtapa(lq.current_state, { do_not_contact: dnc, demo_done: fs.demo_done })
+    const snoozeActive = !!fs.snooze_until && now < fs.snooze_until
+    const inReeng = lq.temperature === 'FRIO' || (now - lastUserAt) >= D30ms
+    const lista = lynkroLista(etapa, snoozeActive, inReeng)
+    listas[lista]++
+
     leads.push({
       id: r.id,
       name: r.lead_name || null,
       phone: r.lead_phone || (r.visitor_id || '').replace(/^wa:|^ig:/, ''),
       channel: r.channel,
-      etapa: lynkroEtapa(lq.current_state, { do_not_contact: dnc, demo_done: fs.demo_done }),
+      etapa,
+      lista,
+      snooze_until: fs.snooze_until || null,
       vertical: lq.vertical || null,
       temperature: lq.temperature || null,
       objection: lq.objection_type || null,
@@ -737,7 +760,7 @@ adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res
     })
   }
 
-  res.json({ lynkro: true, tiles, porVertical, porTemperatura, objeciones, followups, leads })
+  res.json({ lynkro: true, tiles, porVertical, porTemperatura, objeciones, followups, listas, leads })
 })
 
 // Marcar "Demo hecho" → dispara el follow-up post-demo 24h después (runLynkroFollowUp).
@@ -760,6 +783,20 @@ adminRouter.post('/lynkro/conversations/:id/do-not-contact', requireAdmin, (req,
   const val = req.body?.value === false ? 0 : 1
   db.prepare('UPDATE conversations SET do_not_contact = ? WHERE id = ?').run(val, conv.id)
   res.json({ ok: true, do_not_contact: val })
+})
+
+// "Retomar en X meses" — snooze manual. months=0 cancela. Mientras dure, el job de
+// follow-up guarda silencio; al vencer, manda UN mensaje de reactivación (ver chat.js).
+adminRouter.post('/lynkro/conversations/:id/snooze', requireAdmin, (req, res) => {
+  const conv = db.prepare('SELECT id, company_id, flow_state FROM conversations WHERE id = ?').get(req.params.id)
+  if (!conv || conv.company_id !== LYNKRO_COMPANY_ID) return res.status(404).json({ error: 'Conversación no encontrada' })
+  const months = Math.max(0, Math.min(24, parseInt(req.body?.months) || 0))
+  let fs = {}
+  try { fs = conv.flow_state ? JSON.parse(conv.flow_state) : {} } catch {}
+  if (months > 0) { fs.snooze_until = Date.now() + months * 30 * 24 * 60 * 60 * 1000; delete fs.snooze_done }
+  else { delete fs.snooze_until; delete fs.snooze_done }
+  db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(fs), conv.id)
+  res.json({ ok: true, snooze_until: fs.snooze_until || null, months })
 })
 
 // ============================================================

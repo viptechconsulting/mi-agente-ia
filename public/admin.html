@@ -3549,6 +3549,9 @@ const LK_ETAPA_COLOR = {
 };
 const LK_VERT_LABEL = { clinica_estetica:'Clínica/Estética', salon_belleza:'Salón/Belleza', ecommerce:'Ecommerce', otro:'Otro', sin:'Sin clasificar' };
 const LK_TEMP = { CALIENTE:'🔥 Caliente', TIBIO:'🟡 Tibio', FRIO:'🧊 Frío', sin:'Sin señal' };
+let lkData = null, lkFilter = 'all';
+const LK_LISTAS = [['all','Todos'],['en_conversacion','En conversación'],['esperando_demo','Esperando demo'],['demo_completado','Demo completado'],['no_interesado','No interesado'],['retomar','Retomar']];
+const LK_DOW = {1:'en_conversacion',2:'en_conversacion',3:'no_interesado',4:'no_interesado',5:'retomar'}; // Lun-Vie → lista sugerida
 function lkChips(obj, labels) {
  return Object.entries(obj).filter(([,v]) => v > 0).map(([k,v]) =>
   `<span style="display:inline-block;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:14px;padding:4px 10px;margin:3px;font-size:12px;color:#ccc">${(labels && labels[k]) || k}: <b style="color:#fff">${v}</b></span>`
@@ -3580,33 +3583,58 @@ function renderLynkroFunnel(d) {
   </div>
  </div>
  <div class="card">
-  <h2 style="margin:0 0 12px">Leads (${d.leads.length})</h2>
+  <h2 style="margin:0 0 6px">Listas</h2>
+  <div id="lkDayHint"></div>
+  <div id="lkTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px"></div>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:13px">
    <thead><tr style="color:#888;text-align:left;border-bottom:1px solid #2a2a2a">
-    <th style="padding:8px 6px">Lead</th><th>Etapa</th><th>Rubro</th><th>Temp.</th><th>Últ. actividad</th><th style="text-align:right;padding-right:6px">Acciones</th>
+    <th style="padding:8px 6px">Lead</th><th>Etapa</th><th>Rubro</th><th>Temp.</th><th>Estado</th><th style="text-align:right;padding-right:6px">Acciones</th>
    </tr></thead>
-   <tbody>
-   ${d.leads.map(l => {
-     const col = LK_ETAPA_COLOR[l.etapa] || '#64748b';
-     const name = (l.name || l.phone || '—').toString().replace(/</g,'&lt;');
-     const when = l.updated_at ? new Date(l.updated_at).toLocaleString() : '—';
-     return `<tr style="border-bottom:1px solid #1a1a1a">
-      <td style="padding:8px 6px"><a href="#" onclick="viewConv('${l.id}');return false" style="color:var(--gold);text-decoration:none;font-weight:600">${name} ›</a><div style="color:#555;font-size:11px">${(l.phone||'').toString().replace(/</g,'&lt;')} · ${l.channel}</div></td>
-      <td><span style="background:${col}22;color:${col};border:1px solid ${col}55;border-radius:10px;padding:2px 8px;font-size:11px;white-space:nowrap">${l.etapa}</span></td>
-      <td style="color:#ccc">${LK_VERT_LABEL[l.vertical]||'—'}</td>
-      <td>${l.temperature?LK_TEMP[l.temperature]:'—'}</td>
-      <td style="color:#888;font-size:11px;white-space:nowrap">${when}</td>
-      <td style="text-align:right;padding-right:6px;white-space:nowrap">
-       <button onclick="markDemoDone('${l.id}')" title="Marca el demo como hecho → dispara el follow-up post-demo 24h después" style="font-size:11px;padding:4px 8px;background:${l.demo_done?'#14532d':'#0a2a0a'};color:#4ade80;border:1px solid #1a4a1a;text-transform:none;letter-spacing:0">${l.demo_done?'✓ Demo hecho':'Demo hecho'}</button>
-       <button onclick="toggleNoContact('${l.id}',${l.do_not_contact?false:true})" title="No volver a contactar" style="font-size:11px;padding:4px 8px;margin-left:4px;background:${l.do_not_contact?'#3a1414':'#1a1a1a'};color:${l.do_not_contact?'#ef4444':'#888'};border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">${l.do_not_contact?'✕ No contactar':'No contactar'}</button>
-      </td>
-     </tr>`;
-   }).join('') || '<tr><td colspan="6" style="color:#666;padding:14px">Sin leads todavía.</td></tr>'}
-   </tbody>
+   <tbody id="lkLeadRows"></tbody>
   </table>
   </div>
  </div>`;
+ lkData = d;
+ const todays = LK_DOW[new Date().getDay()];
+ const hint = document.getElementById('lkDayHint');
+ if (todays) {
+  const label = (LK_LISTAS.find(x => x[0] === todays) || [])[1];
+  hint.innerHTML = `📅 Hoy toca: <b>${label}</b> · <a href="#" onclick="setLkFilter('${todays}');return false" style="color:var(--gold)">ver esa lista →</a>`;
+  hint.style.cssText = 'font-size:12px;color:#aaa;background:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:8px 10px';
+ } else { hint.style.display = 'none'; }
+ renderLkTabs(); renderLkTable();
+}
+function renderLkTabs() {
+ const c = (lkData && lkData.listas) || {};
+ document.getElementById('lkTabs').innerHTML = LK_LISTAS.map(([k,l]) => {
+  const n = k === 'all' ? (lkData.leads || []).length : (c[k] || 0);
+  const a = k === lkFilter;
+  return `<button onclick="setLkFilter('${k}')" style="font-size:12px;padding:5px 11px;border-radius:14px;border:1px solid ${a?'var(--gold)':'#2a2a2a'};background:${a?'var(--gold)':'#161616'};color:${a?'#000':'#bbb'};text-transform:none;letter-spacing:0">${l} <b>${n}</b></button>`;
+ }).join('');
+}
+function setLkFilter(f) { lkFilter = f; renderLkTabs(); renderLkTable(); }
+function renderLkTable() {
+ const rows = (lkData.leads || []).filter(l => lkFilter === 'all' || l.lista === lkFilter);
+ document.getElementById('lkLeadRows').innerHTML = rows.map(l => {
+  const col = LK_ETAPA_COLOR[l.etapa] || '#64748b';
+  const name = (l.name || l.phone || '—').toString().replace(/</g,'&lt;');
+  const estado = l.snooze_until
+   ? `<span style="color:#c084fc">💤 hasta ${new Date(l.snooze_until).toLocaleDateString()}</span>`
+   : (l.updated_at ? new Date(l.updated_at).toLocaleString() : '—');
+  return `<tr style="border-bottom:1px solid #1a1a1a">
+   <td style="padding:8px 6px"><a href="#" onclick="viewConv('${l.id}');return false" style="color:var(--gold);text-decoration:none;font-weight:600">${name} ›</a><div style="color:#555;font-size:11px">${(l.phone||'').toString().replace(/</g,'&lt;')} · ${l.channel}</div></td>
+   <td><span style="background:${col}22;color:${col};border:1px solid ${col}55;border-radius:10px;padding:2px 8px;font-size:11px;white-space:nowrap">${l.etapa}</span></td>
+   <td style="color:#ccc">${LK_VERT_LABEL[l.vertical]||'—'}</td>
+   <td>${l.temperature?LK_TEMP[l.temperature]:'—'}</td>
+   <td style="color:#888;font-size:11px;white-space:nowrap">${estado}</td>
+   <td style="text-align:right;padding-right:6px;white-space:nowrap">
+    <button onclick="markDemoDone('${l.id}')" title="Marca el demo como hecho → dispara el follow-up post-demo 24h después" style="font-size:11px;padding:4px 8px;background:${l.demo_done?'#14532d':'#0a2a0a'};color:#4ade80;border:1px solid #1a4a1a;text-transform:none;letter-spacing:0">${l.demo_done?'✓ Demo':'Demo hecho'}</button>
+    <button onclick="snoozeLead('${l.id}')" title="Retomar en X meses" style="font-size:11px;padding:4px 8px;margin-left:4px;background:${l.snooze_until?'#2a1a3a':'#1a1a1a'};color:#c084fc;border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">${l.snooze_until?'💤 Retomar':'Retomar'}</button>
+    <button onclick="toggleNoContact('${l.id}',${l.do_not_contact?false:true})" title="No volver a contactar" style="font-size:11px;padding:4px 8px;margin-left:4px;background:${l.do_not_contact?'#3a1414':'#1a1a1a'};color:${l.do_not_contact?'#ef4444':'#888'};border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">${l.do_not_contact?'✕ No contactar':'No contactar'}</button>
+   </td>
+  </tr>`;
+ }).join('') || '<tr><td colspan="6" style="color:#666;padding:14px">Sin leads en esta lista.</td></tr>';
 }
 function markDemoDone(id) {
  fetch(`/api/lynkro/conversations/${id}/demo-done`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
@@ -3615,6 +3643,14 @@ function markDemoDone(id) {
 function toggleNoContact(id, val) {
  fetch(`/api/lynkro/conversations/${id}/do-not-contact`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({value:val}) })
   .then(r=>r.json()).then(()=>{ toast(val?'Marcado: no contactar':'Reactivado'); loadLynkroFunnel(); });
+}
+function snoozeLead(id) {
+ const m = prompt('¿En cuántos meses retomar este lead? (0 = cancelar el snooze)', '3');
+ if (m === null) return;
+ const months = parseInt(m);
+ if (isNaN(months) || months < 0) return toast('Número inválido');
+ fetch(`/api/lynkro/conversations/${id}/snooze`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({months}) })
+  .then(r=>r.json()).then(()=>{ toast(months>0?`Retomar en ${months} mes(es)`:'Snooze cancelado'); loadLynkroFunnel(); });
 }
 
 function loadAIInsights() {
