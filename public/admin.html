@@ -515,8 +515,8 @@
 
  <div id="tab-advisor" class="tab">
   <div class="card">
-   <h2 style="margin:0 0 4px">Asesor IA</h2>
-   <p style="color:#888;font-size:12px;margin:0 0 14px">Revisa tu cuenta real (funnel + conversaciones) y te dice qué hacer. Al abrir hace un diagnóstico; después preguntale lo que quieras.</p>
+   <h2 style="margin:0 0 4px">Asesor IA <button onclick="analyzeAccount()" id="advisorAnalyzeBtn" title="Diagnóstico completo de tu cuenta" style="float:right;font-size:12px;padding:5px 12px;background:#161616;color:var(--gold);border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">🔍 Analizar mi cuenta</button></h2>
+   <p style="color:#888;font-size:12px;margin:0 0 14px">Preguntale lo que quieras sobre tu cuenta. O tocá <b>Analizar mi cuenta</b> para un diagnóstico completo (funnel + conversaciones).</p>
    <div id="advisorLog" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:14px"></div>
    <div style="display:flex;gap:8px">
     <input id="advisorInput" placeholder="Preguntá algo… (ej: ¿a quién debería contactar hoy?)" style="flex:1" onkeydown="if(event.key==='Enter')advisorSend()">
@@ -3659,8 +3659,12 @@ function toggleNoContact(id, val) {
   .then(r=>r.json()).then(()=>{ toast(val?'Marcado: no contactar':'Reactivado'); loadLynkroFunnel(); });
 }
 // ── Asesor IA (chat que revisa la cuenta) ──
-let advisorMsgs = [], advisorInit = false, advisorBusy = false;
+// NO analiza solo al abrir: espera a que preguntes algo o toques "Analizar mi cuenta".
+let advisorMsgs = [], advisorBusy = false;
 function advEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function advisorBtns(disabled) {
+ ['advisorSendBtn','advisorAnalyzeBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+}
 function renderAdvisor(pending) {
  const box = document.getElementById('advisorLog');
  if (!box) return;
@@ -3668,23 +3672,25 @@ function renderAdvisor(pending) {
   const me = role === 'user';
   return `<div style="align-self:${me?'flex-end':'flex-start'};max-width:85%;background:${me?'#14261a':'#161616'};border:1px solid ${me?'#2a4a2a':'#2a2a2a'};border-radius:12px;padding:10px 12px;font-size:13px;color:#ddd;white-space:pre-wrap;line-height:1.5">${advEsc(text)}</div>`;
  };
- box.innerHTML = advisorMsgs.map(m => bubble(m.role, m.content)).join('')
-  + (pending ? `<div style="align-self:flex-start;color:#888;font-size:12px">⌛ Analizando tu cuenta…</div>` : '');
+ const empty = (!advisorMsgs.length && !pending)
+  ? `<div style="color:#666;font-size:13px;padding:10px">Escribí una pregunta abajo, o tocá <b style="color:var(--gold)">🔍 Analizar mi cuenta</b> para un diagnóstico completo.</div>` : '';
+ box.innerHTML = empty + advisorMsgs.map(m => bubble(m.role, m.content)).join('')
+  + (pending ? `<div style="align-self:flex-start;color:#888;font-size:12px">⌛ Pensando…</div>` : '');
  box.scrollTop = box.scrollHeight;
 }
-function initAdvisor() {
- if (advisorInit) { renderAdvisor(advisorBusy); return; } // ya cargado: conserva la charla
- advisorInit = true; advisorMsgs = [];
+function initAdvisor() { renderAdvisor(advisorBusy); } // solo muestra el estado actual, no dispara nada
+function analyzeAccount() {
+ if (advisorBusy) return;
+ advisorMsgs.push({ role:'user', content:'Analiza mi cuenta y dame un diagnóstico completo priorizado: qué funciona, qué falla, y las 3-5 cosas más importantes que debería hacer y hoy no estoy haciendo.' });
  advisorCall();
 }
 function advisorCall() {
- advisorBusy = true; renderAdvisor(true);
- const btn = document.getElementById('advisorSendBtn'); if (btn) btn.disabled = true;
+ advisorBusy = true; renderAdvisor(true); advisorBtns(true);
  fetch('/api/dashboard/advisor', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ messages: advisorMsgs }) })
   .then(r => r.json())
   .then(d => { advisorMsgs.push({ role:'assistant', content: d.reply || d.error || 'No pude generar respuesta.' }); })
   .catch(() => { advisorMsgs.push({ role:'assistant', content:'Error al consultar el asesor. Reintentá.' }); })
-  .finally(() => { advisorBusy = false; renderAdvisor(false); if (btn) btn.disabled = false; });
+  .finally(() => { advisorBusy = false; renderAdvisor(false); advisorBtns(false); });
 }
 function advisorSend() {
  if (advisorBusy) return;

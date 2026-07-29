@@ -849,11 +849,13 @@ adminRouter.post('/dashboard/advisor', requireAdmin, withCompany, async (req, re
 CONTEXTO DE LA CUENTA:
 ${contexto}`
 
-  const INITIAL = 'Dame el diagnóstico inicial de mi cuenta: qué está funcionando, qué está fallando, y las 3-5 cosas más importantes que debería hacer y hoy no estoy haciendo. Prioriza y sé concreto con mis datos.'
+  // El contexto de la cuenta va en `system`. `messages` es la charla real.
   const chat = Array.isArray(req.body?.messages)
     ? req.body.messages.filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content).map(m => ({ role: m.role, content: String(m.content).slice(0, 4000) }))
     : []
-  const convo = [{ role: 'user', content: INITIAL }, ...chat] // siempre arranca con user (requisito de la API)
+  // La API exige que arranque con un turno 'user'; descarta assistant colgados al inicio.
+  while (chat.length && chat[0].role !== 'user') chat.shift()
+  const convo = chat.length ? chat : [{ role: 'user', content: 'Analiza mi cuenta y dame un diagnóstico inicial priorizado.' }]
 
   try {
     const resp = await client.messages.create({
