@@ -1699,9 +1699,15 @@ export async function runLynkroFollowUp() {
       const lastMsg = db.prepare('SELECT role FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1').get(conv.id)
       if (!lastMsg || lastMsg.role !== 'assistant') continue
 
-      // Detect phase: early=calificación, mid=shock factor shown, late=demo offered
-      const { bot_count } = db.prepare(`SELECT SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as bot_count FROM messages WHERE conversation_id = ?`).get(conv.id)
-      const phase = bot_count >= 4 ? 'late' : bot_count === 3 ? 'mid' : 'early'
+      // Detect phase: early=calificación, mid=shock factor shown, late=demo offered.
+      // engaged = el lead realmente respondió (>=2 msgs suyos) o dio contexto (rubro/volumen).
+      // Si NO se enganchó, nos quedamos en 'early': follow-ups suaves, sin número de impacto
+      // ni link de agenda. Antes la fase escalaba por NUESTROS propios mensajes → mandábamos
+      // el "5 prospectos/semana" y la agenda a gente que nunca contestó una pregunta (error #5).
+      const counts = db.prepare(`SELECT SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as bot_count, SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) as user_count FROM messages WHERE conversation_id = ?`).get(conv.id)
+      const bot_count = counts.bot_count || 0
+      const engaged = (counts.user_count || 0) >= 2 || !!lq.volume_level || !!lq.business_type
+      const phase = !engaged ? 'early' : (bot_count >= 4 ? 'late' : bot_count === 3 ? 'mid' : 'early')
 
       // Temperatura del lead (leadQuali.temperature). Un lead FRIO ("el mes que
       // viene", sin prisa) recibe UN solo seguimiento suave (fu1) y no se le
