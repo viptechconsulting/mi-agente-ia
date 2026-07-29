@@ -810,6 +810,66 @@ adminRouter.get('/dashboard/lynkro-funnel.csv', requireAdmin, withCompany, (req,
   res.send(csv)
 })
 
+// ============================================================
+// ASESOR IA — chat que revisa la cuenta real y recomienda acciones
+// ============================================================
+adminRouter.post('/dashboard/advisor', requireAdmin, withCompany, async (req, res) => {
+  const cid = req.company.id
+  const cfg = req.company.config || {}
+
+  // Contexto: funnel (si es Lynkro) + muestra de conversaciones reales.
+  let contexto = `NEGOCIO: ${cfg.businessName || 'Sin nombre'} — industria: ${cfg.industry || 'n/d'}.`
+  if (cid === LYNKRO_COMPANY_ID) {
+    const f = buildLynkroFunnel()
+    const conNum = f.leads.filter(l => l.phone).length
+    contexto += `\n\nFUNNEL LYNKRO (datos reales):
+- Tiles: ${JSON.stringify(f.tiles)}
+- Listas: ${JSON.stringify(f.listas)}
+- Por rubro: ${JSON.stringify(f.porVertical)}
+- Por temperatura: ${JSON.stringify(f.porTemperatura)}
+- Objeciones detectadas: ${JSON.stringify(f.objeciones)}
+- Follow-ups enviados: ${JSON.stringify(f.followups)}
+- Teléfonos: solo ${conNum} de ${f.leads.length} leads tienen número real (el resto es Instagram o WhatsApp en modo privado @lid).`
+  } else {
+    const tot = db.prepare('SELECT COUNT(*) c FROM conversations WHERE company_id = ?').get(cid).c
+    const leads = db.prepare("SELECT COUNT(*) c FROM conversations WHERE company_id = ? AND (lead_email IS NOT NULL OR lead_phone IS NOT NULL)").get(cid).c
+    contexto += `\n\nFUNNEL: ${tot} conversaciones, ${leads} con datos de contacto.`
+  }
+
+  const samples = db.prepare('SELECT id, channel FROM conversations WHERE company_id = ? ORDER BY updated_at DESC LIMIT 15').all(cid)
+  const dialogos = samples.map(s => {
+    const msgs = db.prepare('SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id LIMIT 10').all(s.id)
+    if (!msgs.length) return null
+    return `[${s.channel}]\n` + msgs.map(m => `${m.role === 'user' ? 'Cliente' : 'Agente'}: ${(m.content || '').slice(0, 220)}`).join('\n')
+  }).filter(Boolean).join('\n---\n')
+  if (dialogos) contexto += `\n\nMUESTRA DE ${samples.length} CONVERSACIONES RECIENTES:\n${dialogos}`
+
+  const system = `Eres un asesor experto en ventas y operaciones para ${cfg.businessName || 'este negocio'} (Lynkro vende agentes de IA que responden WhatsApp/Instagram a negocios de servicios). Revisas la cuenta REAL del usuario y le dices, directo y accionable, qué funciona, qué falla y qué debería hacer que hoy no hace. El usuario implementa todo a mano, así que da pasos concretos y priorizados, específicos a SUS datos — nada de consejos genéricos. Responde en español, sin introducciones largas ni relleno. Usa viñetas cortas cuando ayude.
+
+CONTEXTO DE LA CUENTA:
+${contexto}`
+
+  const INITIAL = 'Dame el diagnóstico inicial de mi cuenta: qué está funcionando, qué está fallando, y las 3-5 cosas más importantes que debería hacer y hoy no estoy haciendo. Prioriza y sé concreto con mis datos.'
+  const chat = Array.isArray(req.body?.messages)
+    ? req.body.messages.filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content).map(m => ({ role: m.role, content: String(m.content).slice(0, 4000) }))
+    : []
+  const convo = [{ role: 'user', content: INITIAL }, ...chat] // siempre arranca con user (requisito de la API)
+
+  try {
+    const resp = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1600,
+      system,
+      messages: convo
+    })
+    const reply = resp.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+    res.json({ reply: reply || 'No pude generar una respuesta.' })
+  } catch (err) {
+    console.error('[advisor]', err.message)
+    res.status(500).json({ error: 'No se pudo consultar al asesor.' })
+  }
+})
+
 // Marcar "Demo hecho" → dispara el follow-up post-demo 24h después (runLynkroFollowUp).
 adminRouter.post('/lynkro/conversations/:id/demo-done', requireAdmin, (req, res) => {
   const conv = db.prepare('SELECT id, company_id, flow_state FROM conversations WHERE id = ?').get(req.params.id)

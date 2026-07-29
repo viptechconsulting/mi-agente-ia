@@ -388,6 +388,7 @@
    <button class="nav-item" data-tab="convs" onclick="tab('convs')"><span class="ic"><i data-lucide="message-square"></i></span><span data-i18n="nav_convs">Conversaciones</span></button>
    <button class="nav-item" data-tab="reports" onclick="tab('reports')"><span class="ic"><i data-lucide="trending-up"></i></span><span data-i18n="nav_reports">Reportes</span></button>
    <button class="nav-item" data-tab="aiinsights" onclick="tab('aiinsights')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="18" cy="8" r="4" fill="currentColor" stroke="none" opacity=".3"/><path d="M18 6v2l1.5 1"/></svg></span><span>AI Insights</span></button>
+   <button class="nav-item" data-tab="advisor" onclick="tab('advisor')"><span class="ic"><i data-lucide="sparkles"></i></span><span>Asesor IA</span></button>
   </div>
   <div class="sb-group">
    <div class="sb-label" data-i18n="sb_training">Entrenamiento</div>
@@ -510,6 +511,18 @@
  <div id="activityChart"></div>
  </div>
 
+ </div>
+
+ <div id="tab-advisor" class="tab">
+  <div class="card">
+   <h2 style="margin:0 0 4px">Asesor IA</h2>
+   <p style="color:#888;font-size:12px;margin:0 0 14px">Revisa tu cuenta real (funnel + conversaciones) y te dice qué hacer. Al abrir hace un diagnóstico; después preguntale lo que quieras.</p>
+   <div id="advisorLog" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:14px"></div>
+   <div style="display:flex;gap:8px">
+    <input id="advisorInput" placeholder="Preguntá algo… (ej: ¿a quién debería contactar hoy?)" style="flex:1" onkeydown="if(event.key==='Enter')advisorSend()">
+    <button onclick="advisorSend()" id="advisorSendBtn" style="white-space:nowrap">Enviar</button>
+   </div>
+  </div>
  </div>
 
  <div id="tab-config" class="tab">
@@ -3163,6 +3176,7 @@ function tab(name) {
  if (name === 'leads') loadLeads();
  if (name === 'knowledge') loadDocs();
  if (name === 'dashboard') loadDashboard();
+ if (name === 'advisor') initAdvisor();
  if (name === 'training') loadTraining();
  if (name === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus(); loadGoogleStatus(); loadCalendarProvider(); loadTwilioStatus() }
  if (name === 'citas') loadCitas();
@@ -3643,6 +3657,41 @@ function markDemoDone(id) {
 function toggleNoContact(id, val) {
  fetch(`/api/lynkro/conversations/${id}/do-not-contact`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({value:val}) })
   .then(r=>r.json()).then(()=>{ toast(val?'Marcado: no contactar':'Reactivado'); loadLynkroFunnel(); });
+}
+// ── Asesor IA (chat que revisa la cuenta) ──
+let advisorMsgs = [], advisorInit = false, advisorBusy = false;
+function advEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function renderAdvisor(pending) {
+ const box = document.getElementById('advisorLog');
+ if (!box) return;
+ const bubble = (role, text) => {
+  const me = role === 'user';
+  return `<div style="align-self:${me?'flex-end':'flex-start'};max-width:85%;background:${me?'#14261a':'#161616'};border:1px solid ${me?'#2a4a2a':'#2a2a2a'};border-radius:12px;padding:10px 12px;font-size:13px;color:#ddd;white-space:pre-wrap;line-height:1.5">${advEsc(text)}</div>`;
+ };
+ box.innerHTML = advisorMsgs.map(m => bubble(m.role, m.content)).join('')
+  + (pending ? `<div style="align-self:flex-start;color:#888;font-size:12px">⌛ Analizando tu cuenta…</div>` : '');
+ box.scrollTop = box.scrollHeight;
+}
+function initAdvisor() {
+ if (advisorInit) { renderAdvisor(advisorBusy); return; } // ya cargado: conserva la charla
+ advisorInit = true; advisorMsgs = [];
+ advisorCall();
+}
+function advisorCall() {
+ advisorBusy = true; renderAdvisor(true);
+ const btn = document.getElementById('advisorSendBtn'); if (btn) btn.disabled = true;
+ fetch('/api/dashboard/advisor', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ messages: advisorMsgs }) })
+  .then(r => r.json())
+  .then(d => { advisorMsgs.push({ role:'assistant', content: d.reply || d.error || 'No pude generar respuesta.' }); })
+  .catch(() => { advisorMsgs.push({ role:'assistant', content:'Error al consultar el asesor. Reintentá.' }); })
+  .finally(() => { advisorBusy = false; renderAdvisor(false); if (btn) btn.disabled = false; });
+}
+function advisorSend() {
+ if (advisorBusy) return;
+ const inp = document.getElementById('advisorInput');
+ const txt = (inp.value || '').trim(); if (!txt) return;
+ advisorMsgs.push({ role:'user', content: txt }); inp.value = '';
+ advisorCall();
 }
 function downloadLkCsv() {
  const q = (lkFilter && lkFilter !== 'all') ? `?lista=${lkFilter}` : '';
