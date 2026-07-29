@@ -4444,7 +4444,14 @@ function renderTriggers() {
   div.style.marginBottom = '14px';
   const kws = (t.keywords || []).join(', ');
   const mt = t.matchType || 'contains';
-  const isFlow = t.type === 'flow';
+  const ttype = t.type || 'response';
+  const isFlow = ttype === 'flow';
+  const isAi = ttype === 'ai';
+  const radio = function(val, label) {
+   const on = ttype === val;
+   return '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ' + (on?'var(--gold)':'var(--border)') + ';background:' + (on?'rgba(212,175,55,.1)':'transparent') + '">' +
+    '<input type="radio" name="ttype_' + i + '" value="' + val + '" ' + (on?'checked':'') + ' style="width:auto;margin:0" onchange="setTriggerType(' + i + ',\'' + val + '\')"> <span style="font-size:12px">' + label + '</span></label>';
+  };
   const mtOpts = ['contains','word','exact'].map(function(v) {
    const labels = {contains:'contains — contiene la palabra', word:'word — palabra completa', exact:'exact — mensaje exacto'};
    return '<option value="' + v + '"' + (mt === v ? ' selected' : '') + '>' + labels[v] + '</option>';
@@ -4464,15 +4471,20 @@ function renderTriggers() {
    '<input value="' + kws.replace(/"/g,'&quot;') + '" placeholder="DEMO, info, precio" data-ti="' + i + '" data-field="keywords"></div>' +
 
    // Type selector
-   '<div style="display:flex;gap:10px;margin-bottom:12px">' +
-    '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ' + (!isFlow ? 'var(--gold)' : 'var(--border)') + ';background:' + (!isFlow ? 'rgba(212,175,55,.1)' : 'transparent') + '">' +
-    '<input type="radio" name="ttype_' + i + '" value="response" ' + (!isFlow?'checked':'') + ' style="width:auto;margin:0" onchange="setTriggerType(' + i + ',\'response\')"> <span style="font-size:12px">Respuesta automática</span></label>' +
-    '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ' + (isFlow ? 'var(--gold)' : 'var(--border)') + ';background:' + (isFlow ? 'rgba(212,175,55,.1)' : 'transparent') + '">' +
-    '<input type="radio" name="ttype_' + i + '" value="flow" ' + (isFlow?'checked':'') + ' style="width:auto;margin:0" onchange="setTriggerType(' + i + ',\'flow\')"> <span style="font-size:12px">Flujo de preguntas</span></label>' +
+   '<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">' +
+    radio('response','Respuesta automática') + radio('flow','Flujo de preguntas') + radio('ai','Agente IA (guion)') +
+   '</div>' +
+
+   // AI script (shown when type=ai)
+   '<div id="tai_' + i + '" style="' + (!isAi ? 'display:none' : '') + '">' +
+   '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Guion para el agente <span style="color:#555">(objetivo, apertura y cómo llevar la conversación)</span></label>' +
+   '<textarea style="min-height:180px;font-size:12px" placeholder="Ej: Estas personas comentaron HISTORIA en el post sobre María. Objetivo: confirmar que las vi + hacer UNA pregunta sobre su negocio, sin vender aún. Apertura: ... Si dan el rubro: ... Si responden vago: ... Cuando tengas rubro+canal: puente a demo (15 min + link)." data-ti="' + i + '" data-field="aiInstruction">' + (t.aiInstruction||'').replace(/</g,'&lt;') + '</textarea>' +
+   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#aaa;margin-top:8px">' +
+   '<input type="checkbox" data-ti="' + i + '" data-field="aiStrict"' + (t.aiStrict?' checked':'') + ' style="width:auto;margin:0"> Seguir el guion al pie de la letra (sin improvisar)</label>' +
    '</div>' +
 
    // Response textarea (shown when type=response)
-   '<div id="tresponse_' + i + '" style="' + (isFlow ? 'display:none' : '') + '">' +
+   '<div id="tresponse_' + i + '" style="' + ((isFlow||isAi) ? 'display:none' : '') + '">' +
    '<label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Respuesta automática</label>' +
    '<textarea style="min-height:80px" placeholder="Escribe el mensaje que se enviará cuando el lead use esta palabra..." data-ti="' + i + '" data-field="response">' + (t.response||'') + '</textarea>' +
    // Optional button with link (ManyChat-style) — response type only
@@ -4499,7 +4511,7 @@ function renderTriggers() {
     const idx = parseInt(el.dataset.ti);
     const field = el.dataset.field;
     if (field === 'keywords') config.keywordTriggers[idx].keywords = el.value.split(',').map(function(k){return k.trim();}).filter(Boolean);
-    else if (field === 'followupEnabled') config.keywordTriggers[idx].followupEnabled = el.checked;
+    else if (el.type === 'checkbox') config.keywordTriggers[idx][field] = el.checked;
     else config.keywordTriggers[idx][field] = el.value;
    });
   });
@@ -4518,9 +4530,10 @@ function renderTriggers() {
 
 function setTriggerType(i, type) {
  config.keywordTriggers[i].type = type;
- if (type === 'flow') config.keywordTriggers[i].button = null; // botón solo aplica a "Respuesta automática"
- document.getElementById('tresponse_' + i).style.display = type === 'flow' ? 'none' : '';
+ if (type !== 'response') config.keywordTriggers[i].button = null; // botón solo aplica a "Respuesta automática"
+ document.getElementById('tresponse_' + i).style.display = type === 'response' ? '' : 'none';
  document.getElementById('tflow_' + i).style.display = type === 'flow' ? '' : 'none';
+ const aiEl = document.getElementById('tai_' + i); if (aiEl) aiEl.style.display = type === 'ai' ? '' : 'none';
  // Update radio label styles
  const labels = document.querySelectorAll('input[name="ttype_' + i + '"]');
  labels.forEach(function(r) {
@@ -4595,7 +4608,8 @@ function saveTriggers() {
  const triggers = config.keywordTriggers || [];
  for (let i = 0; i < triggers.length; i++) {
   const t = triggers[i];
-  if (t.type !== 'flow' && t.button) {
+  if (t.type === 'ai' && !(t.aiInstruction || '').trim()) { toast('El activador "' + (t.label || (i+1)) + '" es de tipo Agente IA pero no tiene guion'); return; }
+  if (t.type === 'response' && t.button) {
    if (!t.button.label || !t.button.url) { toast('El botón del activador "' + (t.label || (i+1)) + '" necesita texto y enlace'); return; }
    if (!/^https?:\/\//i.test(t.button.url)) { toast('El enlace del botón de "' + (t.label || (i+1)) + '" debe empezar con http:// o https://'); return; }
   }

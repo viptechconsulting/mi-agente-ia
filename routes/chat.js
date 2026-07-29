@@ -14,7 +14,7 @@ import {
   listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
 } from '../db.js'
 import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
-import { matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow } from '../services/keyword-trigger.js'
+import { matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow, setScriptTrigger, getScriptTrigger } from '../services/keyword-trigger.js'
 import { getServices, searchAvailability, createBooking, getLocations } from '../services/square.js'
 import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/medspa-response-schema.js'
 import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
@@ -529,7 +529,12 @@ export async function processMessage({ companyId, message, conversationId, visit
     const match = matchKeywordTrigger(cfg, message)
     if (match) {
       const { trigger, index } = match
-      if (trigger.type === 'flow' && trigger.steps?.length) {
+      if (trigger.type === 'ai' && trigger.aiInstruction) {
+        // Modo "Agente IA (guion)": no responde canned. Marca la conversación para
+        // que el LLM responda guiado por el guion (inyectado en el system prompt),
+        // y NO retorna: cae al flujo normal del agente.
+        setScriptTrigger(convId, { instruction: trigger.aiInstruction, strict: !!trigger.aiStrict, label: trigger.label || '' })
+      } else if (trigger.type === 'flow' && trigger.steps?.length) {
         startTriggerFlow(convId, index)
         const info = db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(convId, 'assistant', trigger.steps[0].message, Date.now())
         return { conversationId: convId, reply: trigger.steps[0].message, button: null, messageId: info.lastInsertRowid }
@@ -626,6 +631,17 @@ export async function processMessage({ companyId, message, conversationId, visit
   let leadState = isLynkroLead ? loadLeadState(convId) : null
   const leadSystemBlock = isLynkroLead ? buildLynkroLeadPromptModule(leadState) : ''
 
+  // Activador tipo "Agente IA (guion)": si esta conversación fue disparada por uno,
+  // inyecta el guion del usuario como contexto/objetivo (modo aumenta) o como guion
+  // obligatorio (modo estricto). Persiste toda la conversación via flow_state.
+  const scriptTrigger = getScriptTrigger(convId)
+  let triggerScriptBlock = ''
+  if (scriptTrigger?.instruction) {
+    triggerScriptBlock = '\n\n' + (scriptTrigger.strict
+      ? `━━━ GUION OBLIGATORIO — SEGUIR AL PIE DE LA LETRA ━━━\n${scriptTrigger.instruction}\n(Cíñete a este guion; no improvises fuera de él.)`
+      : `━━━ GUION DE ESTA CONVERSACIÓN (campaña específica) ━━━\nEsta persona entró por una campaña con este guion. Úsalo como objetivo, contexto y estilo de apertura, conservando tu inteligencia para conversar, calificar y cerrar:\n${scriptTrigger.instruction}`)
+  }
+
   const activeTools = []
   if (isMedspa) {
     activeTools.push(RESPOND_TO_PATIENT_TOOL)
@@ -640,7 +656,7 @@ export async function processMessage({ companyId, message, conversationId, visit
   const callParams = {
     model: cfg.model || 'claude-haiku-4-5-20251001',
     max_tokens: (hasCommercePro || hasSquare || isMedspa || isLynkroLead) ? 800 : 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock + leadSystemBlock,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock + leadSystemBlock + triggerScriptBlock,
     messages: (isMedspa ? windowHistory(history, 20, 16) : history).map(m => ({ role: m.role, content: m.content }))
   }
   if (activeTools.length > 0) callParams.tools = activeTools

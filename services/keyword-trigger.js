@@ -57,3 +57,15 @@ export function clearTriggerFlow(conversationId) {
   delete blob.keywordTrigger
   saveFlowBlob(conversationId, blob)
 }
+
+// Activador tipo "Agente IA (guion)": no responde canned; marca la conversación
+// para que el LLM responda guiado por el guion, y persiste durante toda la charla.
+export function setScriptTrigger(conversationId, data) {
+  const blob = loadFlowBlob(conversationId)
+  blob.scriptTrigger = data
+  saveFlowBlob(conversationId, blob)
+}
+
+export function getScriptTrigger(conversationId) {
+  return loadFlowBlob(conversationId).scriptTrigger || null
+}
