@@ -683,6 +683,27 @@ function lynkroEtapa(cur, flags) {
   }
 }
 
+// Teléfono real del lead o '' si no hay uno utilizable.
+// Instagram NO expone teléfono (visitor_id es un id interno); WhatsApp en modo
+// privado llega como '...@lid' y también oculta el número. Solo devolvemos un
+// número si: (a) el lead lo dio en el chat, o (b) es un jid de WhatsApp normal.
+function cleanPhone(s) {
+  if (!s) return ''
+  const d = String(s).replace(/[^\d]/g, '')
+  return /^\d{7,15}$/.test(d) ? d : ''
+}
+function lynkroPhone(channel, visitorId, capturedFields) {
+  const cf = capturedFields || {}
+  const given = cleanPhone(cf.whatsapp) || cleanPhone(cf.phone)
+  if (given) return given
+  const raw = (visitorId || '').replace(/^wa:|^ig:/, '')
+  if (channel === 'whatsapp' && !/@lid/i.test(raw)) {
+    const num = cleanPhone(raw.replace(/@.*$/, ''))
+    if (num) return num
+  }
+  return ''
+}
+
 // Mapeo etapa → lista operativa del usuario (5 listas del manual).
 function lynkroLista(etapa, snoozeActive, inReeng) {
   if (snoozeActive) return 'retomar'
@@ -744,7 +765,7 @@ function buildLynkroFunnel() {
     leads.push({
       id: r.id,
       name: r.lead_name || null,
-      phone: r.lead_phone || (r.visitor_id || '').replace(/^wa:|^ig:/, ''),
+      phone: lynkroPhone(r.channel, r.visitor_id, lq.captured_fields),
       channel: r.channel,
       etapa,
       lista,
@@ -776,11 +797,12 @@ adminRouter.get('/dashboard/lynkro-funnel.csv', requireAdmin, withCompany, (req,
   const lista = req.query.lista
   const rows = (lista && lista !== 'all') ? leads.filter(l => l.lista === lista) : leads
   const esc = v => '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"'
-  const header = ['Teléfono', 'Nombre', 'Negocio', 'Etapa', 'Lista', 'Resumen de la conversación', 'Última actividad']
+  const header = ['Teléfono', 'Canal', 'Nombre', 'Negocio', 'Etapa', 'Lista', 'Resumen de la conversación', 'Última actividad']
   const out = [header.map(esc).join(',')]
+  const chLabel = { whatsapp: 'WhatsApp', instagram: 'Instagram' }
   for (const l of rows) {
     const when = l.updated_at ? new Date(l.updated_at).toISOString().slice(0, 10) : ''
-    out.push([l.phone, l.name || '', l.business_type || '', l.etapa, LYNKRO_LISTA_LABEL[l.lista] || l.lista, l.resumen || '', when].map(esc).join(','))
+    out.push([l.phone, chLabel[l.channel] || l.channel, l.name || '', l.business_type || '', l.etapa, LYNKRO_LISTA_LABEL[l.lista] || l.lista, l.resumen || '', when].map(esc).join(','))
   }
   const csv = String.fromCharCode(0xFEFF) + out.join('\r\n') // BOM para que Excel respete acentos
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
