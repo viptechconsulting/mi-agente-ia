@@ -385,6 +385,21 @@ export async function sendInstagram(accessToken, recipientId, text) {
   if (d.error) console.error('[Instagram send]', d.error.message)
 }
 
+// Respuesta privada (DM) a un comentario de un post/reel. Es el único modo de
+// iniciar un DM con alguien que solo comentó: recipient = { comment_id }. Una vez
+// que responde en el DM, ya se le puede escribir con recipient = { id }.
+export async function sendInstagramCommentReply(accessToken, commentId, text) {
+  if (!accessToken || !commentId) return { ok: false }
+  const r = await fetch(`https://graph.instagram.com/v21.0/me/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ recipient: { comment_id: commentId }, message: { text }, messaging_type: 'RESPONSE' })
+  })
+  const d = await r.json().catch(() => ({}))
+  if (d.error) { console.error('[Instagram comment-reply]', d.error.message); return { ok: false, error: d.error.message } }
+  return { ok: true }
+}
+
 // Keyword-trigger button on Instagram via Meta's official "button template".
 // Falls back to plain text (link inline) if the template call fails, so a
 // customer never ends up with no reply because of a button-API error.
@@ -2260,7 +2275,7 @@ chatRouter.get('/instagram/connect', requireAdmin, withCompany, (req, res) => {
     return res.status(400).send('<h3 style="font-family:sans-serif;color:#c00">Credenciales de Instagram no configuradas en el servidor.</h3>')
   const redirectUri = `https://${req.get('host')}/api/instagram/callback`
   const state = signState({ companyId: req.company.id })
-  const scope = 'instagram_business_basic,instagram_business_manage_messages'
+  const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
   const url = `https://www.instagram.com/oauth/authorize?client_id=${igAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`
   res.redirect(url)
 })
@@ -2314,6 +2329,9 @@ chatRouter.get('/instagram/callback', async (req, res) => {
 })
 
 // Webhook verification
+// Dedupe de comentarios ya atendidos (evita doble DM si Meta reenvía el webhook).
+const handledComments = new Set()
+
 chatRouter.get('/instagram/webhook', (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query
   if (mode !== 'subscribe') return res.sendStatus(403)
@@ -2376,6 +2394,30 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
           else await sendInstagram(cfg.igAccessToken, senderId, result.reply)
         }
       } catch (err) { console.error('[Instagram]', err.message) }
+    }
+
+    // Comentarios en posts/reels: si el texto del comentario matchea un activador,
+    // iniciamos un DM privado con la apertura del agente (comentario → DM).
+    for (const change of (entry.changes || [])) {
+      if (change.field !== 'comments') continue
+      const v = change.value || {}
+      const commentId = v.id
+      const commentText = (v.text || '').trim()
+      const fromId = v.from?.id
+      if (!commentId || !commentText || !fromId) continue
+      if (fromId === pageId) continue // ignora comentarios propios
+      if (handledComments.has(commentId)) continue
+      const match = matchKeywordTrigger(cfg, commentText)
+      if (!match) continue
+      if (handledComments.size > 5000) handledComments.clear()
+      handledComments.add(commentId)
+      try {
+        const result = await processMessage({ companyId: company.id, message: commentText, visitorId: `ig:${fromId}`, channel: 'instagram' })
+        if (result?.reply) {
+          const pr = await sendInstagramCommentReply(cfg.igAccessToken, commentId, result.reply)
+          console.log(`[Instagram comment→DM] ${company.id} comment=${commentId} matched, DM sent=${pr.ok}${pr.error ? ' err=' + pr.error : ''}`)
+        }
+      } catch (err) { console.error('[Instagram comment]', err.message) }
     }
   }
 })
