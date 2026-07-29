@@ -16,6 +16,8 @@ const DEFAULT_STATE = {
   volume_level: null,
   avg_ticket: null,
   temperature: null,
+  vertical: null,
+  objection_type: null,
   handoff_required: false,
   handoff_reason: null,
   captured_fields: {},
@@ -71,6 +73,9 @@ export function saveState(conversationId, patch) {
     volume_level: patch.volume_level ?? current.volume_level,
     avg_ticket: patch.avg_ticket ?? current.avg_ticket,
     temperature: patch.temperature ?? current.temperature,
+    vertical: patch.vertical ?? current.vertical,
+    // objection_type es por-turno: se sobrescribe con la objeción más reciente (null si este turno no tuvo).
+    objection_type: patch.objection_type ?? current.objection_type,
     handoff_required: patch.handoff_required ?? current.handoff_required,
     handoff_reason: patch.handoff_reason ?? current.handoff_reason,
     captured_fields: { ...current.captured_fields, ...(patch.captured_fields || {}) },

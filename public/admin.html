@@ -484,6 +484,7 @@
  </div>
 
  <div id="tab-dashboard" class="tab active">
+ <div id="lynkroFunnel" style="display:none"></div>
  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:16px">
  <div>
  <h2 style="margin:0" data-i18n="h2_demo_mode">Modo demo</h2>
@@ -1150,6 +1151,15 @@
  </div>
 
  <div id="tab-followup" class="tab">
+  <div class="card">
+   <h2 style="margin:0 0 6px">Reactivación 30 / 60 / 90 días (Lynkro)</h2>
+   <p style="color:#888;font-size:12px;margin:0 0 14px">Links opcionales que el agente adjunta al retomar leads fríos. Si los dejas vacíos, el mensaje va solo texto.</p>
+   <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Guía gratuita de 7 puntos (día 60)</label>
+   <input id="reengageGuideUrl" placeholder="https://lynkro.io/guia-7-puntos" style="margin-bottom:12px">
+   <label style="font-size:12px;color:#aaa;display:block;margin-bottom:4px">Caso de éxito / testimonio (día 90)</label>
+   <input id="reengageCaseUrl" placeholder="https://lynkro.io/casos-de-exito">
+   <button onclick="save()" style="margin-top:14px">Guardar links</button>
+  </div>
   <div class="card">
    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <h2 style="margin:0">Follow-up automático</h2>
@@ -2689,7 +2699,7 @@ function render() {
  'agentName','personality','language','voiceExamples',
  'waBaseUrl','waInstance','waApiKey',
  'metaAppId','metaAppSecret',
- 'bgColor','userBubbleColor',
+ 'bgColor','userBubbleColor','reengageGuideUrl','reengageCaseUrl',
  'notifyEmail','smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom'].forEach(k => {
  const el = document.getElementById(k);
  if (el) el.value = config[k] || '';
@@ -3114,7 +3124,7 @@ function save() {
  'agentName','personality','language','voiceExamples',
  'waBaseUrl','waInstance','waApiKey',
  'metaAppId','metaAppSecret',
- 'bgColor','userBubbleColor',
+ 'bgColor','userBubbleColor','reengageGuideUrl','reengageCaseUrl',
  'notifyEmail','smtpHost','smtpPort','smtpUser','smtpPass','smtpFrom'].forEach(k => {
  const el = document.getElementById(k);
  if (el) config[k] = el.value;
@@ -3477,6 +3487,7 @@ function loadDashboard() {
  const fetchData = () => fetch('/api/dashboard', { headers: { 'x-admin-password': password } })
  .then(r => r.json()).then(renderDashboard);
  fetchData();
+ loadLynkroFunnel();
  clearInterval(dashInterval);
  dashInterval = setInterval(fetchData, 5000);
 }
@@ -3525,6 +3536,85 @@ function renderDashboard(d) {
  <div class="count">${a.c}</div>
  </div>`).join('')
  : '<p style="color:#666">Sin actividad aún.</p>';
+}
+
+// ── Funnel Lynkro (panel que aparece solo cuando la empresa activa es Lynkro) ──
+function loadLynkroFunnel() {
+ fetch('/api/dashboard/lynkro-funnel').then(r => r.json()).then(renderLynkroFunnel).catch(() => {});
+}
+const LK_ETAPA_COLOR = {
+ 'Primer contacto':'#64748b','Calificando':'#38bdf8','Demo ofrecido':'#a78bfa',
+ 'Demo hecho':'#4ade80','Objeción/duda':'#fbbf24','No califica':'#94a3b8',
+ 'Cerrada':'#64748b','A humano':'#f472b6','No contactar':'#ef4444'
+};
+const LK_VERT_LABEL = { clinica_estetica:'Clínica/Estética', salon_belleza:'Salón/Belleza', ecommerce:'Ecommerce', otro:'Otro', sin:'Sin clasificar' };
+const LK_TEMP = { CALIENTE:'🔥 Caliente', TIBIO:'🟡 Tibio', FRIO:'🧊 Frío', sin:'Sin señal' };
+function lkChips(obj, labels) {
+ return Object.entries(obj).filter(([,v]) => v > 0).map(([k,v]) =>
+  `<span style="display:inline-block;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:14px;padding:4px 10px;margin:3px;font-size:12px;color:#ccc">${(labels && labels[k]) || k}: <b style="color:#fff">${v}</b></span>`
+ ).join('') || '<span style="color:#666;font-size:12px">Sin datos aún.</span>';
+}
+function renderLynkroFunnel(d) {
+ const box = document.getElementById('lynkroFunnel');
+ if (!box) return;
+ if (!d || !d.lynkro) { box.style.display = 'none'; return; }
+ box.style.display = 'block';
+ const T = d.tiles;
+ const tile = (v,l,c) => `<div class="metric"><div class="v" style="color:${c||'#fff'}">${v}</div><div class="l">${l}</div></div>`;
+ box.innerHTML = `
+ <div class="card">
+  <h2 style="margin:0 0 4px">Funnel Lynkro</h2>
+  <p style="color:#888;font-size:12px;margin:0 0 14px">Estado del funnel de calificación y reactivación de leads.</p>
+  <div class="metrics" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px">
+   ${tile(T.conversaciones,'Conversaciones')}
+   ${tile(T.respondieron,'Respondieron','#38bdf8')}
+   ${tile(T.calificados,'Calificados','#a78bfa')}
+   ${tile(T.demoHecho,'Demo hecho','#4ade80')}
+   ${tile(T.noContactar,'No contactar','#ef4444')}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+   <div><div style="font-size:12px;color:#888;margin-bottom:6px">Por rubro</div>${lkChips(d.porVertical, LK_VERT_LABEL)}</div>
+   <div><div style="font-size:12px;color:#888;margin-bottom:6px">Por temperatura</div>${lkChips(d.porTemperatura, LK_TEMP)}</div>
+   <div><div style="font-size:12px;color:#888;margin-bottom:6px">Objeciones</div>${lkChips(d.objeciones)}</div>
+   <div><div style="font-size:12px;color:#888;margin-bottom:6px">Follow-ups enviados</div>${lkChips(d.followups)}</div>
+  </div>
+ </div>
+ <div class="card">
+  <h2 style="margin:0 0 12px">Leads (${d.leads.length})</h2>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+   <thead><tr style="color:#888;text-align:left;border-bottom:1px solid #2a2a2a">
+    <th style="padding:8px 6px">Lead</th><th>Etapa</th><th>Rubro</th><th>Temp.</th><th>Últ. actividad</th><th style="text-align:right;padding-right:6px">Acciones</th>
+   </tr></thead>
+   <tbody>
+   ${d.leads.map(l => {
+     const col = LK_ETAPA_COLOR[l.etapa] || '#64748b';
+     const name = (l.name || l.phone || '—').toString().replace(/</g,'&lt;');
+     const when = l.updated_at ? new Date(l.updated_at).toLocaleString() : '—';
+     return `<tr style="border-bottom:1px solid #1a1a1a">
+      <td style="padding:8px 6px"><div style="color:#fff">${name}</div><div style="color:#555;font-size:11px">${(l.phone||'').toString().replace(/</g,'&lt;')} · ${l.channel}</div></td>
+      <td><span style="background:${col}22;color:${col};border:1px solid ${col}55;border-radius:10px;padding:2px 8px;font-size:11px;white-space:nowrap">${l.etapa}</span></td>
+      <td style="color:#ccc">${LK_VERT_LABEL[l.vertical]||'—'}</td>
+      <td>${l.temperature?LK_TEMP[l.temperature]:'—'}</td>
+      <td style="color:#888;font-size:11px;white-space:nowrap">${when}</td>
+      <td style="text-align:right;padding-right:6px;white-space:nowrap">
+       <button onclick="markDemoDone('${l.id}')" title="Marca el demo como hecho → dispara el follow-up post-demo 24h después" style="font-size:11px;padding:4px 8px;background:${l.demo_done?'#14532d':'#0a2a0a'};color:#4ade80;border:1px solid #1a4a1a;text-transform:none;letter-spacing:0">${l.demo_done?'✓ Demo hecho':'Demo hecho'}</button>
+       <button onclick="toggleNoContact('${l.id}',${l.do_not_contact?false:true})" title="No volver a contactar" style="font-size:11px;padding:4px 8px;margin-left:4px;background:${l.do_not_contact?'#3a1414':'#1a1a1a'};color:${l.do_not_contact?'#ef4444':'#888'};border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">${l.do_not_contact?'✕ No contactar':'No contactar'}</button>
+      </td>
+     </tr>`;
+   }).join('') || '<tr><td colspan="6" style="color:#666;padding:14px">Sin leads todavía.</td></tr>'}
+   </tbody>
+  </table>
+  </div>
+ </div>`;
+}
+function markDemoDone(id) {
+ fetch(`/api/lynkro/conversations/${id}/demo-done`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+  .then(r=>r.json()).then(()=>{ toast('Demo marcado — el follow-up sale en 24h'); loadLynkroFunnel(); });
+}
+function toggleNoContact(id, val) {
+ fetch(`/api/lynkro/conversations/${id}/do-not-contact`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({value:val}) })
+  .then(r=>r.json()).then(()=>{ toast(val?'Marcado: no contactar':'Reactivado'); loadLynkroFunnel(); });
 }
 
 function loadAIInsights() {

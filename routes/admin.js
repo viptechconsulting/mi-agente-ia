@@ -660,6 +660,109 @@ Devuelve SOLO este JSON sin markdown:
 })
 
 // ============================================================
+// LYNKRO FUNNEL — dashboard del funnel de calificación (solo empresa Lynkro)
+// ============================================================
+// Debe coincidir con LYNKRO_COMPANY_ID en routes/chat.js. No se importa de ahí
+// porque chat.js tiene side-effects al importarse (arranca sesiones WhatsApp).
+const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
+
+function lynkroEtapa(cur, flags) {
+  if (flags.do_not_contact || cur === 'DO_NOT_CONTACT') return 'No contactar'
+  if (flags.demo_done) return 'Demo hecho'
+  switch (cur) {
+    case 'OPENING':
+    case 'BUSINESS_TYPE': return 'Primer contacto'
+    case 'VOLUME_DISCOVERY':
+    case 'TICKET_DISCOVERY': return 'Calificando'
+    case 'DEMO_OFFERED': return 'Demo ofrecido'
+    case 'QUESTION_HANDLING': return 'Objeción/duda'
+    case 'LOW_VOLUME_CLOSE': return 'No califica'
+    case 'CONVERSATION_COMPLETE': return 'Cerrada'
+    case 'HUMAN_HANDOFF': return 'A humano'
+    default: return 'Primer contacto'
+  }
+}
+
+adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res) => {
+  if (req.company.id !== LYNKRO_COMPANY_ID) return res.json({ lynkro: false })
+  const rows = db.prepare(`
+    SELECT id, visitor_id, channel, updated_at, flow_state, lead_name, lead_phone, do_not_contact
+    FROM conversations
+    WHERE company_id = ? AND channel IN ('whatsapp','instagram')
+    ORDER BY updated_at DESC
+  `).all(LYNKRO_COMPANY_ID)
+
+  const tiles = { conversaciones: 0, respondieron: 0, calificados: 0, demoHecho: 0, noContactar: 0 }
+  const porVertical = { clinica_estetica: 0, salon_belleza: 0, ecommerce: 0, otro: 0, sin: 0 }
+  const porTemperatura = { CALIENTE: 0, TIBIO: 0, FRIO: 0, sin: 0 }
+  const objeciones = { PRECIO: 0, TIMING: 0, PENSARLO: 0, CONSULTAR: 0, DESCONFIANZA: 0 }
+  const followups = { fu1: 0, fu2: 0, fu3: 0, reeng30: 0, reeng60: 0, reeng90: 0, postDemo: 0 }
+  const leads = []
+
+  for (const r of rows) {
+    let fs = {}
+    try { fs = r.flow_state ? JSON.parse(r.flow_state) : {} } catch {}
+    const lq = fs.leadQuali || {}
+    tiles.conversaciones++
+
+    const userCount = db.prepare("SELECT COUNT(*) c FROM messages WHERE conversation_id = ? AND role='user'").get(r.id).c
+    if (userCount >= 2) tiles.respondieron++   // engaged más allá del primer mensaje
+
+    const qualified = (lq.volume_level === 'MEDIO' || lq.volume_level === 'ALTO') && !!lq.captured_fields?.website && !!lq.captured_fields?.instagram
+    if (qualified) tiles.calificados++
+    if (fs.demo_done) tiles.demoHecho++
+    const dnc = r.do_not_contact === 1 || lq.current_state === 'DO_NOT_CONTACT'
+    if (dnc) tiles.noContactar++
+
+    porVertical[lq.vertical || 'sin'] = (porVertical[lq.vertical || 'sin'] || 0) + 1
+    porTemperatura[lq.temperature || 'sin'] = (porTemperatura[lq.temperature || 'sin'] || 0) + 1
+    if (lq.objection_type && objeciones[lq.objection_type] != null) objeciones[lq.objection_type]++
+
+    for (const k of ['fu1', 'fu2', 'fu3', 'reeng30', 'reeng60', 'reeng90']) if (fs[k]) followups[k]++
+    if (fs.post_demo_sent) followups.postDemo++
+
+    leads.push({
+      id: r.id,
+      name: r.lead_name || null,
+      phone: r.lead_phone || (r.visitor_id || '').replace(/^wa:|^ig:/, ''),
+      channel: r.channel,
+      etapa: lynkroEtapa(lq.current_state, { do_not_contact: dnc, demo_done: fs.demo_done }),
+      vertical: lq.vertical || null,
+      temperature: lq.temperature || null,
+      objection: lq.objection_type || null,
+      business_type: lq.business_type || null,
+      updated_at: r.updated_at,
+      demo_done: !!fs.demo_done,
+      do_not_contact: dnc
+    })
+  }
+
+  res.json({ lynkro: true, tiles, porVertical, porTemperatura, objeciones, followups, leads })
+})
+
+// Marcar "Demo hecho" → dispara el follow-up post-demo 24h después (runLynkroFollowUp).
+adminRouter.post('/lynkro/conversations/:id/demo-done', requireAdmin, (req, res) => {
+  const conv = db.prepare('SELECT id, company_id, flow_state FROM conversations WHERE id = ?').get(req.params.id)
+  if (!conv || conv.company_id !== LYNKRO_COMPANY_ID) return res.status(404).json({ error: 'Conversación no encontrada' })
+  let fs = {}
+  try { fs = conv.flow_state ? JSON.parse(conv.flow_state) : {} } catch {}
+  const done = req.body?.done !== false // default true; {done:false} desmarca
+  if (done) { fs.demo_done = true; fs.demo_done_at = Date.now(); delete fs.post_demo_sent }
+  else { delete fs.demo_done; delete fs.demo_done_at }
+  db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(fs), conv.id)
+  res.json({ ok: true, demo_done: !!fs.demo_done })
+})
+
+// Marcar / desmarcar "No contactar" — el job de follow-up respeta do_not_contact.
+adminRouter.post('/lynkro/conversations/:id/do-not-contact', requireAdmin, (req, res) => {
+  const conv = db.prepare('SELECT id, company_id FROM conversations WHERE id = ?').get(req.params.id)
+  if (!conv || conv.company_id !== LYNKRO_COMPANY_ID) return res.status(404).json({ error: 'Conversación no encontrada' })
+  const val = req.body?.value === false ? 0 : 1
+  db.prepare('UPDATE conversations SET do_not_contact = ? WHERE id = ?').run(val, conv.id)
+  res.json({ ok: true, do_not_contact: val })
+})
+
+// ============================================================
 // EMAIL NOTIFICATIONS
 // ============================================================
 adminRouter.post('/notify/test', requireAdmin, withCompany, async (req, res) => {

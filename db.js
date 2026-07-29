@@ -161,6 +161,10 @@ export const defaultConfig = {
     { label: 'Ver FAQ', message: 'Muéstrame las preguntas frecuentes' }
   ],
   bookingUrl: '',
+  // Lynkro Etapa 6 (reactivación 30/60/90) — links opcionales que el agente adjunta
+  // en los follow-ups de días 60 (guía) y 90 (caso de éxito). Vacío ⇒ va solo texto.
+  reengageGuideUrl: '',
+  reengageCaseUrl: '',
   igAccessToken: '',
   igVerifyToken: '',
   igPageId: '',

@@ -304,6 +304,7 @@ async function sendNotification({ type, conversationId, companyId }) {
         <div>🏢 <b>${leadState.business_type || 'Tipo de negocio no capturado'}</b></div>
         <div>💰 Ticket promedio: <b>${leadState.avg_ticket || 'no capturado'}</b></div>
         <div>📊 Volumen: <b>${leadState.volume_level || 'no capturado'}</b></div>
+        <div>🏷️ Rubro: <b>${leadState.vertical || 'no capturado'}</b></div>
         ${leadState.captured_fields?.website ? `<div>🌐 <b>${leadState.captured_fields.website}</b></div>` : ''}
         ${leadState.captured_fields?.instagram ? `<div>📷 <b>${leadState.captured_fields.instagram}</b></div>` : ''}
       </td></tr><tr><td style="height:14px"></td></tr>`
@@ -1590,6 +1591,51 @@ const LYNKRO_FU = {
   fu3: 'Una última para cerrar el tema: ¿sigue siendo prioridad dejar de perder esos clientes que se van sin respuesta, o lo retomamos más adelante?'
 }
 
+// Follow-up post-demo (Etapa 4C) — se dispara 24h después de que un humano marca
+// "Demo hecho" en el dashboard (state.demo_done + state.demo_done_at), no antes.
+const POST_DEMO_MSG = 'Gracias por el tiempo del demo 🙌 ¿Qué te quedó dando vueltas después de verlo? Si hay algo que no quedó claro o que te frena, prefiero saberlo directo antes que asumir. Sin presión, solo quiero entender tu punto.'
+
+// Etapa 6 — retomar 30/60/90 días con un ángulo nuevo cada vez. La base de tiempo
+// es el ÚLTIMO mensaje del lead (no updated_at, que nuestros propios envíos mueven).
+function reengSituation(lq) {
+  const neg = lq?.business_type ? `tu ${lq.business_type}` : 'tu negocio'
+  return `Hola, ¿cómo va todo? La última vez me contabas de ${neg}. ¿Cambió algo en cómo manejas los mensajes con tus clientes, o sigue más o menos igual? Lo pregunto sin intención de venderte nada — solo por saber si el tema sigue ahí.`
+}
+function reengGuide(cfg) {
+  const base = 'Hola 👋 Armamos una guía gratis de 7 puntos para responder a tus clientes en menos de 2 minutos, sin contratar a nadie nuevo. Te la dejo por si te sirve para tu operación'
+  const tail = ' — sin compromiso, cero venta detrás.'
+  return cfg?.reengageGuideUrl ? `${base}: ${cfg.reengageGuideUrl}${tail}` : `${base}${tail}`
+}
+function reengCase(lq, cfg) {
+  const byVertical = {
+    clinica_estetica: 'Hace poco una clínica en Brickell bajó su tiempo de respuesta de 4 horas a 90 segundos y recuperó 11 citas que se le escapaban, en el primer mes.',
+    salon_belleza: 'Hace poco un salón dejó de perder clientas que reservaban con la competencia solo porque no alcanzaban a contestar a tiempo — el sistema les respondía al instante.',
+    ecommerce: 'Hace poco una tienda recuperó ventas que se le perdían en preguntas de producto que quedaban sin responder — el sistema contestaba al toque y cerraba.'
+  }
+  const base = byVertical[lq?.vertical] || 'Hace poco un negocio como el tuyo dejó de perder clientes por no responder a tiempo — el sistema contesta al instante, como lo harías tú.'
+  const intro = 'Hola 👋 '
+  const outro = ' No sé si tu situación cambió, pero quería compartirte el caso por si te resulta útil'
+  return cfg?.reengageCaseUrl ? `${intro}${base}${outro}: ${cfg.reengageCaseUrl}` : `${intro}${base}${outro}.`
+}
+
+// Envío de un follow-up de Lynkro por el canal correcto (WhatsApp builtin/Twilio o Instagram).
+async function sendLynkroFU(conv, cfg, text) {
+  if (conv.channel === 'whatsapp') {
+    const conn = waConnections.get(conv.company_id)
+    if (conn?.sock && conn.state?.status === 'open') {
+      const rawJid = conv.visitor_id.replace('wa:', '')
+      const jid = rawJid.includes('@') ? rawJid : `${rawJid}@s.whatsapp.net`
+      const result = await conn.sock.sendMessage(jid, { text })
+      console.log(`[Lynkro FU] sendMessage result=${result ? result.key?.id : 'null'}`)
+    } else {
+      console.log(`[Lynkro FU] no conn or not open for company ${conv.company_id}`)
+      await sendWhatsApp(cfg, conv.visitor_id.replace('wa:', ''), text)
+    }
+  } else {
+    await sendInstagram(cfg.igAccessToken, conv.visitor_id.replace('ig:', ''), text)
+  }
+}
+
 export async function runLynkroFollowUp() {
   const now = Date.now()
   const H4  = 4  * 60 * 60 * 1000
@@ -1597,6 +1643,8 @@ export async function runLynkroFollowUp() {
   const D3  = 3  * 24 * 60 * 60 * 1000
   const D7  = 7  * 24 * 60 * 60 * 1000
   const D30 = 30 * 24 * 60 * 60 * 1000
+  const D60 = 60 * 24 * 60 * 60 * 1000
+  const D90 = 90 * 24 * 60 * 60 * 1000
 
   const convs = db.prepare(`
     SELECT id, visitor_id, channel, updated_at, flow_state, company_id
@@ -1612,7 +1660,24 @@ export async function runLynkroFollowUp() {
   for (const conv of convs) {
     try {
       const state = conv.flow_state ? JSON.parse(conv.flow_state) : {}
+      // Legacy: leads ya agotados por la cadencia vieja (>=30d silencio) tienen
+      // nurture=true; se saltan para NO disparar una ráfaga de reactivaciones en
+      // el deploy. Los leads que se enfríen de acá en adelante usan reeng30/60/90.
       if (state.nurture) continue
+
+      const lq = state.leadQuali || {}
+
+      // (1) Post-demo (Etapa 4C): 24h después de que un humano marca "Demo hecho"
+      // en el dashboard. Independiente del silencio — se envía aunque el lead haya
+      // respondido, porque es una invitación a dar feedback del demo.
+      if (state.demo_done && state.demo_done_at && !state.post_demo_sent && (now - state.demo_done_at) >= H24) {
+        await sendLynkroFU(conv, cfg, POST_DEMO_MSG)
+        state.post_demo_sent = true
+        db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
+        db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', POST_DEMO_MSG, now)
+        console.log(`[Lynkro FU] post_demo → ${conv.visitor_id}`)
+        continue
+      }
 
       // Only follow up when last message was from the bot (lead hasn't replied)
       const lastMsg = db.prepare('SELECT role FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1').get(conv.id)
@@ -1624,40 +1689,35 @@ export async function runLynkroFollowUp() {
 
       // Temperatura del lead (leadQuali.temperature). Un lead FRIO ("el mes que
       // viene", sin prisa) recibe UN solo seguimiento suave (fu1) y no se le
-      // insiste más; el resto sigue la cadencia completa.
-      const isCold = state.leadQuali?.temperature === 'FRIO'
+      // insiste más en la cadencia corta; igual entra a la reactivación 30/60/90.
+      const isCold = lq.temperature === 'FRIO'
 
+      // Cadencia corta = desde la última actividad (updated_at, que nuestros propios
+      // envíos mueven). Cadencia larga (Etapa 6) = desde el ÚLTIMO mensaje del lead,
+      // que es estable y no se corre cuando el bot manda un follow-up.
       const elapsed = now - conv.updated_at
+      const lu = db.prepare("SELECT MAX(created_at) as t FROM messages WHERE conversation_id = ? AND role = 'user'").get(conv.id)
+      const elapsedUser = now - (lu?.t || conv.updated_at)
       let fuKey = null
       let fuText = null
 
       if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; fuText = LYNKRO_FU.fu1[phase] }
       else if (!isCold && elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
       else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
-      else if (elapsed >= D7  && elapsed < D30 && !state.reactivacion) { state.reactivacion = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
-      else if (elapsed >= D30 && !state.nurture) { state.nurture = true; db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id); continue }
+      // Etapa 6 — reactivación con ángulo nuevo. Descendente para que un lead ya
+      // muy frío (p.ej. 100 días) reciba solo el ángulo más reciente, no los tres.
+      else if (elapsedUser >= D90 && !state.reeng90) { fuKey = 'reeng90'; fuText = reengCase(lq, cfg) }
+      else if (elapsedUser >= D60 && elapsedUser < D90 && !state.reeng60) { fuKey = 'reeng60'; fuText = reengGuide(cfg) }
+      else if (elapsedUser >= D30 && elapsedUser < D60 && !state.reeng30) { fuKey = 'reeng30'; fuText = reengSituation(lq) }
 
       if (!fuKey || !fuText) continue
 
       // En etapas de demo/cierre (mid/late), adjunta el link de agendamiento para
-      // que el próximo paso quede a un clic — nunca "te contacto" sin acción.
-      if (phase !== 'early' && cfg.bookingUrl) fuText += `\n\nAgenda aquí: ${cfg.bookingUrl}`
+      // que el próximo paso quede a un clic. Las reactivaciones (reeng*) NO lo llevan:
+      // son de valor/curiosidad, no de push a agenda.
+      if (!fuKey.startsWith('reeng') && phase !== 'early' && cfg.bookingUrl) fuText += `\n\nAgenda aquí: ${cfg.bookingUrl}`
 
-      if (conv.channel === 'whatsapp') {
-        const conn = waConnections.get(conv.company_id)
-        if (conn?.sock && conn.state?.status === 'open') {
-          const rawJid = conv.visitor_id.replace('wa:', '')
-          const jid = rawJid.includes('@') ? rawJid : `${rawJid}@s.whatsapp.net`
-          console.log(`[Lynkro FU] sending to jid=${jid} conn=${conn.state?.status}`)
-          const result = await conn.sock.sendMessage(jid, { text: fuText })
-          console.log(`[Lynkro FU] sendMessage result=${result ? result.key?.id : 'null'}`)
-        } else {
-          console.log(`[Lynkro FU] no conn or not open for company ${conv.company_id}`)
-          await sendWhatsApp(cfg, conv.visitor_id.replace('wa:', ''), fuText)
-        }
-      } else {
-        await sendInstagram(cfg.igAccessToken, conv.visitor_id.replace('ig:', ''), fuText)
-      }
+      await sendLynkroFU(conv, cfg, fuText)
 
       state[fuKey] = true
       db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
@@ -2246,11 +2306,12 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
       if (senderId === pageId || event.message?.is_echo) {
         const recipientId = event.recipient?.id || event.message?.recipient_id
         if (!recipientId) continue
-        if (text === '/' || text === '//') {
+        // Acepta */** (convención WhatsApp) y ///// para que el comando de pausa sea igual en todos los canales
+        if (text === '/' || text === '//' || text === '*' || text === '**') {
           const visitorId = `ig:${recipientId}`
           const conv = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND company_id = ? AND channel = 'instagram' ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
           if (conv) {
-            const mode = text === '/' ? 1 : 0
+            const mode = (text === '/' || text === '*') ? 1 : 0
             db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
             const ack = mode ? '⏸ IA pausada. Tú tienes el control.' : '▶ IA reactivada.'
             await sendInstagram(cfg.igAccessToken, recipientId, ack)
