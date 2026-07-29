@@ -693,8 +693,7 @@ function lynkroLista(etapa, snoozeActive, inReeng) {
   return 'en_conversacion'
 }
 
-adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res) => {
-  if (req.company.id !== LYNKRO_COMPANY_ID) return res.json({ lynkro: false })
+function buildLynkroFunnel() {
   const rows = db.prepare(`
     SELECT id, visitor_id, channel, updated_at, flow_state, lead_name, lead_phone, do_not_contact
     FROM conversations
@@ -754,13 +753,39 @@ adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res
       temperature: lq.temperature || null,
       objection: lq.objection_type || null,
       business_type: lq.business_type || null,
+      resumen: lq.conversation_summary || '',
       updated_at: r.updated_at,
       demo_done: !!fs.demo_done,
       do_not_contact: dnc
     })
   }
 
-  res.json({ lynkro: true, tiles, porVertical, porTemperatura, objeciones, followups, listas, leads })
+  return { tiles, porVertical, porTemperatura, objeciones, followups, listas, leads }
+}
+
+adminRouter.get('/dashboard/lynkro-funnel', requireAdmin, withCompany, (req, res) => {
+  if (req.company.id !== LYNKRO_COMPANY_ID) return res.json({ lynkro: false })
+  res.json({ lynkro: true, ...buildLynkroFunnel() })
+})
+
+// Export CSV de la lista de leads (respeta el filtro de lista activo: ?lista=xxx).
+const LYNKRO_LISTA_LABEL = { en_conversacion: 'En conversación', esperando_demo: 'Esperando demo', demo_completado: 'Demo completado', no_interesado: 'No interesado', retomar: 'Retomar' }
+adminRouter.get('/dashboard/lynkro-funnel.csv', requireAdmin, withCompany, (req, res) => {
+  if (req.company.id !== LYNKRO_COMPANY_ID) return res.status(404).send('No disponible')
+  const { leads } = buildLynkroFunnel()
+  const lista = req.query.lista
+  const rows = (lista && lista !== 'all') ? leads.filter(l => l.lista === lista) : leads
+  const esc = v => '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"'
+  const header = ['Teléfono', 'Nombre', 'Negocio', 'Etapa', 'Lista', 'Resumen de la conversación', 'Última actividad']
+  const out = [header.map(esc).join(',')]
+  for (const l of rows) {
+    const when = l.updated_at ? new Date(l.updated_at).toISOString().slice(0, 10) : ''
+    out.push([l.phone, l.name || '', l.business_type || '', l.etapa, LYNKRO_LISTA_LABEL[l.lista] || l.lista, l.resumen || '', when].map(esc).join(','))
+  }
+  const csv = String.fromCharCode(0xFEFF) + out.join('\r\n') // BOM para que Excel respete acentos
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="lynkro-leads-${lista || 'todos'}.csv"`)
+  res.send(csv)
 })
 
 // Marcar "Demo hecho" → dispara el follow-up post-demo 24h después (runLynkroFollowUp).
