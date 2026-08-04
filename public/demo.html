@@ -123,7 +123,7 @@ footer a:hover{color:var(--ac)}
     <span class="chip"><span class="chip-dot"></span>Calificación de leads</span>
   </div>
   <button class="hero-btn" onclick="scrollToChat()">
-    Iniciar conversación
+    <span id="heroBtnText">Iniciar conversación</span>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
   </button>
 </section>
@@ -164,14 +164,29 @@ footer a:hover{color:var(--ac)}
 </section>
 
 <footer>
-  Powered by <a href="https://chat.lynkro.io" target="_blank">Lynkro AI</a> · Entorno de demo
+  Powered by <a href="https://chat.lynkro.io" target="_blank">Lynkro AI</a> · <span id="footerText">Entorno de demo</span>
 </footer>
 
 <script>
-let cfg = { businessName:'', agentName:'Agente', accentColor:'#27F59B', welcomeMessage:'¡Hola! ¿En qué puedo ayudarte hoy?', description:'', quickReplies:[], faqs:[] };
+let cfg = { businessName:'', agentName:'Agente', accentColor:'#27F59B', welcomeMessage:'¡Hola! ¿En qué puedo ayudarte hoy?', description:'', quickReplies:[], faqs:[], language:'español' };
 let companyId = '';
 let demoHistory = [];
 const token = location.pathname.split('/').pop();
+
+const I18N = {
+  'español':   { badge:'DEMO EN VIVO', navCta:'Quiero uno para mi negocio →', heroLabel:'Agente activo · Responde al instante', heroPrefix:'Habla con el agente de', heroDesc:'Prueba cómo el agente de IA responde, califica leads y da seguimiento — exactamente como lo haría para tu negocio.', chip1:'Respuesta en segundos', chip2:'FAQs automáticas', chip3:'Calificación de leads', startBtn:'Iniciar conversación', roleDefault:'Asistente virtual', rolePrefix:'Asistente de', status:'En línea · Responde al instante', chatLabel:'— Prueba el agente en vivo —', placeholder:'Escribe tu mensaje…', footer:'Entorno de demo', welcome:'¡Hola! ¿En qué puedo ayudarte hoy?', errReply:'Lo siento, hubo un error. Intenta de nuevo.', errConn:'Error de conexión. Intenta de nuevo.', errLoad:'Error al cargar el agente. Recarga la página.' },
+  'inglés':    { badge:'LIVE DEMO', navCta:'I want one for my business →', heroLabel:'Agent active · Replies instantly', heroPrefix:'Chat with the agent for', heroDesc:'Try how the AI agent replies, qualifies leads, and follows up — exactly as it would for your business.', chip1:'Replies in seconds', chip2:'Automated FAQs', chip3:'Lead qualification', startBtn:'Start conversation', roleDefault:'Virtual assistant', rolePrefix:'Assistant for', status:'Online · Replies instantly', chatLabel:'— Try the agent live —', placeholder:'Type your message…', footer:'Demo environment', welcome:'Hi! How can I help you today?', errReply:'Sorry, something went wrong. Please try again.', errConn:'Connection error. Please try again.', errLoad:'Error loading the agent. Please reload the page.' },
+  'portugués': { badge:'DEMO EM TEMPO REAL', navCta:'Quero um para o meu negócio →', heroLabel:'Agente ativo · Responde na hora', heroPrefix:'Converse com o agente de', heroDesc:'Veja como o agente de IA responde, qualifica leads e faz o acompanhamento — exatamente como faria para o seu negócio.', chip1:'Resposta em segundos', chip2:'FAQs automáticas', chip3:'Qualificação de leads', startBtn:'Iniciar conversa', roleDefault:'Assistente virtual', rolePrefix:'Assistente de', status:'Online · Responde na hora', chatLabel:'— Teste o agente em tempo real —', placeholder:'Digite sua mensagem…', footer:'Ambiente de demonstração', welcome:'Olá! Como posso ajudar?', errReply:'Desculpe, ocorreu um erro. Tente novamente.', errConn:'Erro de conexão. Tente novamente.', errLoad:'Erro ao carregar o agente. Recarregue a página.' },
+  'francés':   { badge:'DÉMO EN DIRECT', navCta:'Je veux ça pour mon entreprise →', heroLabel:'Agent actif · Répond instantanément', heroPrefix:"Discutez avec l'agent de", heroDesc:"Découvrez comment l'agent IA répond, qualifie les prospects et effectue un suivi — exactement comme il le ferait pour votre entreprise.", chip1:'Réponse en quelques secondes', chip2:'FAQ automatiques', chip3:'Qualification des prospects', startBtn:'Démarrer la conversation', roleDefault:'Assistant virtuel', rolePrefix:'Assistant de', status:'En ligne · Répond instantanément', chatLabel:"— Essayez l'agent en direct —", placeholder:'Écrivez votre message…', footer:'Environnement de démo', welcome:'Bonjour ! Comment puis-je vous aider ?', errReply:"Désolé, une erreur s'est produite. Veuillez réessayer.", errConn:'Erreur de connexion. Veuillez réessayer.', errLoad:"Erreur de chargement de l'agent. Veuillez recharger la page." },
+  'hebreo':    { badge:'הדגמה חייה', navCta:'אני רוצה כזה לעסק שלי ←', heroLabel:'הסוכן פעיל · עונה באופן מיידי', heroPrefix:'שוחח עם הסוכן של', heroDesc:'בדוק כיצד סוכן ה-AI עונה, מסנן לידים ועוקב — בדיוק כמו שהוא יעשה בעסק שלך.', chip1:'מענה בתוך שניות', chip2:'שאלות נפוצות אוטומטיות', chip3:'סינון לידים', startBtn:'התחל שיחה', roleDefault:'עוזר וירטואלי', rolePrefix:'עוזר של', status:'מחובר · עונה באופן מיידי', chatLabel:'— נסה את הסוכן בזמן אמת —', placeholder:'הקלד את הודעתך…', footer:'סביבת הדגמה', welcome:'שלום! איך אפשר לעזור?', errReply:'מצטערים, אירעה שגיאה. נסה שוב.', errConn:'שגיאת חיבור. נסה שוב.', errLoad:'שגיאה בטעינת הסוכן. אנא רענן את הדף.', rtl:true },
+  'italiano':  { badge:'DEMO LIVE', navCta:'Lo voglio per la mia attività →', heroLabel:'Agente attivo · Risponde all\'istante', heroPrefix:"Parla con l'agente di", heroDesc:"Scopri come l'agente IA risponde, qualifica i lead e fa follow-up — esattamente come farebbe per la tua attività.", chip1:'Risposta in pochi secondi', chip2:'FAQ automatiche', chip3:'Qualificazione dei lead', startBtn:'Inizia conversazione', roleDefault:'Assistente virtuale', rolePrefix:'Assistente di', status:'Online · Risponde all\'istante', chatLabel:"— Prova l'agente dal vivo —", placeholder:'Scrivi il tuo messaggio…', footer:'Ambiente demo', welcome:'Ciao! Come posso aiutarti?', errReply:'Siamo spiacenti, si è verificato un errore. Riprova.', errConn:'Errore di connessione. Riprova.', errLoad:"Errore nel caricamento dell'agente. Ricarica la pagina." },
+  'alemán':    { badge:'LIVE-DEMO', navCta:'Das will ich für mein Unternehmen →', heroLabel:'Agent aktiv · Antwortet sofort', heroPrefix:'Chatte mit dem Agenten von', heroDesc:'Erlebe, wie der KI-Agent antwortet, Leads qualifiziert und nachfasst — genau wie er es für dein Unternehmen tun würde.', chip1:'Antwort in Sekunden', chip2:'Automatische FAQs', chip3:'Lead-Qualifizierung', startBtn:'Unterhaltung starten', roleDefault:'Virtueller Assistent', rolePrefix:'Assistent von', status:'Online · Antwortet sofort', chatLabel:'— Teste den Agenten live —', placeholder:'Schreibe deine Nachricht…', footer:'Demo-Umgebung', welcome:'Hallo! Wie kann ich dir helfen?', errReply:'Es ist ein Fehler aufgetreten. Bitte versuche es erneut.', errConn:'Verbindungsfehler. Bitte versuche es erneut.', errLoad:'Fehler beim Laden des Agenten. Bitte lade die Seite neu.' }
+};
+function t() { return I18N[cfg.language] || I18N['español']; }
+function pickWelcome(data) {
+  if (cfg.language === 'inglés' && data.welcomeMessageEn) return data.welcomeMessageEn;
+  return data.welcomeMessage || t().welcome;
+}
 
 fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
   if (data.error) {
@@ -180,10 +195,26 @@ fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
   }
   cfg = { ...cfg, ...data };
   companyId = data.companyId || '';
+  const i18n = t();
+  document.documentElement.lang = i18n.rtl ? 'he' : (cfg.language === 'inglés' ? 'en' : cfg.language === 'portugués' ? 'pt' : cfg.language === 'francés' ? 'fr' : cfg.language === 'italiano' ? 'it' : cfg.language === 'alemán' ? 'de' : 'es');
+  if (i18n.rtl) document.documentElement.dir = 'rtl';
 
   const ac = data.accentColor || '#27F59B';
   document.documentElement.style.setProperty('--ac', ac);
   document.documentElement.style.setProperty('--ac2', ac);
+
+  document.getElementById('navBadge').textContent = i18n.badge;
+  document.getElementById('navCta').textContent = i18n.navCta;
+  document.getElementById('heroLabel').textContent = i18n.heroLabel;
+  document.getElementById('heroTitle').innerHTML = `${escH(i18n.heroPrefix)}<br><span id="heroName">tu negocio</span>`;
+  document.getElementById('heroDesc').textContent = i18n.heroDesc;
+  document.getElementById('heroChips').innerHTML = `<span class="chip"><span class="chip-dot"></span>${escH(i18n.chip1)}</span><span class="chip"><span class="chip-dot"></span>${escH(i18n.chip2)}</span><span class="chip"><span class="chip-dot"></span>${escH(i18n.chip3)}</span>`;
+  document.getElementById('heroBtnText').textContent = i18n.startBtn;
+  document.getElementById('acRole').textContent = i18n.roleDefault;
+  document.querySelector('.ac-status').lastChild.textContent = i18n.status;
+  document.querySelector('.chat-label').textContent = i18n.chatLabel;
+  document.getElementById('chatInput').setAttribute('placeholder', i18n.placeholder);
+  document.getElementById('footerText').textContent = i18n.footer;
 
   const name = data.businessName || 'tu negocio';
   document.title = `Demo · ${name}`;
@@ -191,7 +222,7 @@ fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
   document.getElementById('heroName').style.color = ac;
   if (data.description) document.getElementById('heroDesc').textContent = data.description;
   document.getElementById('acName').textContent = data.agentName || 'Agente IA';
-  document.getElementById('acRole').textContent = `Asistente de ${name}`;
+  document.getElementById('acRole').textContent = `${i18n.rolePrefix} ${name}`;
   document.getElementById('chatUrl').textContent = `${location.host} · ${name}`;
   if (data.logoUrl) {
     const av = document.getElementById('acAvatar');
@@ -206,7 +237,7 @@ fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
   const body = document.getElementById('chatBody');
   const wMsg = document.createElement('div');
   wMsg.className = 'chat-msg agent';
-  wMsg.innerHTML = linkify(data.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte hoy?');
+  wMsg.innerHTML = linkify(pickWelcome(data));
   body.appendChild(wMsg);
   if (data.quickReplies && data.quickReplies.length) {
     const qr = document.createElement('div');
@@ -220,7 +251,7 @@ fetch(`/api/demo/config/${token}`).then(r => r.json()).then(data => {
     body.appendChild(qr);
   }
 }).catch(() => {
-  document.getElementById('chatBody').innerHTML = `<p style="color:#7a8fa8;text-align:center;margin-top:60px">Error al cargar el agente. Recarga la página.</p>`;
+  document.getElementById('chatBody').innerHTML = `<p style="color:#7a8fa8;text-align:center;margin-top:60px">${escH(t().errLoad)}</p>`;
 });
 
 function scrollToChat() {
@@ -256,7 +287,7 @@ function sendMsg(text) {
   }).then(r => r.json()).then(d => {
     typing.remove();
     if (d.history) demoHistory = d.history;
-    const reply = d.error ? 'Lo siento, hubo un error. Intenta de nuevo.' : d.reply;
+    const reply = d.error ? t().errReply : d.reply;
     const aDiv = document.createElement('div');
     aDiv.className = 'chat-msg agent';
     aDiv.innerHTML = linkify(reply);
@@ -266,14 +297,22 @@ function sendMsg(text) {
     typing.remove();
     const errDiv = document.createElement('div');
     errDiv.className = 'chat-msg agent';
-    errDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+    errDiv.textContent = t().errConn;
     body.appendChild(errDiv);
     body.scrollTop = body.scrollHeight;
   });
 }
 
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function linkify(s){ return escH(s).replace(/\n/g,'<br>').replace(/(https?:\/\/[^\s<>"&]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">$1</a>'); }
+function videoEmbed(url){
+  if(/\.(mp4|webm|mov)(\?|$)/i.test(url)) return `<video src="${url}" controls playsinline preload="metadata" style="display:block;width:100%;margin-top:8px;border-radius:10px"></video>`;
+  const yt=url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+  if(yt) return `<div style="position:relative;width:100%;padding-top:56.25%;margin-top:8px"><iframe src="https://www.youtube.com/embed/${yt[1]}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px" allow="fullscreen; encrypted-media" loading="lazy"></iframe></div>`;
+  const vm=url.match(/vimeo\.com\/(\d+)/);
+  if(vm) return `<div style="position:relative;width:100%;padding-top:56.25%;margin-top:8px"><iframe src="https://player.vimeo.com/video/${vm[1]}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px" allow="fullscreen" loading="lazy"></iframe></div>`;
+  return '';
+}
+function linkify(s){ return escH(s).replace(/\n/g,'<br>').replace(/(https?:\/\/[^\s<>"&]+)/g,(m,url)=>videoEmbed(url)||`<a href="${url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">${url}</a>`); }
 </script>
 </body>
 </html>

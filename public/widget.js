@@ -240,9 +240,19 @@
   }
 
   // ── Messages ─────────────────────────────────────────────────
+  // A video URL in a reply becomes an inline player in the bubble. ponytail:
+  // handles .mp4/.webm/.mov (native) + youtube/vimeo (iframe); other links stay links.
+  function videoEmbed(url) {
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(url)) return `<video src="${url}" controls playsinline preload="metadata" style="display:block;width:100%;margin-top:8px;border-radius:10px"></video>`;
+    const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+    if (yt) return `<div style="position:relative;width:100%;padding-top:56.25%;margin-top:8px"><iframe src="https://www.youtube.com/embed/${yt[1]}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px" allow="fullscreen; encrypted-media" loading="lazy"></iframe></div>`;
+    const vm = url.match(/vimeo\.com\/(\d+)/);
+    if (vm) return `<div style="position:relative;width:100%;padding-top:56.25%;margin-top:8px"><iframe src="https://player.vimeo.com/video/${vm[1]}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:10px" allow="fullscreen" loading="lazy"></iframe></div>`;
+    return '';
+  }
   function linkify(text) {
     const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return esc.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">$1</a>');
+    return esc.replace(/(https?:\/\/[^\s<>"]+)/g, (m, url) => videoEmbed(url) || `<a href="${url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all">${url}</a>`);
   }
 
   function addBubble(role, text, button) {
