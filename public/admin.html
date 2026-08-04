@@ -1380,6 +1380,17 @@
    <button onclick="copyShareLink()" style="white-space:nowrap;background:rgba(39,245,155,.1);color:var(--gold);border:1px solid rgba(39,245,155,.3)">Copiar link</button>
    <button onclick="window.open(document.getElementById('shareLink').value,'_blank')" style="white-space:nowrap;background:var(--card);color:var(--muted);border:1px solid var(--border)">Abrir</button>
   </div>
+  <div id="shareExpiryRow" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px">
+   <label style="margin:0;color:var(--muted);font-size:13px">Expiración del link:</label>
+   <select id="shareExpiry" onchange="setShareExpiry(this.value)" style="width:auto;flex:0 0 auto">
+    <option value="">Nunca (no expira)</option>
+    <option value="1">1 día</option>
+    <option value="3">3 días</option>
+    <option value="7">7 días</option>
+    <option value="30">30 días</option>
+   </select>
+   <span id="shareExpiryStatus" style="color:var(--muted);font-size:12px"></span>
+  </div>
  </div>
  <div class="card">
  <h2 data-i18n="h2_embed">Código para embeber</h2>
@@ -2746,6 +2757,7 @@ function render() {
  `<script src="${location.origin}/widget.js" data-api="${location.origin}" data-company="${activeCompanyId}"><\/script>`;
  // Share link — usa share_token si existe; si no, lo genera en el servidor
  if (document.getElementById('shareLink')) updateShareLink();
+ renderShareExpiry();
 }
 
 async function updateShareLink() {
@@ -2761,6 +2773,43 @@ async function updateShareLink() {
   } catch (e) { console.error('[shareLink]', e.message) }
  }
  el.value = tok ? `${location.origin}/demo/${tok}` : `${location.origin}/chat?company=${activeCompanyId}`;
+}
+
+// Selector de expiración del link directo — solo superadmin (el PATCH lo exige)
+function renderShareExpiry() {
+ const row = document.getElementById('shareExpiryRow');
+ if (!row) return;
+ row.style.display = isSuperAdmin ? 'flex' : 'none';
+ if (!isSuperAdmin) return;
+ const co = companies.find(c => c.id === activeCompanyId);
+ const exp = co?.expires_at || null;
+ const status = document.getElementById('shareExpiryStatus');
+ if (exp) {
+  const days = Math.ceil((exp - Date.now()) / 86400000);
+  status.textContent = days > 0 ? `Expira en ${days} día(s)` : 'Ya expiró';
+  status.style.color = days > 0 ? 'var(--muted)' : '#ff6b6b';
+ } else {
+  status.textContent = 'Sin expiración';
+  status.style.color = 'var(--muted)';
+ }
+ document.getElementById('shareExpiry').value = ''; // el select fija una NUEVA expiración; el estado actual va en el texto
+}
+
+async function setShareExpiry(v) {
+ const co = companies.find(c => c.id === activeCompanyId);
+ const expires_at = v === '' ? null : Date.now() + parseInt(v, 10) * 86400000;
+ try {
+  await api('/api/companies/' + activeCompanyId, {
+   method: 'PATCH',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({ expires_at })
+  });
+  if (co) co.expires_at = expires_at;
+  renderShareExpiry();
+  toast('Expiración actualizada ✓');
+ } catch (e) {
+  alert('No se pudo actualizar la expiración: ' + e.message);
+ }
 }
 
 function renderFaqs() {
