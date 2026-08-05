@@ -414,6 +414,20 @@ export async function sendInstagramCommentReply(accessToken, commentId, text) {
   return { ok: true }
 }
 
+// Respuesta PÚBLICA al comentario (visible en el post), distinta del DM privado.
+// Endpoint /{comment-id}/replies. Se usa para avisar "te envié un DM".
+export async function sendInstagramCommentPublicReply(accessToken, commentId, text) {
+  if (!accessToken || !commentId) return { ok: false }
+  const r = await fetch(`https://graph.instagram.com/v21.0/${commentId}/replies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ message: text })
+  })
+  const d = await r.json().catch(() => ({}))
+  if (d.error) { console.error('[Instagram comment-public-reply]', d.error.message); return { ok: false, error: d.error.message } }
+  return { ok: true }
+}
+
 // Keyword-trigger button on Instagram via Meta's official "button template".
 // Falls back to plain text (link inline) if the template call fails, so a
 // customer never ends up with no reply because of a button-API error.
@@ -2429,7 +2443,10 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
         const result = await processMessage({ companyId: company.id, message: commentText, visitorId: `ig:${fromId}`, channel: 'instagram' })
         if (result?.reply) {
           const pr = await sendInstagramCommentReply(cfg.igAccessToken, commentId, result.reply)
-          console.log(`[Instagram comment→DM] ${company.id} comment=${commentId} matched, DM sent=${pr.ok}${pr.error ? ' err=' + pr.error : ''}`)
+          // Además del DM, responde públicamente al comentario avisando que llegó el DM.
+          const publicText = cfg.igCommentPublicReply || 'Gracias, te envié un DM :) con la información'
+          const pub = await sendInstagramCommentPublicReply(cfg.igAccessToken, commentId, publicText)
+          console.log(`[Instagram comment→DM] ${company.id} comment=${commentId} matched, DM sent=${pr.ok}, public reply=${pub.ok}${pr.error ? ' dmErr=' + pr.error : ''}${pub.error ? ' pubErr=' + pub.error : ''}`)
         }
       } catch (err) { console.error('[Instagram comment]', err.message) }
     }
