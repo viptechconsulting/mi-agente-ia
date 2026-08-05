@@ -21,6 +21,7 @@ import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
 import { loadState as loadMedspaState, saveState as saveMedspaState, setDoNotContact } from '../services/medspa-state.js'
 import { canModifyAppointment } from '../services/appointments.js'
 import { RESPOND_TO_LEAD_TOOL, validateAgentResponse as validateLeadResponse } from '../services/lynkro-lead-schema.js'
+import { splitVideoMessage } from '../services/wa-media.js'
 import { buildLynkroLeadPromptModule } from '../services/lynkro-lead-prompt.js'
 import { loadState as loadLeadState, saveState as saveLeadState, shouldNotifyQualified } from '../services/lynkro-lead-state.js'
 import { transcribeAudioBuffer } from '../services/transcribe.js'
@@ -340,16 +341,29 @@ export function usesEvolution(cfg) {
   return !!(cfg && cfg.waBaseUrl && cfg.waInstance && cfg.waApiKey)
 }
 
+async function evoPost(cfg, action, body) {
+  return fetch(`${cfg.waBaseUrl.replace(/\/$/, '')}/message/${action}/${cfg.waInstance}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': cfg.waApiKey },
+    body: JSON.stringify(body)
+  })
+}
+
 export async function sendWhatsApp(cfg, phone, text) {
   if (!cfg.waBaseUrl || !cfg.waInstance || !cfg.waApiKey) return
-  const url = `${cfg.waBaseUrl.replace(/\/$/, '')}/message/sendText/${cfg.waInstance}`
+  const vid = splitVideoMessage(text)
   try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': cfg.waApiKey },
-      body: JSON.stringify({ number: phone, text })
-    })
-    if (!r.ok) console.error('WA send failed:', r.status, await r.text())
+    if (vid) {
+      const r = await evoPost(cfg, 'sendMedia', {
+        number: phone, mediatype: 'video', mimetype: 'video/mp4',
+        media: vid.mediaUrl, caption: vid.caption, fileName: vid.mediaUrl.split('/').pop()
+      })
+      if (r.ok) return
+      // Don't drop the message: fall back to plain text (link) if media send fails.
+      console.error('WA media send failed, falling back to text:', r.status, await r.text().catch(() => ''))
+    }
+    const r = await evoPost(cfg, 'sendText', { number: phone, text })
+    if (!r.ok) console.error('WA send failed:', r.status, await r.text().catch(() => ''))
   } catch (err) { console.error('WA send error:', err.message) }
 }
 
