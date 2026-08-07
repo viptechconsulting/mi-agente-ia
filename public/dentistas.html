@@ -14,11 +14,11 @@
 <meta property="og:url" content="https://chat.lynkro.io/dentistas">
 <meta property="og:title" content="Lynkro para dentistas — Ningún paciente sin respuesta">
 <meta property="og:description" content="Responde al instante, entiende el miedo del paciente y agenda la cita. Sin dejar de atender consulta.">
-<meta property="og:image" content="https://chat.lynkro.io/logo.png">
+<meta property="og:image" content="https://chat.lynkro.io/img-dent/dent-team.jpg">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
 <style>
   :root{
@@ -28,7 +28,7 @@
     --border:#252A38; --border2:rgba(255,255,255,.07);
     --text:#F5F7FA; --text2:#A9B7C6; --muted:#64748B;
     --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    --display:'Fraunces',Georgia,serif;
+    --display:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     --r:16px; --r-sm:10px; --maxw:1120px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -41,8 +41,8 @@
   ::selection{background:var(--green-2);color:#04110a}
 
   /* ---- type ---- */
-  h1{font-family:var(--display);font-weight:600;font-size:clamp(2.3rem,5.2vw,4.1rem);line-height:1.04;letter-spacing:-.02em}
-  h2{font-family:var(--display);font-weight:600;font-size:clamp(1.8rem,3.6vw,2.9rem);line-height:1.1;letter-spacing:-.015em}
+  h1{font-family:var(--display);font-weight:800;font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.05;letter-spacing:-.035em}
+  h2{font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,3.7vw,2.9rem);line-height:1.1;letter-spacing:-.03em}
   h3{font-weight:700;font-size:1.15rem;letter-spacing:-.01em}
   .eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--green-2)}
   .lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--text2);max-width:44ch}
@@ -174,7 +174,7 @@
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;margin:0 auto}
   @media(max-width:720px){.stats{grid-template-columns:1fr}}
   .stat{text-align:center;padding:34px 20px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r)}
-  .stat-n{font-family:var(--display);font-weight:600;font-size:clamp(2.6rem,5vw,3.6rem);line-height:1;background:linear-gradient(135deg,#fff,#27F59B);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .stat-n{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:clamp(2.6rem,5vw,3.6rem);line-height:1;background:linear-gradient(135deg,#fff,#27F59B);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   .stat-l{margin-top:12px;color:var(--text2);font-size:14px;font-weight:500}
   .results-note{text-align:center;margin-top:30px;color:var(--muted);font-size:13.5px}
 
@@ -210,6 +210,45 @@
   .sticky-bar .btn{flex:1;padding:14px}
   @media(max-width:620px){.sticky-bar{display:flex}body{padding-bottom:76px}}
 
+  /* ---- media / imágenes ---- */
+  .media-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center}
+  @media(max-width:840px){.media-grid{grid-template-columns:1fr;gap:34px}}
+  .media-img{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .media-img img{width:100%;height:100%;object-fit:cover;display:block}
+  .media-img::after{content:'';position:absolute;inset:0;background:linear-gradient(150deg,transparent 55%,rgba(0,200,90,.15));pointer-events:none}
+  .media-txt .eyebrow{display:block;margin-bottom:16px}
+  .media-txt h2{margin-bottom:16px}
+  .media-txt>p{color:var(--text2)}
+  .story-quote-inline{margin-top:26px;padding-left:18px;border-left:3px solid var(--green-2);font-size:clamp(1.2rem,2vw,1.55rem);font-weight:600;line-height:1.32;letter-spacing:-.015em;color:var(--text)}
+  .story-quote-inline span{display:block;margin-top:10px;font-size:.68em;font-weight:500;color:var(--muted)}
+
+  /* ---- servicios (tira de imágenes) ---- */
+  .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:720px){.svc-grid{grid-template-columns:1fr 1fr;gap:12px}}
+  .svc{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3}
+  .svc img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+  .svc:hover img{transform:scale(1.06)}
+  .svc-cap{position:absolute;left:0;right:0;bottom:0;padding:26px 18px 15px;font-weight:700;font-size:16px;color:#fff;background:linear-gradient(transparent,rgba(5,8,12,.92))}
+
+  /* ---- resultados: stats compactos ---- */
+  .stats-inline{display:flex;flex-direction:column;gap:12px;margin-top:28px}
+  .stat-row{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .stat-row .n{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:2.1rem;line-height:1;background:linear-gradient(135deg,#fff,#27F59B);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;min-width:78px}
+  .stat-row .l{color:var(--text2);font-size:14.5px}
+
+  /* ---- demo modal (iframe embebido) ---- */
+  .modal{position:fixed;inset:0;z-index:100;display:none}
+  .modal.open{display:block}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(5,8,12,.78);backdrop-filter:blur(4px)}
+  .modal-card{position:absolute;top:3vh;left:50%;transform:translateX(-50%);width:min(460px,94vw);height:94vh;background:var(--bg);border:1px solid var(--border);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 100px rgba(0,0,0,.6)}
+  .modal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px 11px 16px;border-bottom:1px solid var(--border2);background:var(--s1)}
+  .modal-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;white-space:nowrap}
+  .modal-actions{display:flex;align-items:center;gap:8px}
+  .modal-close{width:34px;height:34px;flex-shrink:0;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .modal-close:hover{background:rgba(255,255,255,.12)}
+  .modal-body{flex:1;background:#0B0F14}
+  .modal-body iframe{width:100%;height:100%;border:0;display:block}
+
   @media(prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
     .reveal{opacity:1;transform:none}
@@ -226,7 +265,7 @@
   <div class="nav-inner">
     <a href="https://lynkro.io" class="nav-logo" aria-label="Lynkro"><img src="/logo.png" alt="Lynkro"></a>
     <div class="nav-cta">
-      <a href="#demo" class="nav-link">Ver demo</a>
+      <a href="/demo/80JokOpEPO8uisYq4cXvBnle" class="nav-link" onclick="openDemo();return false">Ver demo</a>
       <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary" style="padding:11px 20px;font-size:14px">Agendar una cita</a>
     </div>
   </div>
@@ -312,15 +351,17 @@
 <!-- STORY: Carlos -->
 <section id="story" class="sec">
   <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="eyebrow">Una historia real</span>
-      <h2>Carlos era dentista en Los Ángeles.</h2>
-      <p>Cada vez que estaba en consulta, entraban mensajes de gente buscando implantes, blanqueamiento, limpieza. Muchos quedaban sin respuesta.</p>
+    <div class="media-grid" style="margin-bottom:56px">
+      <div class="media-img reveal">
+        <img src="/img-dent/dent-story.jpg" alt="Dentista atendiendo a un paciente en consulta" loading="lazy" width="760" height="900">
+      </div>
+      <div class="media-txt reveal">
+        <span class="eyebrow">Una historia real</span>
+        <h2>Carlos era dentista en Los Ángeles.</h2>
+        <p>Cada vez que estaba en consulta, entraban mensajes de gente buscando implantes, blanqueamiento, limpieza. Muchos quedaban sin respuesta.</p>
+        <p class="story-quote-inline">“Tengo miedo al dolor, pero necesito arreglar esto.”<span>— un martes, a las 10:14am</span></p>
+      </div>
     </div>
-
-    <p class="story-quote reveal">“Tengo miedo al dolor, pero necesito arreglar esto.”
-      <span>— un martes, a las 10:14am</span>
-    </p>
 
     <div class="beat">
       <div class="beat-card beat-before reveal">
@@ -372,19 +413,40 @@
   </div>
 </section>
 
+<!-- SERVICIOS -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Lo que preguntan tus pacientes</span>
+      <h2>Implantes, blanqueamiento, limpieza…</h2>
+      <p>Cada consulta que entra por WhatsApp o Instagram es una cita potencial. Lynkro las atiende todas, al instante.</p>
+    </div>
+    <div class="svc-grid">
+      <div class="svc reveal"><img src="/img-dent/svc-implant.jpg" alt="Implantes dentales" loading="lazy" width="640" height="480"><div class="svc-cap">Implantes</div></div>
+      <div class="svc reveal"><img src="/img-dent/svc-smile.jpg" alt="Blanqueamiento dental" loading="lazy" width="640" height="480"><div class="svc-cap">Blanqueamiento</div></div>
+      <div class="svc reveal"><img src="/img-dent/svc-clean.jpg" alt="Limpieza dental" loading="lazy" width="640" height="480"><div class="svc-cap">Limpieza</div></div>
+    </div>
+  </div>
+</section>
+
 <!-- RESULTS -->
 <section id="results" class="sec">
   <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="eyebrow">Primer mes de Carlos</span>
-      <h2>Sin dejar de atender a sus pacientes.</h2>
+    <div class="media-grid">
+      <div class="media-txt reveal">
+        <span class="eyebrow">Primer mes de Carlos</span>
+        <h2>Sin dejar de atender a sus pacientes.</h2>
+        <div class="stats-inline">
+          <div class="stat-row"><span class="n">302</span><span class="l">conversaciones activas</span></div>
+          <div class="stat-row"><span class="n">210</span><span class="l">leads recuperados</span></div>
+          <div class="stat-row"><span class="n">0</span><span class="l">personal adicional contratado</span></div>
+        </div>
+        <p class="results-note" style="text-align:left;margin-top:22px">Resultados de un caso real. Tu clínica es distinta — por eso mejor lo pruebas tú mismo.</p>
+      </div>
+      <div class="media-img reveal">
+        <img src="/img-dent/dent-team.jpg" alt="Dentista con una paciente satisfecha en la clínica" loading="lazy" width="900" height="720">
+      </div>
     </div>
-    <div class="stats">
-      <div class="stat reveal"><div class="stat-n">302</div><div class="stat-l">conversaciones activas</div></div>
-      <div class="stat reveal"><div class="stat-n">210</div><div class="stat-l">leads recuperados</div></div>
-      <div class="stat reveal"><div class="stat-n">0</div><div class="stat-l">personal adicional contratado</div></div>
-    </div>
-    <p class="results-note reveal">Resultados de un caso real. Tu clínica es distinta — por eso mejor lo pruebas tú mismo.</p>
   </div>
 </section>
 
@@ -394,11 +456,13 @@
     <div class="demo-box reveal">
       <span class="eyebrow">Demo en vivo</span>
       <h2 style="margin-top:14px">Escríbele como si fueras un paciente.</h2>
-      <p>Configuramos un agente para una clínica dental de ejemplo. Pregúntale por implantes, precios o dile que tienes miedo al dolor — y mira cómo responde y agenda.</p>
-      <a href="https://chat.lynkro.io/demo/80JokOpEPO8uisYq4cXvBnle" class="btn btn-primary btn-lg">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="9 7 17 12 9 17 9 7"/></svg>
-        Probar el agente dental
-      </a>
+      <p>Configuramos un agente para una clínica dental de ejemplo. Pregúntale por implantes, precios o dile que tienes miedo al dolor — y mira cómo responde y agenda. Sin salir de esta página.</p>
+      <div style="display:flex;justify-content:center">
+        <a href="/demo/80JokOpEPO8uisYq4cXvBnle" class="btn btn-primary btn-lg" onclick="openDemo();return false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="9 7 17 12 9 17 9 7"/></svg>
+          Probar el agente dental
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -469,7 +533,40 @@
   <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
 </a>
 
+<!-- DEMO MODAL -->
+<div id="demoModal" class="modal" aria-hidden="true" role="dialog" aria-label="Demo dental en vivo">
+  <div class="modal-backdrop" onclick="closeDemo()"></div>
+  <div class="modal-card">
+    <div class="modal-bar">
+      <div class="modal-title"><span class="dot-live"></span> Demo dental en vivo</div>
+      <div class="modal-actions">
+        <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary" style="padding:9px 16px;font-size:13px">Agendar una cita</a>
+        <button class="modal-close" onclick="closeDemo()" aria-label="Cerrar demo">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="demoFrameWrap"></div>
+  </div>
+</div>
+
 <script>
+  // Demo modal (iframe embebido, se crea al abrir)
+  function openDemo(){
+    var m=document.getElementById('demoModal'), w=document.getElementById('demoFrameWrap');
+    if(!w.querySelector('iframe')){
+      var f=document.createElement('iframe');
+      f.src='/demo/80JokOpEPO8uisYq4cXvBnle'; f.title='Demo dental Lynkro';
+      w.appendChild(f);
+    }
+    m.classList.add('open'); m.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  function closeDemo(){
+    var m=document.getElementById('demoModal');
+    m.classList.remove('open'); m.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemo(); });
+
   // FAQ accordion
   document.querySelectorAll('.faq-item').forEach(function(it){
     it.addEventListener('click', function(){ it.classList.toggle('open'); });
