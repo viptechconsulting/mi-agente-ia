@@ -41,6 +41,11 @@ app.get(['/admin', '/admin.html'], (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// Public route: landing page para dentistas (campaña Meta)
+app.get('/dentistas', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dentistas.html'));
+});
+
 // Public route: onboarding page for Discovery Call
 app.get('/onboarding-discovery.html', (req, res) => {
   const bookingUrl = process.env.DISCOVERY_CALL_BOOKING_URL || ''
