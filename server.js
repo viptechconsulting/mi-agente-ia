@@ -46,6 +46,11 @@ app.get('/dentistas', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dentistas.html'));
 });
 
+// Public route: landing page para plomería (campaña Meta, EN)
+app.get('/plumbing', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'plumbing.html'));
+});
+
 // Public route: onboarding page for Discovery Call
 app.get('/onboarding-discovery.html', (req, res) => {
   const bookingUrl = process.env.DISCOVERY_CALL_BOOKING_URL || ''

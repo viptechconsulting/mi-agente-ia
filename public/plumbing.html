@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lynkro for plumbers — Conversations never close</title>
+<meta name="description" content="At 2 AM a homeowner is standing in a flooded kitchen. Lynkro answers, asks the right questions, confirms the address and dispatches help — while you sleep. Book a call.">
+<meta name="keywords" content="AI answering service for plumbers, 24/7 plumbing answering, after-hours plumbing calls, plumber lead capture, emergency plumbing dispatch, Lynkro plumbing">
+<link rel="canonical" href="https://chat.lynkro.io/plumbing">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://chat.lynkro.io/plumbing">
+<meta property="og:title" content="Lynkro for plumbers — Conversations never close">
+<meta property="og:description" content="Your business might be closed. But emergencies don't check the clock. Lynkro answers, qualifies and dispatches — while you sleep.">
+<meta property="og:image" content="https://chat.lynkro.io/img-plumb/plumb-team.jpg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0B0F14; --s1:#141C26; --s2:#0e1219; --s3:#111720;
+    --green:#00C85A; --green-2:#27F59B; --green-glow:rgba(39,245,155,.18); --green-bg:rgba(39,245,155,.08);
+    --red:#EF4444; --red-bg:rgba(239,68,68,.08); --red-bdr:rgba(239,68,68,.22);
+    --border:#252A38; --border2:rgba(255,255,255,.07);
+    --text:#F5F7FA; --text2:#A9B7C6; --muted:#64748B;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --display:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --r:16px; --r-sm:10px; --maxw:1120px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  section{position:relative}
+  ::selection{background:var(--green-2);color:#04110a}
+
+  h1{font-family:var(--display);font-weight:800;font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.05;letter-spacing:-.035em}
+  h2{font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,3.7vw,2.9rem);line-height:1.1;letter-spacing:-.03em}
+  h3{font-weight:700;font-size:1.15rem;letter-spacing:-.01em}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--green-2)}
+  .lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--text2);max-width:46ch}
+  em{font-style:normal;color:var(--green-2)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:15px 28px;border-radius:var(--r-sm);font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:.2px;cursor:pointer;border:none;transition:transform .15s,box-shadow .25s,background .2s;white-space:nowrap}
+  .btn-primary{background:linear-gradient(135deg,#00E066,#00A84A);color:#04110a;box-shadow:0 0 34px rgba(0,224,102,.34),0 6px 20px rgba(0,0,0,.35)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 54px rgba(0,224,102,.5),0 10px 28px rgba(0,0,0,.4)}
+  .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--border)}
+  .btn-ghost:hover{background:rgba(255,255,255,.09);border-color:#38414f}
+  .btn-lg{padding:17px 34px;font-size:16px}
+  .btn-wa{background:rgba(37,211,102,.12);color:#3ddc84;border:1px solid rgba(37,211,102,.32)}
+  .btn-wa:hover{background:rgba(37,211,102,.2);border-color:#25D366;transform:translateY(-2px)}
+  .wa-fab{position:fixed;right:22px;bottom:22px;z-index:55;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 10px 28px rgba(37,211,102,.45);transition:transform .15s,box-shadow .25s;animation:float 6s ease-in-out infinite}
+  .wa-fab:hover{transform:scale(1.07);box-shadow:0 14px 36px rgba(37,211,102,.6)}
+  @media(max-width:620px){.wa-fab{display:none}}
+  a.btn:focus-visible,a:focus-visible{outline:2px solid var(--green-2);outline-offset:3px;border-radius:6px}
+
+  .nav{position:sticky;top:0;z-index:50;background:rgba(11,15,20,.72);backdrop-filter:blur(14px);border-bottom:1px solid var(--border2)}
+  .nav-inner{max-width:var(--maxw);margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  .nav-logo img{height:26px}
+  .nav-cta{display:flex;align-items:center;gap:12px}
+  .nav-link{font-size:14px;font-weight:600;color:var(--text2)}
+  .nav-link:hover{color:var(--text)}
+  @media(max-width:620px){.nav-link{display:none}}
+
+  .hero{position:relative;padding:64px 0 88px;overflow:hidden}
+  .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;pointer-events:none;z-index:0}
+  .orb-a{width:520px;height:520px;background:radial-gradient(circle,rgba(0,200,90,.28),transparent 70%);top:-160px;right:-140px;animation:float 14s ease-in-out infinite}
+  .orb-b{width:420px;height:420px;background:radial-gradient(circle,rgba(39,245,155,.16),transparent 70%);bottom:-180px;left:-120px;animation:float 18s ease-in-out infinite reverse}
+  .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000,transparent 75%);z-index:0}
+  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(-24px,26px)}}
+
+  .hero-inner{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  @media(max-width:920px){.hero-inner{grid-template-columns:1fr;gap:44px}}
+  .hero-visual{position:relative;max-width:400px;margin:0 0 0 auto}
+  @media(max-width:920px){.hero-visual{margin:0 auto}}
+
+  .flag{display:inline-flex;align-items:center;gap:9px;padding:7px 14px;border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:100px;font-size:12.5px;font-weight:600;color:var(--text2);margin-bottom:26px}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(0,200,90,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,200,90,.55)}70%{box-shadow:0 0 0 9px rgba(0,200,90,0)}100%{box-shadow:0 0 0 0 rgba(0,200,90,0)}}
+  .hero h1{margin-bottom:22px}
+  .hero .lead{margin-bottom:32px}
+  .hero-ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px}
+  .hero-proof{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);font-weight:500}
+  .hero-proof b{color:var(--text2)}
+  .hero-proof .sep{color:var(--border)}
+  @media(max-width:620px){.hero-proof{flex-direction:column;gap:7px}.hero-proof .sep{display:none}}
+
+  .chat{position:relative;z-index:2;background:linear-gradient(180deg,#151d28,#0e141d);border:1px solid var(--border);border-radius:22px;box-shadow:0 34px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.02) inset;overflow:hidden;max-width:400px;margin:0 auto;width:100%}
+  .chat-top{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border2);background:rgba(255,255,255,.02)}
+  .chat-top .tdots{display:flex;gap:6px}
+  .chat-top .tdots span{width:9px;height:9px;border-radius:50%;background:#2b3441}
+  .chat-top .turl{flex:1;text-align:center;font-size:11.5px;color:var(--muted)}
+  .chat-hd{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--border2)}
+  .chat-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#00C85A,#0891b2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#04110a;flex-shrink:0}
+  .chat-name{font-weight:700;font-size:14.5px}
+  .chat-chan{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-top:1px}
+  .chat-ai{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--green-2);border:1px solid var(--green-bg);background:var(--green-bg);padding:4px 8px;border-radius:6px}
+  .chat-body{padding:18px 16px;display:flex;flex-direction:column;gap:11px;min-height:326px;background:radial-gradient(circle at 50% 0,rgba(39,245,155,.04),transparent 60%)}
+  .bub{max-width:82%;padding:11px 14px;border-radius:16px;font-size:13.6px;line-height:1.5;opacity:0;transform:translateY(8px) scale(.98);animation:pop .5s forwards}
+  .bub-in{align-self:flex-start;background:#1c2531;border:1px solid var(--border2);border-bottom-left-radius:5px}
+  .bub-out{align-self:flex-end;background:linear-gradient(135deg,#00C85A,#00a84a);color:#04110a;font-weight:500;border-bottom-right-radius:5px}
+  .bub-meta{display:block;margin-top:6px;font-size:10.5px;font-weight:700;opacity:.72}
+  .typing{align-self:flex-start;background:#1c2531;border:1px solid var(--border2);padding:12px 15px;border-radius:16px;border-bottom-left-radius:5px;display:flex;gap:4px;opacity:0;animation:pop .4s forwards}
+  .typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+  .booked{margin-top:2px;display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--green-bg);border:1px solid rgba(39,245,155,.28);border-radius:12px;opacity:0;transform:translateY(8px);animation:pop .5s forwards}
+  .booked-ic{width:26px;height:26px;border-radius:50%;background:var(--green);color:#04110a;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0}
+  .booked-t{font-size:12.5px;font-weight:700;color:var(--green-2)}
+  .booked-s{font-size:11px;color:var(--text2)}
+  @keyframes pop{to{opacity:1;transform:translateY(0) scale(1)}}
+  .chat-body .bub,.chat-body .typing,.chat-body .booked{animation-iteration-count:infinite;animation-duration:11s}
+  .a1{animation-name:s1}.a2{animation-name:s2}.a3{animation-name:s3}.a4{animation-name:s4}.a5{animation-name:s5}
+  @keyframes s1{0%,3%{opacity:0;transform:translateY(8px)}8%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s2{0%,14%{opacity:0}18%,26%{opacity:1}30%,100%{opacity:0;height:0;margin:0;padding:0}}
+  @keyframes s3{0%,30%{opacity:0;transform:translateY(8px)}36%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s4{0%,52%{opacity:0;transform:translateY(8px)}58%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s5{0%,72%{opacity:0;transform:translateY(8px)}80%,100%{opacity:1;transform:translateY(0)}}
+  .chat-foot{display:flex;align-items:center;padding:13px 16px;border-top:1px solid var(--border2);background:rgba(255,255,255,.02)}
+  .cf{flex:1;text-align:center}
+  .cf-n{font-weight:800;font-size:15px;color:var(--green-2)}
+  .cf-l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .cf-div{width:1px;height:24px;background:var(--border2)}
+  .float-tag{position:absolute;right:-14px;top:64px;z-index:3;display:flex;align-items:center;gap:7px;background:#141c26;border:1px solid var(--border);border-radius:100px;padding:8px 13px;font-size:12px;font-weight:700;box-shadow:0 12px 30px rgba(0,0,0,.4);animation:float 6s ease-in-out infinite}
+  @media(max-width:920px){.float-tag{right:0}}
+
+  .sec{padding:88px 0}
+  .sec-head{max-width:660px;margin:0 auto 52px;text-align:center}
+  .sec-head .eyebrow{display:block;margin-bottom:16px}
+  .sec-head p{color:var(--text2);margin-top:16px;font-size:1.05rem}
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.3,1),transform .7s cubic-bezier(.2,.7,.3,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  #story{background:linear-gradient(180deg,var(--bg),#0a0d12)}
+  .beat{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:860px;margin:0 auto}
+  @media(max-width:720px){.beat{grid-template-columns:1fr}}
+  .beat-card{padding:26px;border-radius:var(--r);border:1px solid var(--border)}
+  .beat-before{background:var(--red-bg);border-color:var(--red-bdr)}
+  .beat-after{background:var(--green-bg);border-color:rgba(39,245,155,.24)}
+  .beat-tag{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+  .beat-before .beat-tag{color:#ff8080}
+  .beat-after .beat-tag{color:var(--green-2)}
+  .beat-card h3{margin-bottom:8px}
+  .beat-card p{color:var(--text2);font-size:14.5px}
+  .beat-time{margin-top:16px;font-size:12.5px;font-weight:700;color:var(--muted)}
+
+  .feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;max-width:900px;margin:0 auto}
+  @media(max-width:720px){.feat-grid{grid-template-columns:1fr}}
+  .feat{padding:28px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);transition:transform .2s,border-color .2s}
+  .feat:hover{transform:translateY(-3px);border-color:#38414f}
+  .feat-ic{width:44px;height:44px;border-radius:11px;background:var(--green-bg);border:1px solid rgba(39,245,155,.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .feat h3{margin-bottom:7px}
+  .feat p{color:var(--text2);font-size:14.5px}
+
+  #results{background:radial-gradient(ellipse 70% 100% at 50% 0,rgba(0,200,90,.07),transparent),var(--s2)}
+  .results-note{color:var(--muted);font-size:13.5px}
+
+  .demo-box{max-width:760px;margin:0 auto;background:linear-gradient(135deg,#141c26,#0e141d);border:1px solid var(--border);border-radius:var(--r);padding:48px 40px;text-align:center;position:relative;overflow:hidden}
+  .demo-box::before{content:'';position:absolute;top:-50%;left:50%;width:340px;height:340px;transform:translateX(-50%);background:radial-gradient(circle,var(--green-glow),transparent 70%);pointer-events:none}
+  .demo-box>*{position:relative}
+  .demo-box h2{margin-bottom:14px}
+  .demo-box p{color:var(--text2);margin-bottom:28px;max-width:52ch;margin-left:auto;margin-right:auto}
+
+  .faq{max-width:720px;margin:0 auto}
+  .faq-item{border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:12px;background:var(--s1);overflow:hidden;cursor:pointer}
+  .faq-q{padding:18px 22px;font-weight:600;font-size:15.5px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  .faq-q .chev{color:var(--green-2);transition:transform .3s;flex-shrink:0;font-size:20px;line-height:1}
+  .faq-item.open .chev{transform:rotate(45deg)}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease;color:var(--text2);font-size:14.5px}
+  .faq-item.open .faq-a{max-height:240px}
+  .faq-a-inner{padding:0 22px 20px}
+
+  #final{padding:100px 0;text-align:center;background:radial-gradient(ellipse 80% 100% at 50% 100%,rgba(0,200,90,.1),transparent)}
+  #final h2{max-width:18ch;margin:0 auto 18px}
+  #final p{color:var(--text2);max-width:54ch;margin:0 auto 34px}
+
+  footer{border-top:1px solid var(--border2);padding:34px 0;text-align:center}
+  footer img{height:26px;margin:0 auto 14px;opacity:.85}
+  footer p{color:var(--muted);font-size:13px}
+
+  .sticky-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:none;padding:12px 16px;background:rgba(11,15,20,.92);backdrop-filter:blur(12px);border-top:1px solid var(--border);gap:10px}
+  .sticky-bar .btn{flex:1;padding:14px}
+  @media(max-width:620px){.sticky-bar{display:flex}body{padding-bottom:76px}}
+
+  /* media / images */
+  .media-grid{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center}
+  @media(max-width:840px){.media-grid{grid-template-columns:1fr;gap:34px}}
+  .media-img{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .media-img img{width:100%;height:100%;object-fit:cover;display:block}
+  .media-img::after{content:'';position:absolute;inset:0;background:linear-gradient(150deg,transparent 55%,rgba(0,200,90,.15));pointer-events:none}
+  .media-txt .eyebrow{display:block;margin-bottom:16px}
+  .media-txt h2{margin-bottom:16px}
+  .media-txt>p{color:var(--text2)}
+  .story-quote-inline{margin-top:26px;padding-left:18px;border-left:3px solid var(--green-2);font-size:clamp(1.2rem,2vw,1.55rem);font-weight:600;line-height:1.32;letter-spacing:-.015em;color:var(--text)}
+  .story-quote-inline span{display:block;margin-top:10px;font-size:.68em;font-weight:500;color:var(--muted)}
+
+  .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:720px){.svc-grid{grid-template-columns:1fr 1fr;gap:12px}}
+  .svc{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3}
+  .svc img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+  .svc:hover img{transform:scale(1.06)}
+  .svc-cap{position:absolute;left:0;right:0;bottom:0;padding:26px 18px 15px;font-weight:700;font-size:16px;color:#fff;background:linear-gradient(transparent,rgba(5,8,12,.92))}
+
+  .stats-inline{display:flex;flex-direction:column;gap:12px;margin-top:28px}
+  .stat-row{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm)}
+  .stat-row .n{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:2.1rem;line-height:1;background:linear-gradient(135deg,#fff,#27F59B);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;min-width:96px}
+  .stat-row .l{color:var(--text2);font-size:14.5px}
+
+  .modal{position:fixed;inset:0;z-index:100;display:none}
+  .modal.open{display:block}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(5,8,12,.78);backdrop-filter:blur(4px)}
+  .modal-card{position:absolute;top:3vh;left:50%;transform:translateX(-50%);width:min(460px,94vw);height:94vh;background:var(--bg);border:1px solid var(--border);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 100px rgba(0,0,0,.6)}
+  .modal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px 11px 16px;border-bottom:1px solid var(--border2);background:var(--s1)}
+  .modal-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;white-space:nowrap}
+  .modal-actions{display:flex;align-items:center;gap:8px}
+  .modal-close{width:34px;height:34px;flex-shrink:0;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .modal-close:hover{background:rgba(255,255,255,.12)}
+  .modal-body{flex:1;background:#0B0F14}
+  .modal-body iframe{width:100%;height:100%;border:0;display:block}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+    .bub,.typing,.booked{opacity:1;transform:none}
+  }
+</style>
+<noscript><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="https://lynkro.io" class="nav-logo" aria-label="Lynkro"><img src="/logo.png" alt="Lynkro"></a>
+    <div class="nav-cta">
+      <a href="/demo/dtwEFD1NhiOvnl9QfSre9pJ-" class="nav-link" onclick="openDemo();return false">See demo</a>
+      <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:11px 20px;font-size:14px">Book a call</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="grid-bg"></div>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="wrap">
+    <div class="hero-inner">
+
+      <div class="hero-copy">
+        <div class="flag"><span class="dot-live"></span> For plumbing &amp; home-service pros &middot; 24/7</div>
+        <h1>Your next customer isn't waiting until <em>morning.</em></h1>
+        <p class="lead">At 2 AM, someone's standing in a flooded kitchen. Lynkro answers, asks the right questions, confirms the address, and dispatches help &mdash; while you sleep.</p>
+        <div class="hero-ctas">
+          <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a call</a>
+          <a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+            WhatsApp
+          </a>
+        </div>
+        <div class="hero-proof">
+          <span><b>Answers in seconds</b></span><span class="sep">&middot;</span>
+          <span><b>24/7, even at 2 AM</b></span><span class="sep">&middot;</span>
+          <span><b>No job left on voicemail</b></span>
+        </div>
+      </div>
+
+      <!-- SIGNATURE: live emergency chat -->
+      <div class="hero-visual">
+        <div class="chat" role="img" aria-label="Conversation: a homeowner's kitchen is flooding at 2 AM, Lynkro answers instantly, confirms the address and dispatches a crew.">
+          <div class="chat-top">
+            <div class="tdots"><span></span><span></span><span></span></div>
+            <div class="turl">Lynkro &mdash; live conversation</div>
+          </div>
+          <div class="chat-hd">
+            <div class="chat-av">MR</div>
+            <div>
+              <div class="chat-name">Marcus R.</div>
+              <div class="chat-chan">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                WhatsApp &middot; 2:14 AM
+              </div>
+            </div>
+            <div class="chat-ai">AI</div>
+          </div>
+          <div class="chat-body">
+            <div class="bub bub-in a1">My kitchen is flooding, water everywhere 😰 it's 2am</div>
+            <div class="typing a2"><span></span><span></span><span></span></div>
+            <div class="bub bub-out a3">Shut off your main water valve first — that stops it. What's the address? I'll get a crew rolling right now.
+              <span class="bub-meta">⚡ Lynkro · replied in 4s</span>
+            </div>
+            <div class="bub bub-in a4">1420 Oak St — please hurry 🙏</div>
+            <div class="booked a5">
+              <div class="booked-ic">✓</div>
+              <div>
+                <div class="booked-t">Job dispatched</div>
+                <div class="booked-s">Emergency · 1420 Oak St · crew ETA 55 min</div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-foot">
+            <div class="cf"><div class="cf-n">4s</div><div class="cf-l">Response</div></div>
+            <div class="cf-div"></div>
+            <div class="cf"><div class="cf-n">24/7</div><div class="cf-l">On call</div></div>
+            <div class="cf-div"></div>
+            <div class="cf"><div class="cf-n">0</div><div class="cf-l">Missed</div></div>
+          </div>
+        </div>
+        <div class="float-tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="#27F59B"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Job booked · 2:14 AM
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<!-- STORY -->
+<section id="story" class="sec">
+  <div class="wrap">
+    <div class="media-grid" style="margin-bottom:56px">
+      <div class="media-img reveal">
+        <img src="/img-plumb/plumb-story.jpg" alt="Plumber working on a pipe under a sink" loading="lazy" width="760" height="920">
+      </div>
+      <div class="media-txt reveal">
+        <span class="eyebrow">The 2 a.m. problem</span>
+        <h2>Your trucks are parked. You're resting.</h2>
+        <p>But for someone else, the emergency is just beginning. A homeowner standing in a flooded kitchen won't leave a voicemail and hope for the best &mdash; they'll call the next company on the list until someone answers.</p>
+        <p class="story-quote-inline">“It could have been another missed message. Another lost job.”<span>— 2:15 a.m.</span></p>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="beat-card beat-before reveal">
+        <div class="beat-tag">Without Lynkro</div>
+        <h3>Straight to voicemail.</h3>
+        <p>By the time you hear the message in the morning, they've already called three other companies. The job is gone before you've had coffee.</p>
+        <div class="beat-time">🌙 2:15 a.m. · missed · heard at 7:40 a.m.</div>
+      </div>
+      <div class="beat-card beat-after reveal">
+        <div class="beat-tag">With Lynkro</div>
+        <h3>Answered, qualified, dispatched.</h3>
+        <p>Lynkro answers, asks the right questions, confirms the address and books the job &mdash; while you sleep. You wake up to a confirmed job, not a missed call.</p>
+        <div class="beat-time">⚡ 2:15 a.m. · answered · crew dispatched</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">What changes</span>
+      <h2>It doesn't just take a message.</h2>
+      <p>It works the call like your best dispatcher would — and it never sleeps.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <h3>Answers instantly</h3>
+        <p>Day, night, weekend. The customer gets a real reply before they text the next company on the list.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>Asks the right questions</h3>
+        <p>Triages the emergency, gets the details, and knows when it's an urgent flood vs a quote request.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <h3>Confirms the address</h3>
+        <p>Captures and reads back the location so your crew rolls to the right place — not a wrong turn at 2 a.m.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg></div>
+        <h3>Books &amp; dispatches</h3>
+        <p>Turns a 2 a.m. message into a confirmed job on your calendar — with the address and the problem attached.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVICES -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">The calls that come in after hours</span>
+      <h2>Burst pipes, water heaters, backed-up drains…</h2>
+      <p>Every after-hours call is a job — if someone answers. Lynkro answers all of them, instantly.</p>
+    </div>
+    <div class="svc-grid">
+      <div class="svc reveal"><img src="/img-plumb/svc-pipe.jpg" alt="Burst and leaking pipes" loading="lazy" width="640" height="480"><div class="svc-cap">Burst &amp; leaking pipes</div></div>
+      <div class="svc reveal"><img src="/img-plumb/svc-heater.jpg" alt="Water heater repair and replacement" loading="lazy" width="640" height="480"><div class="svc-cap">Water heaters</div></div>
+      <div class="svc reveal"><img src="/img-plumb/svc-drain.jpg" alt="Drain and sewer clearing" loading="lazy" width="640" height="480"><div class="svc-cap">Drains &amp; sewer</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section id="results" class="sec">
+  <div class="wrap">
+    <div class="media-grid">
+      <div class="media-txt reveal">
+        <span class="eyebrow">Your night shift, handled</span>
+        <h2>Wake up to booked jobs, not missed calls.</h2>
+        <div class="stats-inline">
+          <div class="stat-row"><span class="n">24/7</span><span class="l">answered — day, night, and weekend</span></div>
+          <div class="stat-row"><span class="n">Seconds</span><span class="l">to first reply, every single time</span></div>
+          <div class="stat-row"><span class="n">0</span><span class="l">after-hours jobs lost to voicemail</span></div>
+        </div>
+        <p class="results-note" style="margin-top:22px">This is what happens while you sleep. Try it yourself below.</p>
+      </div>
+      <div class="media-img reveal">
+        <img src="/img-plumb/plumb-team.jpg" alt="Professional plumber on the job" loading="lazy" width="900" height="680">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="demo" class="sec">
+  <div class="wrap">
+    <div class="demo-box reveal">
+      <span class="eyebrow">Live demo</span>
+      <h2 style="margin-top:14px">Text it like it's 2 a.m.</h2>
+      <p>We set up an agent for a sample plumbing company. Tell it your kitchen is flooding, ask for a price, or describe any job — and watch it answer, qualify and book. Without leaving this page.</p>
+      <div style="display:flex;justify-content:center">
+        <a href="/demo/dtwEFD1NhiOvnl9QfSre9pJ-" class="btn btn-primary btn-lg" onclick="openDemo();return false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="9 7 17 12 9 17 9 7"/></svg>
+          Try the live agent
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Questions</span>
+      <h2>What plumbers usually ask.</h2>
+    </div>
+    <div class="faq">
+      <div class="faq-item reveal">
+        <div class="faq-q">Does it really answer in the middle of the night?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">Yes — 24/7, no voicemail. It replies in seconds at any hour and books the job while you sleep.</div></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q">Will it sound like a robot?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">No. It talks naturally, in your company's voice, and knows how to handle a stressed homeowner in an emergency. Try it in the demo above.</div></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q">Does it connect to my schedule?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">Yes. It carries the conversation all the way to a booked job and logs it with the address and the problem.</div></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q">What if it's a real emergency vs just a quote?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">It triages. Active floods and leaks get quick safety guidance and immediate dispatch; quote requests get answered and scheduled.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="final">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>Your business might be closed. Emergencies don't check the clock.</h2>
+      <p>Book a 20-minute call. We'll show you — using your own services — exactly how Lynkro would answer your after-hours calls. No pressure.</p>
+      <div class="hero-ctas" style="justify-content:center">
+        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a call</a>
+        <a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+          WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="https://lynkro.io"><img src="/logo.png" alt="Lynkro"></a>
+    <p>© Lynkro — Conversations never close.</p>
+  </div>
+</footer>
+
+<!-- STICKY MOBILE CTA -->
+<div class="sticky-bar">
+  <a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="btn btn-wa" target="_blank" rel="noopener" aria-label="Message us on WhatsApp">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+    WhatsApp
+  </a>
+  <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary">Book a call</a>
+</div>
+
+<!-- WhatsApp floating (desktop) -->
+<a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="wa-fab" target="_blank" rel="noopener" aria-label="Message us on WhatsApp">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+</a>
+
+<!-- DEMO MODAL -->
+<div id="demoModal" class="modal" aria-hidden="true" role="dialog" aria-label="Live plumbing demo">
+  <div class="modal-backdrop" onclick="closeDemo()"></div>
+  <div class="modal-card">
+    <div class="modal-bar">
+      <div class="modal-title"><span class="dot-live"></span> Live plumbing demo</div>
+      <div class="modal-actions">
+        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:9px 16px;font-size:13px">Book a call</a>
+        <button class="modal-close" onclick="closeDemo()" aria-label="Close demo">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="demoFrameWrap"></div>
+  </div>
+</div>
+
+<script>
+  function openDemo(){
+    var m=document.getElementById('demoModal'), w=document.getElementById('demoFrameWrap');
+    if(!w.querySelector('iframe')){
+      var f=document.createElement('iframe');
+      f.src='/demo/dtwEFD1NhiOvnl9QfSre9pJ-'; f.title='Lynkro plumbing demo';
+      w.appendChild(f);
+    }
+    m.classList.add('open'); m.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  function closeDemo(){
+    var m=document.getElementById('demoModal');
+    m.classList.remove('open'); m.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemo(); });
+
+  document.querySelectorAll('.faq-item').forEach(function(it){
+    it.addEventListener('click', function(){ it.classList.toggle('open'); });
+  });
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.14});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+</script>
+</body>
+</html>
