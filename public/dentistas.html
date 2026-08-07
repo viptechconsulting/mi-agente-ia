@@ -55,6 +55,11 @@
   .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--border)}
   .btn-ghost:hover{background:rgba(255,255,255,.09);border-color:#38414f}
   .btn-lg{padding:17px 34px;font-size:16px}
+  .btn-wa{background:rgba(37,211,102,.12);color:#3ddc84;border:1px solid rgba(37,211,102,.32)}
+  .btn-wa:hover{background:rgba(37,211,102,.2);border-color:#25D366;transform:translateY(-2px)}
+  .wa-fab{position:fixed;right:22px;bottom:22px;z-index:55;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 10px 28px rgba(37,211,102,.45);transition:transform .15s,box-shadow .25s;animation:float 6s ease-in-out infinite}
+  .wa-fab:hover{transform:scale(1.07);box-shadow:0 14px 36px rgba(37,211,102,.6)}
+  @media(max-width:620px){.wa-fab{display:none}}
   a.btn:focus-visible,a:focus-visible{outline:2px solid var(--green-2);outline-offset:3px;border-radius:6px}
 
   /* ---- nav ---- */
@@ -241,7 +246,10 @@
         <p class="lead">Lynkro responde al instante, entiende la preocupación del paciente y le agenda la cita &mdash; mientras tú sigues en consulta.</p>
         <div class="hero-ctas">
           <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary btn-lg">Agendar una cita</a>
-          <a href="#demo" class="btn btn-ghost btn-lg">Probar el agente dental</a>
+          <a href="https://wa.me/17866696831?text=Hola%20%F0%9F%91%8B%20Vengo%20del%20anuncio%20de%20Lynkro.%20Tengo%20una%20cl%C3%ADnica%20dental%20y%20quiero%20ver%20c%C3%B3mo%20responder%C3%ADa%20el%20agente%20para%20mis%20pacientes." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+            WhatsApp
+          </a>
         </div>
         <div class="hero-proof">
           <span><b>Responde en segundos</b></span><span class="sep">&middot;</span>
@@ -429,7 +437,13 @@
     <div class="reveal">
       <h2>Deja de perder pacientes que ya te estaban escribiendo.</h2>
       <p>Agenda una cita de 20 minutos. Te mostramos, con los servicios de tu propia clínica, el tipo de respuestas que Lynkro daría. Sin compromiso.</p>
-      <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary btn-lg">Agendar una cita</a>
+      <div class="hero-ctas" style="justify-content:center">
+        <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary btn-lg">Agendar una cita</a>
+        <a href="https://wa.me/17866696831?text=Hola%20%F0%9F%91%8B%20Vengo%20del%20anuncio%20de%20Lynkro.%20Tengo%20una%20cl%C3%ADnica%20dental%20y%20quiero%20ver%20c%C3%B3mo%20responder%C3%ADa%20el%20agente%20para%20mis%20pacientes." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+          WhatsApp
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -443,9 +457,17 @@
 
 <!-- STICKY MOBILE CTA -->
 <div class="sticky-bar">
-  <a href="#demo" class="btn btn-ghost">Ver demo</a>
+  <a href="https://wa.me/17866696831?text=Hola%20%F0%9F%91%8B%20Vengo%20del%20anuncio%20de%20Lynkro.%20Tengo%20una%20cl%C3%ADnica%20dental%20y%20quiero%20ver%20c%C3%B3mo%20responder%C3%ADa%20el%20agente%20para%20mis%20pacientes." class="btn btn-wa" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+    WhatsApp
+  </a>
   <a href="https://lynkro.io/agendar-consulta" class="btn btn-primary">Agendar una cita</a>
 </div>
+
+<!-- WhatsApp flotante (desktop) -->
+<a href="https://wa.me/17866696831?text=Hola%20%F0%9F%91%8B%20Vengo%20del%20anuncio%20de%20Lynkro.%20Tengo%20una%20cl%C3%ADnica%20dental%20y%20quiero%20ver%20c%C3%B3mo%20responder%C3%ADa%20el%20agente%20para%20mis%20pacientes." class="wa-fab" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+</a>
 
 <script>
   // FAQ accordion
