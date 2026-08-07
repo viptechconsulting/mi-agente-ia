@@ -224,6 +224,25 @@
   .modal-body{flex:1;background:#0B0F14}
   .modal-body iframe{width:100%;height:100%;border:0;display:block}
 
+  /* offer microcopy under hero CTAs */
+  .offer-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--text2);font-weight:600;margin:-6px 0 24px}
+  .offer-line svg{color:var(--green-2);flex-shrink:0}
+  .offer-line b{color:var(--green-2);font-weight:700}
+
+  /* trust strip */
+  .trust{border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);background:var(--s2)}
+  .trust-inner{max-width:var(--maxw);margin:0 auto;padding:20px 24px;display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:center}
+  .trust-item{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--text2)}
+  .trust-item svg{color:var(--green-2);flex-shrink:0}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:960px;margin:0 auto}
+  @media(max-width:720px){.steps{grid-template-columns:1fr}}
+  .step{padding:28px 24px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r)}
+  .step-n{width:34px;height:34px;border-radius:9px;background:var(--green-bg);border:1px solid rgba(39,245,155,.28);color:var(--green-2);font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:15px}
+  .step h3{margin-bottom:6px}
+  .step p{color:var(--text2);font-size:14px}
+
   @media(prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
     .reveal{opacity:1;transform:none}
@@ -240,7 +259,7 @@
     <a href="https://lynkro.io" class="nav-logo" aria-label="Lynkro"><img src="/logo.png" alt="Lynkro"></a>
     <div class="nav-cta">
       <a href="/demo/dtwEFD1NhiOvnl9QfSre9pJ-" class="nav-link" onclick="openDemo();return false">See demo</a>
-      <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:11px 20px;font-size:14px">Book a call</a>
+      <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:11px 20px;font-size:14px">Book a free call</a>
     </div>
   </div>
 </nav>
@@ -258,11 +277,15 @@
         <h1>Your next customer isn't waiting until <em>morning.</em></h1>
         <p class="lead">At 2 AM, someone's standing in a flooded kitchen. Lynkro answers, asks the right questions, confirms the address, and dispatches help &mdash; while you sleep.</p>
         <div class="hero-ctas">
-          <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a call</a>
+          <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a free call</a>
           <a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
             WhatsApp
           </a>
+        </div>
+        <div class="offer-line">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Free 20-min demo &middot; live in <b>72 hours</b> &middot; from <b>$147/mo</b>, cancel anytime
         </div>
         <div class="hero-proof">
           <span><b>Answers in seconds</b></span><span class="sep">&middot;</span>
@@ -321,6 +344,16 @@
     </div>
   </div>
 </header>
+
+<!-- TRUST STRIP -->
+<div class="trust">
+  <div class="trust-inner">
+    <div class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Works with your current number &amp; WhatsApp</div>
+    <div class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>You review &amp; control every conversation</div>
+    <div class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Live in 72 hours</div>
+    <div class="trust-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>No contract — cancel anytime</div>
+  </div>
+</div>
 
 <!-- STORY -->
 <section id="story" class="sec">
@@ -415,7 +448,7 @@
           <div class="stat-row"><span class="n">Seconds</span><span class="l">to first reply, every single time</span></div>
           <div class="stat-row"><span class="n">0</span><span class="l">after-hours jobs lost to voicemail</span></div>
         </div>
-        <p class="results-note" style="margin-top:22px">This is what happens while you sleep. Try it yourself below.</p>
+        <p class="results-note" style="margin-top:22px">This is what happens while you sleep — don't take our word for it, try the agent yourself below.</p>
       </div>
       <div class="media-img reveal">
         <img src="/img-plumb/plumb-team.jpg" alt="Professional plumber on the job" loading="lazy" width="900" height="680">
@@ -465,6 +498,30 @@
         <div class="faq-q">What if it's a real emergency vs just a quote?<span class="chev">+</span></div>
         <div class="faq-a"><div class="faq-a-inner">It triages. Active floods and leaks get quick safety guidance and immediate dispatch; quote requests get answered and scheduled.</div></div>
       </div>
+      <div class="faq-item reveal">
+        <div class="faq-q">How long until it's running?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">72 hours. We handle the whole setup — you just give access to your WhatsApp Business and Instagram, and approve how it talks.</div></div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q">How much does it cost?<span class="chev">+</span></div>
+        <div class="faq-a"><div class="faq-a-inner">Plans start at $147/month with no contract — cancel anytime. We'll confirm the right plan for your volume on the call.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">How it works</span>
+      <h2>Live in 72 hours. You stay in control.</h2>
+      <p>No new hardware, no new number. It runs on the WhatsApp, Instagram and line you already use.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="step-n">1</div><h3>Book a quick call</h3><p>We learn your services, pricing and service area — 20 minutes, no pressure.</p></div>
+      <div class="step reveal"><div class="step-n">2</div><h3>We set it up in 72 hours</h3><p>On your existing number, WhatsApp and Instagram. You review and approve how it talks before it goes live.</p></div>
+      <div class="step reveal"><div class="step-n">3</div><h3>It answers &amp; books</h3><p>Day and night it replies, qualifies and books jobs — and you wake up to a full calendar.</p></div>
     </div>
   </div>
 </section>
@@ -476,12 +533,13 @@
       <h2>Your business might be closed. Emergencies don't check the clock.</h2>
       <p>Book a 20-minute call. We'll show you — using your own services — exactly how Lynkro would answer your after-hours calls. No pressure.</p>
       <div class="hero-ctas" style="justify-content:center">
-        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a call</a>
+        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary btn-lg">Book a free call</a>
         <a href="https://wa.me/17866696831?text=Hi%20%F0%9F%91%8B%20I%20saw%20the%20Lynkro%20ad.%20I%20run%20a%20plumbing%20business%20and%20want%20to%20see%20how%20the%20agent%20would%20answer%20my%20after-hours%20calls." class="btn btn-wa btn-lg" target="_blank" rel="noopener">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
           WhatsApp
         </a>
       </div>
+      <p style="margin-top:18px;font-size:13px;color:var(--muted)">Free 20-min demo &middot; live in 72 hours &middot; from $147/mo, cancel anytime</p>
     </div>
   </div>
 </section>
@@ -499,7 +557,7 @@
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
     WhatsApp
   </a>
-  <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary">Book a call</a>
+  <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary">Book a free call</a>
 </div>
 
 <!-- WhatsApp floating (desktop) -->
@@ -514,7 +572,7 @@
     <div class="modal-bar">
       <div class="modal-title"><span class="dot-live"></span> Live plumbing demo</div>
       <div class="modal-actions">
-        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:9px 16px;font-size:13px">Book a call</a>
+        <a href="https://api.leadconnectorhq.com/widget/booking/62MrniY6kKgLK9BClP19" class="btn btn-primary" style="padding:9px 16px;font-size:13px">Book a free call</a>
         <button class="modal-close" onclick="closeDemo()" aria-label="Close demo">✕</button>
       </div>
     </div>
