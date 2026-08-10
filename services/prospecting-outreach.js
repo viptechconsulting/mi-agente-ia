@@ -8,21 +8,20 @@ import { db } from '../db.js'
 
 const STAGES = ['opener', 'day2', 'day4', 'day7']
 
-function firstName(fullName) {
-  return String(fullName || '').trim().split(/\s+/)[0] || 'ahí'
-}
-
+// Google Maps/Apify solo da el nombre del NEGOCIO, nunca el del dueño — usar
+// la primera palabra (ej. "Taller" de "Taller El Rayo") como si fuera un
+// nombre de persona suena raro. Saludamos con el nombre completo del negocio.
 export function buildOpenerMessage(prospect, issues, { senderName, videoUrl } = {}) {
   const [p1, p2, p3] = issues && issues.length ? issues : [
     'su página no abre bien en celular', 'no tiene cómo agendar citas en línea', 'los mensajes fuera de horario se quedan sin responder'
   ]
   const sender = senderName || 'tu nombre'
   const link = videoUrl || '[link del video]'
-  return `Hola ${firstName(prospect.name)} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nSe lo grabé en un video de 90 seg: ${link}. Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
+  return `Hola ${prospect.name} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nSe lo grabé en un video de 90 seg: ${link}. Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
 }
 
 export function buildFollowupMessage(prospect, day) {
-  const name = firstName(prospect.name)
+  const name = prospect.name
   if (day === 2) {
     return `${name}, ¿alcanzó a ver el video? La parte de la página en celular es la que más rápido le sube las citas. Si me dice que sí, se la dejo lista esta semana sin costo.`
   }
