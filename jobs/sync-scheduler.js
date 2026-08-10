@@ -99,3 +99,20 @@ function scheduleDaily(hour, fn) {
 }
 
 scheduleDaily(8, runCampaignScheduler)
+
+// ============================================================
+// PROSPECTING FOLLOW-UPS (daily at 9am)
+// ============================================================
+
+async function runProspectingFollowupsJob() {
+  console.log('[prospecting-followups] Starting daily run')
+  try {
+    const { runProspectingFollowups } = await import('./prospecting-followups.js')
+    await runProspectingFollowups()
+    console.log('[prospecting-followups] Done')
+  } catch (e) {
+    console.error('[prospecting-followups] Fatal:', e.message)
+  }
+}
+
+scheduleDaily(9, runProspectingFollowupsJob)

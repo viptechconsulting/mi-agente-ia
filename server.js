@@ -12,10 +12,12 @@ import {
   db, listCompanies, getCompany, getCompanyByToken
 } from './db.js';
 import { applyCommerceSchema } from './db-commerce.js';
+import { applyProspectingSchema } from './db-prospecting.js';
 import { billingRouter } from './routes/billing.js';
 import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
 import { commerceRouter, webhookRouter } from './routes/commerce.js';
+import { prospectingRouter } from './routes/prospecting.js';
 import './jobs/sync-scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -70,6 +72,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS users (
 
 // Apply commerce schema
 applyCommerceSchema(db);
+applyProspectingSchema(db);
 
 // ============================================================
 // RATE LIMITING
@@ -93,6 +96,7 @@ app.use('/api/chat', chatLimiter);
 // (webhookRouter and the Stripe webhook path are mounted earlier, ahead of express.json())
 app.use('/api/commerce', commerceRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/prospecting', prospectingRouter);
 app.use('/api', adminRouter);
 app.use('/api', chatRouter);
 
