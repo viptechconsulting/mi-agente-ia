@@ -4,52 +4,71 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prospección — La Máquina de Tu Primer Cliente</title>
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0a0a0a; --panel:#131313; --panel2:#1a1a1a; --border:#2a2a2a; --text:#f2f2f2; --muted:#9a9a9a; --accent:#D4AF37; }
+  :root {
+    --bg:#0B0F14; --panel:#141C26; --panel2:#1a1f2e; --border:#252A38;
+    --text:#F5F7FA; --muted:#9FB0C8; --accent:#27F59B; --accent2:#3BA5FF;
+    --grad:linear-gradient(135deg,#27F59B,#3BA5FF);
+  }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
-  a { color:var(--accent); }
-  header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border); }
-  header h1 { font-size:18px; margin:0; }
-  header h1 span { color:var(--accent); }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,Segoe UI,Roboto,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; border-bottom:1px solid rgba(255,255,255,.07); background:rgba(11,15,20,.72); backdrop-filter:blur(12px); position:sticky; top:0; z-index:10; }
+  header .brand { display:flex; align-items:center; gap:12px; }
+  header .brand img { height:24px; display:block; }
+  header h1 { font-size:16px; font-weight:700; margin:0; letter-spacing:-.01em; }
+  header h1 span { background:var(--grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
   main { max-width:1200px; margin:0 auto; padding:24px; }
-  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:20px; }
-  .card h2 { margin:0 0 14px; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; margin-bottom:20px; }
+  .card h2 { margin:0 0 14px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700; }
   .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-  .stat { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
-  .stat .n { font-size:28px; font-weight:700; color:var(--accent); }
-  .stat .l { font-size:11px; color:var(--muted); margin-top:4px; }
+  .stat { background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:16px; text-align:center; }
+  .stat .n { font-size:30px; font-weight:800; letter-spacing:-.02em; background:var(--grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; line-height:1.1; }
+  .stat .l { font-size:11px; color:var(--muted); margin-top:6px; }
   form.inline { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-  label { display:block; font-size:11px; color:var(--muted); margin-bottom:4px; }
-  input, select, textarea { background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px 10px; font-size:13px; }
-  textarea { width:100%; min-height:110px; font-family:inherit; }
-  button { background:var(--accent); color:#111; border:none; border-radius:6px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
-  button.secondary { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
-  button.small { padding:4px 8px; font-size:11px; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
+  label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:500; }
+  input, select, textarea { background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:9px 11px; font-size:13px; font-family:inherit; outline:none; transition:border-color .15s; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  textarea { width:100%; min-height:110px; }
+  button { background:var(--grad); color:#04110a; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:transform .15s, box-shadow .2s; box-shadow:0 0 20px rgba(39,245,155,.2); }
+  button:hover { transform:translateY(-1px); box-shadow:0 0 30px rgba(39,245,155,.35); }
+  button.secondary { background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--border); box-shadow:none; }
+  button.secondary:hover { background:rgba(255,255,255,.1); transform:none; }
+  button.small { padding:5px 10px; font-size:11px; }
+  button:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); }
-  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; }
-  tr:hover td { background:#161616; }
-  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
-  .p-hi { background:#3a1414; color:#ff8a8a; }
-  .p-md { background:#3a2f10; color:#ffd27a; }
-  .p-lo { background:#123a1a; color:#8affa0; }
-  .status { font-size:11px; padding:2px 8px; border-radius:20px; background:#222; color:var(--muted); }
-  #login { max-width:360px; margin:80px auto; }
+  th, td { text-align:left; padding:10px 10px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  tr:hover td { background:rgba(255,255,255,.03); }
+  .pill { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+  .p-hi { background:rgba(239,68,68,.15); color:#ff8a8a; }
+  .p-md { background:rgba(245,158,11,.15); color:#ffd27a; }
+  .p-lo { background:rgba(39,245,155,.12); color:var(--accent); }
+  .status { font-size:11px; padding:3px 9px; border-radius:20px; background:rgba(255,255,255,.06); color:var(--muted); }
+  #login { max-width:380px; margin:90px auto; }
+  #login img { height:26px; margin-bottom:18px; }
   #app { display:none; }
   .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
-  #detail { position:fixed; top:0; right:0; width:420px; max-width:100%; height:100%; background:var(--panel); border-left:1px solid var(--border); padding:20px; overflow-y:auto; transform:translateX(100%); transition:transform .2s; }
+  #detail { position:fixed; top:0; right:0; width:440px; max-width:100%; height:100%; background:var(--panel); border-left:1px solid var(--border); padding:22px; overflow-y:auto; transform:translateX(100%); transition:transform .25s; z-index:20; box-shadow:-20px 0 60px rgba(0,0,0,.5); }
   #detail.open { transform:translateX(0); }
-  #detail .close { float:right; cursor:pointer; color:var(--muted); }
-  .msg-box { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:10px; margin:8px 0; font-size:12px; }
+  #detail .close { float:right; cursor:pointer; color:var(--muted); font-size:13px; }
+  #detail .close:hover { color:var(--text); }
+  .msg-box { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin:8px 0; font-size:12px; line-height:1.5; }
   .muted { color:var(--muted); font-size:12px; }
+  ul { margin:8px 0; padding-left:18px; }
+  li { margin:4px 0; font-size:13px; }
 </style>
 </head>
 <body>
 
 <div id="login" class="card">
-  <h2>Entrar</h2>
+  <img src="/logo.png" alt="Lynkro">
+  <h2>Entrar a Prospección</h2>
   <label>Email</label>
   <input id="loginEmail" type="email" style="width:100%;margin-bottom:10px">
   <label>Contraseña</label>
@@ -59,8 +78,8 @@
 
 <div id="app">
   <header>
-    <h1>La Máquina de <span>Tu Primer Cliente</span></h1>
-    <div><a href="/admin.html">← Admin</a> &nbsp; <button class="secondary small" onclick="logout()">Salir</button></div>
+    <div class="brand"><img src="/logo.png" alt="Lynkro"><h1>La Máquina de <span>Tu Primer Cliente</span></h1></div>
+    <div style="display:flex;align-items:center;gap:14px"><a href="/admin.html">← Admin</a><button class="secondary small" onclick="logout()">Salir</button></div>
   </header>
 
   <main>
