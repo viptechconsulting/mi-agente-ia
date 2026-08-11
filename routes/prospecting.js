@@ -3,6 +3,7 @@
 // Herramienta interna, protegida con requireAdmin: no es una feature de
 // Lynkro para sus clientes, es cómo Vip Tech/Lynkro consigue los propios.
 import express from 'express'
+import { randomUUID } from 'node:crypto'
 import { db } from '../db.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { runProspectingBatch } from '../services/prospecting-scraper.js'
@@ -84,7 +85,52 @@ prospectingRouter.get('/prospects/:id', requireAdmin, (req, res) => {
   if (!prospect) return res.status(404).json({ error: 'Prospecto no encontrado' })
   const audits = db.prepare('SELECT * FROM prospect_audits WHERE prospect_id = ? ORDER BY audited_at DESC').all(req.params.id)
   const messages = db.prepare('SELECT * FROM prospect_messages WHERE prospect_id = ? ORDER BY created_at DESC').all(req.params.id)
-  res.json({ prospect: withTier(prospect), audits, messages })
+  const notes = db.prepare('SELECT * FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC').all(req.params.id)
+  res.json({ prospect: withTier(prospect), audits, messages, notes })
+})
+
+// ── Borrar prospectos (individual + bulk) ──────────────────────────────
+function deleteProspects(ids) {
+  if (!ids.length) return 0
+  const ph = ids.map(() => '?').join(',')
+  const tx = db.transaction(() => {
+    db.prepare(`DELETE FROM prospect_audits WHERE prospect_id IN (${ph})`).run(...ids)
+    db.prepare(`DELETE FROM prospect_messages WHERE prospect_id IN (${ph})`).run(...ids)
+    db.prepare(`DELETE FROM prospect_notes WHERE prospect_id IN (${ph})`).run(...ids)
+    return db.prepare(`DELETE FROM prospects WHERE id IN (${ph})`).run(...ids).changes
+  })
+  return tx()
+}
+
+prospectingRouter.delete('/prospects/:id', requireAdmin, (req, res) => {
+  const deleted = deleteProspects([req.params.id])
+  if (!deleted) return res.status(404).json({ error: 'Prospecto no encontrado' })
+  res.json({ ok: true, deleted })
+})
+
+prospectingRouter.post('/prospects/bulk-delete', requireAdmin, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(x => typeof x === 'string') : []
+  if (!ids.length) return res.status(400).json({ error: 'Envía un array de ids en el body' })
+  const deleted = deleteProspects(ids)
+  res.json({ ok: true, deleted })
+})
+
+// ── Notas tipo CRM por prospecto ───────────────────────────────────────
+prospectingRouter.post('/prospects/:id/notes', requireAdmin, (req, res) => {
+  const body = String(req.body?.body || '').trim()
+  if (!body) return res.status(400).json({ error: 'La nota está vacía' })
+  const exists = db.prepare('SELECT 1 FROM prospects WHERE id = ?').get(req.params.id)
+  if (!exists) return res.status(404).json({ error: 'Prospecto no encontrado' })
+  const note = { id: randomUUID(), prospect_id: req.params.id, body, created_at: Date.now() }
+  db.prepare('INSERT INTO prospect_notes (id, prospect_id, body, created_at) VALUES (?, ?, ?, ?)')
+    .run(note.id, note.prospect_id, note.body, note.created_at)
+  res.json({ note })
+})
+
+prospectingRouter.delete('/notes/:noteId', requireAdmin, (req, res) => {
+  const result = db.prepare('DELETE FROM prospect_notes WHERE id = ?').run(req.params.noteId)
+  if (!result.changes) return res.status(404).json({ error: 'Nota no encontrada' })
+  res.json({ ok: true })
 })
 
 prospectingRouter.patch('/prospects/:id/status', requireAdmin, (req, res) => {

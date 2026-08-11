@@ -71,6 +71,15 @@ export function applyProspectingSchema(db) {
       FOREIGN KEY(prospect_id) REFERENCES prospects(id)
     );
     CREATE INDEX IF NOT EXISTS idx_messages_prospect ON prospect_messages(prospect_id);
+
+    CREATE TABLE IF NOT EXISTS prospect_notes (
+      id TEXT PRIMARY KEY,
+      prospect_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at INTEGER,
+      FOREIGN KEY(prospect_id) REFERENCES prospects(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_notes_prospect ON prospect_notes(prospect_id);
   `)
 
   // Additive columns for future-proofing without breaking existing rows.

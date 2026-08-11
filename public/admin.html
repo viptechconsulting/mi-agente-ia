@@ -590,9 +590,13 @@
      <option value="">Todos</option><option value="new">new</option><option value="audited">audited</option><option value="contacted">contacted</option><option value="followup_2">followup_2</option><option value="followup_4">followup_4</option><option value="followup_7">followup_7</option><option value="won">won</option><option value="lost">lost</option><option value="do_not_contact">do_not_contact</option>
     </select></div>
    </form>
+   <div id="prospBulkBar" style="display:none;align-items:center;gap:12px;margin-bottom:10px">
+    <span class="p-muted" id="prospSelCount">0 seleccionados</span>
+    <button class="p-btn small" style="background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.3)" onclick="prospBulkDelete()">🗑 Borrar seleccionados</button>
+   </div>
    <div style="overflow-x:auto">
-    <table><thead><tr><th>Negocio</th><th>Contacto</th><th>Reseñas</th><th>Dolor</th><th>Estado</th><th></th></tr></thead>
-    <tbody id="prospBody"><tr><td colspan="6" class="p-muted">Sin datos todavía.</td></tr></tbody></table>
+    <table><thead><tr><th style="width:28px"><input type="checkbox" id="prospCheckAll" onchange="prospToggleAll(this.checked)" style="width:auto;margin:0"></th><th>Negocio</th><th>Contacto</th><th>Reseñas</th><th>Dolor</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="prospBody"><tr><td colspan="7" class="p-muted">Sin datos todavía.</td></tr></tbody></table>
    </div>
   </div>
 
@@ -5864,31 +5868,44 @@ async function prospLoadProspects() {
 function prospPainTier(score) { return score >= 6 ? 'hi' : score >= 3 ? 'md' : 'lo'; }
 function prospRenderProspects() {
   const body = document.getElementById('prospBody');
-  if (!prospProspects.length) { body.innerHTML = '<tr><td colspan="6" class="p-muted">Sin prospectos todavía.</td></tr>'; return; }
+  const chk = document.getElementById('prospCheckAll'); if (chk) chk.checked = false;
+  if (!prospProspects.length) { body.innerHTML = '<tr><td colspan="7" class="p-muted">Sin prospectos todavía.</td></tr>'; prospUpdateSel(); return; }
   body.innerHTML = prospProspects.map(p => `
     <tr>
+      <td><input type="checkbox" class="prosp-check" value="${p.id}" onchange="prospUpdateSel()" style="width:auto;margin:0"></td>
       <td>${p.name || '—'}<br><span class="p-muted">${p.category || ''}</span></td>
       <td>${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
       <td>${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
       <td><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
       <td><span class="p-status">${p.status}</span></td>
-      <td><button class="p-btn sec small" onclick="prospOpenDetail('${p.id}')">Ver</button></td>
+      <td style="white-space:nowrap"><button class="p-btn sec small" onclick="prospOpenDetail('${p.id}')">Ver</button> <button class="p-btn small" style="background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.3)" onclick="prospDeleteOne('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button></td>
     </tr>`).join('');
+  prospUpdateSel();
 }
 async function prospOpenDetail(id) {
   const detail = document.getElementById('prospDetail');
   const body = document.getElementById('prospDetailBody');
   body.innerHTML = '<p class="p-muted">Cargando…</p>';
   detail.classList.add('open');
-  const { prospect, audits, messages } = await prospApi('/prospects/' + id);
+  const { prospect, audits, messages, notes } = await prospApi('/prospects/' + id);
   const latestAudit = audits[0];
   const issues = latestAudit ? JSON.parse(latestAudit.issues_json || '[]') : [];
+  const nm = (prospect.name || '').replace(/'/g, "\\'");
   body.innerHTML = `
     <h3>${prospect.name}</h3>
     <p class="p-muted">${prospect.category || ''} · ${prospect.address || ''}</p>
     <p>${prospect.phone ? '📱 ' + prospect.phone + '<br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
     <p><span class="pill p-${prospPainTier(prospect.pain_score)}">pain_score: ${prospect.pain_score}</span> &nbsp; <span class="p-status">${prospect.status}</span></p>
-    <div class="card" style="margin-top:14px">
+    <div style="margin:12px 0"><button class="p-btn small" style="background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.3)" onclick="prospDeleteOne('${id}','${nm}',true)">🗑 Borrar prospecto</button></div>
+
+    <div class="card">
+      <h2>📝 Notas (CRM)</h2>
+      <textarea id="prospNoteInput" placeholder="Agrega una nota... (ej: llamé, pidió propuesta el lunes; presupuesto ~$300/mes)"></textarea>
+      <div style="margin-top:8px"><button class="p-btn small" onclick="prospAddNote('${id}')">Agregar nota</button></div>
+      <div style="margin-top:12px">${(notes && notes.length) ? notes.map(n => `<div class="p-msgbox"><div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px"><span class="p-muted">${new Date(n.created_at).toLocaleString()}</span><span title="Borrar nota" style="cursor:pointer;color:#ff8a8a" onclick="prospDeleteNote('${n.id}','${id}')">✕</span></div>${(n.body || '').replace(/\n/g, '<br>')}</div>`).join('') : '<p class="p-muted">Sin notas todavía.</p>'}</div>
+    </div>
+
+    <div class="card">
       <h2>Cambiar estado</h2>
       <select id="prospStatusSelect">${['new','audited','contacted','followup_2','followup_4','followup_7','won','lost','do_not_contact'].map(s => `<option value="${s}" ${s === prospect.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <button class="p-btn sec small" onclick="prospSetStatus('${id}')">Guardar</button>
@@ -5948,6 +5965,43 @@ async function prospSendMsg(messageId, prospectId) {
 }
 async function prospMarkCopied(messageId, prospectId) {
   try { await prospApi(`/messages/${messageId}/send`, { method:'POST' }); await prospOpenDetail(prospectId); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+function prospSelectedIds() { return Array.from(document.querySelectorAll('.prosp-check:checked')).map(c => c.value); }
+function prospToggleAll(on) { document.querySelectorAll('.prosp-check').forEach(c => c.checked = on); prospUpdateSel(); }
+function prospUpdateSel() {
+  const n = prospSelectedIds().length;
+  const bar = document.getElementById('prospBulkBar'); if (bar) bar.style.display = n ? 'flex' : 'none';
+  const cnt = document.getElementById('prospSelCount'); if (cnt) cnt.textContent = n + (n === 1 ? ' seleccionado' : ' seleccionados');
+}
+async function prospBulkDelete() {
+  const ids = prospSelectedIds();
+  if (!ids.length) return;
+  if (!confirm(`¿Borrar ${ids.length} prospecto(s)? Esta acción no se puede deshacer.`)) return;
+  try {
+    await prospApi('/prospects/bulk-delete', { method:'POST', body: JSON.stringify({ ids }) });
+    toast(`${ids.length} prospecto(s) borrado(s)`);
+    await prospLoadProspects(); await prospLoadStats();
+  } catch (e) { toast('Error: ' + e.message); }
+}
+async function prospDeleteOne(id, name, fromDetail) {
+  if (!confirm(`¿Borrar el prospecto "${name || id}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await prospApi('/prospects/' + id, { method:'DELETE' });
+    toast('Prospecto borrado');
+    if (fromDetail) prospCloseDetail();
+    await prospLoadProspects(); await prospLoadStats();
+  } catch (e) { toast('Error: ' + e.message); }
+}
+async function prospAddNote(id) {
+  const ta = document.getElementById('prospNoteInput');
+  const body = (ta && ta.value || '').trim();
+  if (!body) return;
+  try { await prospApi(`/prospects/${id}/notes`, { method:'POST', body: JSON.stringify({ body }) }); await prospOpenDetail(id); }
+  catch (e) { toast('Error: ' + e.message); }
+}
+async function prospDeleteNote(noteId, prospectId) {
+  try { await prospApi('/notes/' + noteId, { method:'DELETE' }); await prospOpenDetail(prospectId); }
   catch (e) { toast('Error: ' + e.message); }
 }
 
