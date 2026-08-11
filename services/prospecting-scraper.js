@@ -82,6 +82,23 @@ function insertProspect(batchId, normalized) {
   return id
 }
 
+// Scrapea sobre un batch YA creado (status 'running'). Pensado para correr en
+// segundo plano: la ruta responde de inmediato y el frontend hace polling sobre
+// el status del batch — así el scrape (minutos) no choca con el timeout del proxy.
+export async function scrapeIntoBatch(batchId, { niche, city, limit = DEFAULT_LIMIT }) {
+  try {
+    const input = buildGmapsSearchInput(niche, city, limit)
+    const items = await runApifyActor(actorId(), input)
+    const normalized = items.map(normalizeGmapsItem).filter(n => n.name)
+    for (const n of normalized) insertProspect(batchId, n)
+    db.prepare("UPDATE prospect_batches SET status = 'completed', total_scraped = ? WHERE id = ?").run(normalized.length, batchId)
+    return { batchId, totalScraped: normalized.length }
+  } catch (err) {
+    db.prepare("UPDATE prospect_batches SET status = 'failed', error = ? WHERE id = ?").run(err.message, batchId)
+    throw err
+  }
+}
+
 export async function runProspectingBatch({ niche, city, serviceOffered, limit = DEFAULT_LIMIT }) {
   if (!niche || !city) throw new Error('niche y city son obligatorios')
 

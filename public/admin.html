@@ -5846,18 +5846,38 @@ async function prospStartBatch(ev) {
   const city = document.getElementById('prospCity').value.trim();
   const serviceOffered = document.getElementById('prospService').value.trim();
   const limit = Number(document.getElementById('prospLimit').value) || 100;
+  const statusEl = document.getElementById('prospBatchStatus');
   btn.disabled = true;
-  document.getElementById('prospBatchStatus').textContent = 'Scrapeando con Apify... esto puede tardar un par de minutos.';
+  statusEl.textContent = 'Scrapeando con Apify… esto puede tardar 1–3 min. Puedes seguir usando el panel.';
   try {
     const { batch } = await prospApi('/batches', { method:'POST', body: JSON.stringify({ niche, city, serviceOffered, limit }) });
-    document.getElementById('prospBatchStatus').textContent = `Batch listo: ${batch.total_scraped} negocios encontrados.`;
-    await prospLoadBatches();
-    document.getElementById('prospBatchFilter').value = batch.id;
-    await prospLoadProspects();
-    await prospLoadStats();
+    const done = await prospPollBatch(batch.id, statusEl);
+    if (done.status === 'completed') {
+      statusEl.textContent = `Batch listo: ${done.total_scraped} negocios encontrados.`;
+      await prospLoadBatches();
+      document.getElementById('prospBatchFilter').value = batch.id;
+      await prospLoadProspects();
+      await prospLoadStats();
+    } else if (done.status === 'failed') {
+      statusEl.textContent = 'Error en el scrape: ' + (done.error || 'desconocido');
+    } else {
+      statusEl.textContent = 'El scrape sigue corriendo en el servidor; en un momento aparece en el filtro de Batch.';
+    }
   } catch (e) {
-    document.getElementById('prospBatchStatus').textContent = 'Error: ' + e.message;
+    statusEl.textContent = 'Error: ' + e.message;
   } finally { btn.disabled = false; }
+}
+async function prospPollBatch(batchId, statusEl) {
+  for (let i = 0; i < 90; i++) {          // ~6 min máx (90 × 4s)
+    await new Promise(r => setTimeout(r, 4000));
+    try {
+      const r = await prospApi('/batches/' + batchId);
+      const b = r.batch || r;
+      if (b && b.status && b.status !== 'running') return b;
+      if (statusEl) statusEl.textContent = `Scrapeando con Apify… (${(i + 1) * 4}s)`;
+    } catch (e) { /* reintenta en la siguiente vuelta */ }
+  }
+  return { status: 'running' };
 }
 async function prospLoadProspects() {
   const batchId = document.getElementById('prospBatchFilter').value;

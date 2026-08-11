@@ -6,7 +6,7 @@ import express from 'express'
 import { randomUUID } from 'node:crypto'
 import { db } from '../db.js'
 import { requireAdmin } from '../middleware/auth.js'
-import { runProspectingBatch } from '../services/prospecting-scraper.js'
+import { scrapeIntoBatch } from '../services/prospecting-scraper.js'
 import { auditProspect, sendAuditChat, clearAuditChat } from '../services/prospecting-audit.js'
 import { generateMessage } from '../services/prospecting-outreach.js'
 import { sendProspectMessage } from '../services/prospecting-send.js'
@@ -39,17 +39,19 @@ prospectingRouter.get('/stats/today', requireAdmin, (req, res) => {
 })
 
 // ── Batches ──────────────────────────────────────────────────────────────
-prospectingRouter.post('/batches', requireAdmin, async (req, res) => {
+prospectingRouter.post('/batches', requireAdmin, (req, res) => {
   const { niche, city, serviceOffered, limit } = req.body || {}
   if (!niche || !city) return res.status(400).json({ error: 'niche y city son obligatorios' })
-  try {
-    const result = await runProspectingBatch({ niche, city, serviceOffered, limit })
-    const batch = db.prepare('SELECT * FROM prospect_batches WHERE id = ?').get(result.batchId)
-    res.json({ ok: true, batch })
-  } catch (err) {
-    console.error('[prospecting] batch error:', err.message)
-    res.status(500).json({ error: err.message })
-  }
+  // Crea el batch en estado 'running' y responde YA; el scrape (minutos) corre
+  // en segundo plano para no chocar con el timeout del proxy. El frontend hace
+  // polling sobre GET /batches/:id hasta status 'completed'/'failed'.
+  const batchId = randomUUID()
+  db.prepare(`INSERT INTO prospect_batches (id, niche, city, service_offered, status, created_at) VALUES (?,?,?,?,?,?)`)
+    .run(batchId, niche, city, serviceOffered || null, 'running', Date.now())
+  const batch = db.prepare('SELECT * FROM prospect_batches WHERE id = ?').get(batchId)
+  res.json({ ok: true, batch })
+  scrapeIntoBatch(batchId, { niche, city, limit })
+    .catch(err => console.error('[prospecting] batch bg error:', err.message))
 })
 
 prospectingRouter.get('/batches', requireAdmin, (req, res) => {
