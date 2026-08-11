@@ -357,7 +357,7 @@
    <button class="nav-item nav-superadmin" data-tab="companies" onclick="tab('companies')" style="display:none"><span class="ic"><i data-lucide="building-2"></i></span><span data-i18n="nav_companies">Empresas</span></button>
    <button class="nav-item" data-tab="demos" onclick="tab('demos')"><span class="ic"><i data-lucide="play-circle"></i></span><span data-i18n="nav_demos">Demos</span></button>
    <button class="nav-item nav-superadmin" data-tab="users" onclick="tab('users')" style="display:none"><span class="ic"><i data-lucide="users-round"></i></span><span data-i18n="nav_users">Usuarios</span></button>
-  <a class="nav-item nav-superadmin" href="/prospecting.html" style="display:none"><span class="ic"><i data-lucide="radar"></i></span><span>Prospección</span></a>
+  <button class="nav-item nav-superadmin" data-tab="prospecting" onclick="tab('prospecting')" id="nav-prospecting" style="display:none"><span class="ic"><i data-lucide="radar"></i></span><span>Prospección</span></button>
   </div>
   <div class="sb-group">
    <div class="sb-label">Commerce</div>
@@ -526,7 +526,87 @@
   </div>
  </div>
 
+ <!-- ✦ PROSPECCIÓN (módulo interno, embebido) -->
+ <div id="tab-prospecting" class="tab">
+  <style>
+   #tab-prospecting .p-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+   @media(max-width:760px){#tab-prospecting .p-stats{grid-template-columns:1fr 1fr}}
+   #tab-prospecting .p-stat{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+   #tab-prospecting .p-stat .n{font-size:28px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,var(--gold),var(--blue));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1.15}
+   #tab-prospecting .p-stat .l{font-size:11px;color:var(--muted);margin-top:6px}
+   #tab-prospecting .p-form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+   #tab-prospecting .p-form>div{display:flex;flex-direction:column}
+   #tab-prospecting .p-form label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500}
+   #tab-prospecting .p-form input,#tab-prospecting .p-form select{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit}
+   #tab-prospecting table{width:100%;border-collapse:collapse;font-size:13px}
+   #tab-prospecting th,#tab-prospecting td{text-align:left;padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+   #tab-prospecting th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+   #tab-prospecting tr:hover td{background:rgba(255,255,255,.03)}
+   #tab-prospecting .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+   #tab-prospecting .p-hi{background:rgba(239,68,68,.15);color:#ff8a8a}
+   #tab-prospecting .p-md{background:rgba(245,158,11,.15);color:#ffd27a}
+   #tab-prospecting .p-lo{background:rgba(39,245,155,.12);color:var(--gold)}
+   #tab-prospecting .p-status{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted)}
+   #tab-prospecting .p-muted{color:var(--muted);font-size:12px}
+   #tab-prospecting .p-btn{background:linear-gradient(135deg,var(--gold),var(--blue));color:#04110a;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+   #tab-prospecting .p-btn.sec{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--border)}
+   #tab-prospecting .p-btn.small{padding:5px 10px;font-size:11px}
+   #tab-prospecting .p-btn:disabled{opacity:.5;cursor:not-allowed}
+   #prospDetail{position:fixed;top:0;right:0;width:440px;max-width:100%;height:100%;background:var(--card);border-left:1px solid var(--border);padding:22px;overflow-y:auto;transform:translateX(100%);transition:transform .25s;z-index:1000;box-shadow:-20px 0 60px rgba(0,0,0,.5)}
+   #prospDetail.open{transform:translateX(0)}
+   #prospDetail .p-close{float:right;cursor:pointer;color:var(--muted);font-size:13px}
+   #prospDetail h3{margin:0 0 4px}
+   #prospDetail textarea{width:100%;min-height:110px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px;font-family:inherit;font-size:13px}
+   #prospDetail .p-msgbox{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;font-size:12px;line-height:1.5}
+  </style>
+
+  <div class="card">
+   <h2>Cuota diaria (no negociable)</h2>
+   <div class="p-stats">
+    <div class="p-stat"><div class="n" id="prospStatNew">–</div><div class="l">negocios nuevos hoy</div></div>
+    <div class="p-stat"><div class="n" id="prospStatAudited">–</div><div class="l">auditorías hoy</div></div>
+    <div class="p-stat"><div class="n" id="prospStatMsgs">–</div><div class="l">mensajes mandados hoy</div></div>
+    <div class="p-stat"><div class="n" id="prospStatPending">–</div><div class="l">seguimientos pendientes</div></div>
+   </div>
+  </div>
+
+  <div class="card">
+   <h2>Paso 1 · Scrapea</h2>
+   <form class="p-form" onsubmit="prospStartBatch(event)">
+    <div><label>Nicho</label><input id="prospNiche" placeholder="talleres mecánicos" required></div>
+    <div><label>Ciudad</label><input id="prospCity" placeholder="Miami" required></div>
+    <div><label>Servicio que ofreces</label><input id="prospService" placeholder="agente de WhatsApp con IA"></div>
+    <div><label>Límite</label><input id="prospLimit" type="number" value="100" style="width:80px"></div>
+    <div><button type="submit" class="p-btn" id="prospBatchBtn">Lanzar batch</button></div>
+   </form>
+   <p class="p-muted" id="prospBatchStatus"></p>
+  </div>
+
+  <div class="card">
+   <h2>Prospectos</h2>
+   <form class="p-form" onsubmit="event.preventDefault(); prospLoadProspects()" style="margin-bottom:12px">
+    <div><label>Batch</label><select id="prospBatchFilter" onchange="prospLoadProspects()"><option value="">Todos</option></select></div>
+    <div><label>Estado</label><select id="prospStatusFilter" onchange="prospLoadProspects()">
+     <option value="">Todos</option><option value="new">new</option><option value="audited">audited</option><option value="contacted">contacted</option><option value="followup_2">followup_2</option><option value="followup_4">followup_4</option><option value="followup_7">followup_7</option><option value="won">won</option><option value="lost">lost</option><option value="do_not_contact">do_not_contact</option>
+    </select></div>
+   </form>
+   <div style="overflow-x:auto">
+    <table><thead><tr><th>Negocio</th><th>Contacto</th><th>Reseñas</th><th>Dolor</th><th>Estado</th><th></th></tr></thead>
+    <tbody id="prospBody"><tr><td colspan="6" class="p-muted">Sin datos todavía.</td></tr></tbody></table>
+   </div>
+  </div>
+
+  <div id="prospDetail"><span class="p-close" onclick="prospCloseDetail()">✕ cerrar</span><div id="prospDetailBody"></div></div>
+ </div>
+
  <div id="tab-config" class="tab">
+
+ <!-- Módulo de Prospección (toggle superadmin, por empresa) -->
+ <div class="card nav-superadmin" style="display:none;border-color:rgba(39,245,155,.25)">
+  <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="radar"></i> Módulo de Prospección</h2>
+  <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Herramienta interna para conseguir clientes (scraping + auditoría + outreach). Actívala solo en las empresas donde quieras que aparezca en el menú.</p>
+  <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer"><input type="checkbox" id="prospEnabledToggle" onchange="toggleProspecting()" style="width:auto;margin:0"> Habilitar Prospección para esta empresa</label>
+ </div>
 
  <!-- ✦ GENERAR CONFIGURACIÓN COMPLETA CON IA -->
  <div class="card" style="border-color:rgba(39,245,155,.25);background:linear-gradient(135deg,rgba(39,245,155,.04),transparent)">
@@ -2719,6 +2799,8 @@ function logout() {
 })();
 
 function render() {
+ const _pe = document.getElementById('prospEnabledToggle'); if (_pe) _pe.checked = !!config.prospectingEnabled;
+ updateProspectingNav();
  ['businessName','description','industry','hours','contact','products','tone',
  'welcomeMessage','welcomeMessageEn','bookingUrl','systemPromptExtra','model','plan','accentColor',
  'agentName','personality','language','voiceExamples',
@@ -3237,6 +3319,7 @@ function tab(name) {
  if (name === 'reports') loadStats();
  if (name === 'triggers') renderTriggers();
  if (name === 'billing') loadBillingStatus();
+ if (name === 'prospecting') prospLoadAll();
 }
 
 function loadDemos() {
@@ -5709,6 +5792,163 @@ window.tab = function(t) {
   if (t === 'campanas') { loadServerCreds(); loadGhlStatus(); loadSquareStatus(); loadQBOStatus() }
   if (t === 'citas')    { loadGhlWebhookUrl(); loadGenericWebhookUrl() }
   document.getElementById('sidebar')?.classList.remove('open') // close the mobile drawer after navigating
+}
+
+// ── Prospección (módulo interno embebido en el admin) ──────────
+function updateProspectingNav() {
+  const nav = document.getElementById('nav-prospecting');
+  if (nav) nav.style.display = (isSuperAdmin && config && config.prospectingEnabled) ? '' : 'none';
+}
+function toggleProspecting() {
+  const on = !!document.getElementById('prospEnabledToggle').checked;
+  api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...config, prospectingEnabled: on }) })
+    .then(d => {
+      if (d && d.error) return toast('Error: ' + d.error);
+      config.prospectingEnabled = on;
+      updateProspectingNav();
+      toast(on ? 'Prospección activada para esta empresa ✓' : 'Prospección desactivada');
+    });
+}
+function prospApi(path, opts) {
+  opts = opts || {};
+  return fetch('/api/prospecting' + path, Object.assign({}, opts, { headers: Object.assign({ 'Content-Type':'application/json' }, opts.headers || {}) }))
+    .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status)); return d; });
+}
+let prospProspects = [];
+function prospLoadAll() { prospLoadStats(); prospLoadBatches(); prospLoadProspects(); }
+async function prospLoadStats() {
+  try {
+    const s = await prospApi('/stats/today');
+    document.getElementById('prospStatNew').textContent = s.newToday;
+    document.getElementById('prospStatAudited').textContent = s.auditedToday;
+    document.getElementById('prospStatMsgs').textContent = s.messagesToday;
+    document.getElementById('prospStatPending').textContent = s.pendingFollowups;
+  } catch (e) {}
+}
+async function prospLoadBatches() {
+  try {
+    const { batches } = await prospApi('/batches');
+    const sel = document.getElementById('prospBatchFilter');
+    sel.innerHTML = '<option value="">Todos</option>' + batches.map(b => `<option value="${b.id}">${b.niche} · ${b.city} (${b.total_scraped || 0})</option>`).join('');
+  } catch (e) {}
+}
+async function prospStartBatch(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('prospBatchBtn');
+  const niche = document.getElementById('prospNiche').value.trim();
+  const city = document.getElementById('prospCity').value.trim();
+  const serviceOffered = document.getElementById('prospService').value.trim();
+  const limit = Number(document.getElementById('prospLimit').value) || 100;
+  btn.disabled = true;
+  document.getElementById('prospBatchStatus').textContent = 'Scrapeando con Apify... esto puede tardar un par de minutos.';
+  try {
+    const { batch } = await prospApi('/batches', { method:'POST', body: JSON.stringify({ niche, city, serviceOffered, limit }) });
+    document.getElementById('prospBatchStatus').textContent = `Batch listo: ${batch.total_scraped} negocios encontrados.`;
+    await prospLoadBatches();
+    document.getElementById('prospBatchFilter').value = batch.id;
+    await prospLoadProspects();
+    await prospLoadStats();
+  } catch (e) {
+    document.getElementById('prospBatchStatus').textContent = 'Error: ' + e.message;
+  } finally { btn.disabled = false; }
+}
+async function prospLoadProspects() {
+  const batchId = document.getElementById('prospBatchFilter').value;
+  const status = document.getElementById('prospStatusFilter').value;
+  const params = new URLSearchParams();
+  if (batchId) params.set('batchId', batchId);
+  if (status) params.set('status', status);
+  try { const { prospects } = await prospApi('/prospects?' + params.toString()); prospProspects = prospects; prospRenderProspects(); }
+  catch (e) {}
+}
+function prospPainTier(score) { return score >= 6 ? 'hi' : score >= 3 ? 'md' : 'lo'; }
+function prospRenderProspects() {
+  const body = document.getElementById('prospBody');
+  if (!prospProspects.length) { body.innerHTML = '<tr><td colspan="6" class="p-muted">Sin prospectos todavía.</td></tr>'; return; }
+  body.innerHTML = prospProspects.map(p => `
+    <tr>
+      <td>${p.name || '—'}<br><span class="p-muted">${p.category || ''}</span></td>
+      <td>${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
+      <td>${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
+      <td><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
+      <td><span class="p-status">${p.status}</span></td>
+      <td><button class="p-btn sec small" onclick="prospOpenDetail('${p.id}')">Ver</button></td>
+    </tr>`).join('');
+}
+async function prospOpenDetail(id) {
+  const detail = document.getElementById('prospDetail');
+  const body = document.getElementById('prospDetailBody');
+  body.innerHTML = '<p class="p-muted">Cargando…</p>';
+  detail.classList.add('open');
+  const { prospect, audits, messages } = await prospApi('/prospects/' + id);
+  const latestAudit = audits[0];
+  const issues = latestAudit ? JSON.parse(latestAudit.issues_json || '[]') : [];
+  body.innerHTML = `
+    <h3>${prospect.name}</h3>
+    <p class="p-muted">${prospect.category || ''} · ${prospect.address || ''}</p>
+    <p>${prospect.phone ? '📱 ' + prospect.phone + '<br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
+    <p><span class="pill p-${prospPainTier(prospect.pain_score)}">pain_score: ${prospect.pain_score}</span> &nbsp; <span class="p-status">${prospect.status}</span></p>
+    <div class="card" style="margin-top:14px">
+      <h2>Cambiar estado</h2>
+      <select id="prospStatusSelect">${['new','audited','contacted','followup_2','followup_4','followup_7','won','lost','do_not_contact'].map(s => `<option value="${s}" ${s === prospect.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <button class="p-btn sec small" onclick="prospSetStatus('${id}')">Guardar</button>
+    </div>
+    <div class="card">
+      <h2>Paso 2 · Construye (auditoría)</h2>
+      ${issues.length ? '<ul>' + issues.map(i => `<li>${i}</li>`).join('') + '</ul>' : '<p class="p-muted">Sin auditoría todavía.</p>'}
+      <button class="p-btn" onclick="prospRunAudit('${id}')" id="prospAuditBtn">Auditar ahora</button>
+    </div>
+    <div class="card">
+      <h2>Paso 3 · Manda</h2>
+      <form class="p-form" onsubmit="event.preventDefault()">
+        <div><label>Etapa</label><select id="prospMsgStage"><option value="opener">Opener</option><option value="day2">Día 2</option><option value="day4">Día 4</option><option value="day7">Día 7</option></select></div>
+        <div><label>Canal</label><select id="prospMsgChannel"><option value="whatsapp">WhatsApp (envío real)</option><option value="instagram">Instagram (copiar/pegar)</option></select></div>
+      </form>
+      <div style="margin-top:8px"><label>Tu nombre</label><input id="prospSenderName" placeholder="tu nombre" style="width:100%;margin-bottom:6px">
+      <label>Link del video (90seg)</label><input id="prospVideoUrl" placeholder="https://..." style="width:100%"></div>
+      <div style="margin-top:10px"><button class="p-btn" onclick="prospGenMessage('${id}')">Generar mensaje</button></div>
+      <div id="prospMsgResult"></div>
+      <h3 style="font-size:12px;color:var(--muted);margin-top:16px">Historial</h3>
+      ${messages.map(m => `<div class="p-msgbox"><b>${m.stage}</b> · ${m.channel} · <span class="p-muted">${m.status}</span><br>${(m.message_text || '').replace(/\n/g,'<br>')}</div>`).join('') || '<p class="p-muted">Sin mensajes todavía.</p>'}
+    </div>`;
+}
+function prospCloseDetail() { document.getElementById('prospDetail').classList.remove('open'); }
+async function prospSetStatus(id) {
+  const status = document.getElementById('prospStatusSelect').value;
+  await prospApi(`/prospects/${id}/status`, { method:'PATCH', body: JSON.stringify({ status }) });
+  await prospLoadProspects(); prospCloseDetail();
+}
+async function prospRunAudit(id) {
+  const btn = document.getElementById('prospAuditBtn');
+  btn.disabled = true; btn.textContent = 'Auditando…';
+  try { await prospApi(`/prospects/${id}/audit`, { method:'POST' }); await prospLoadStats(); await prospOpenDetail(id); }
+  catch (e) { toast('Error: ' + e.message); btn.disabled = false; btn.textContent = 'Auditar ahora'; }
+}
+async function prospGenMessage(id) {
+  const stage = document.getElementById('prospMsgStage').value;
+  const channel = document.getElementById('prospMsgChannel').value;
+  const senderName = document.getElementById('prospSenderName').value.trim();
+  const videoUrl = document.getElementById('prospVideoUrl').value.trim();
+  const result = document.getElementById('prospMsgResult');
+  result.innerHTML = '<p class="p-muted">Generando…</p>';
+  try {
+    const { message } = await prospApi(`/prospects/${id}/message`, { method:'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl }) });
+    result.innerHTML = `
+      <textarea id="prospMsgText" readonly>${message.message_text}</textarea>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="p-btn sec small" onclick="prospCopyMsg()">Copiar</button>
+        ${channel === 'whatsapp' ? `<button class="p-btn small" onclick="prospSendMsg('${message.id}','${id}')">Enviar por WhatsApp</button>` : `<button class="p-btn small" onclick="prospMarkCopied('${message.id}','${id}')">Marcar como listo</button>`}
+      </div>`;
+  } catch (e) { result.innerHTML = `<p class="p-muted">Error: ${e.message}</p>`; }
+}
+function prospCopyMsg() { const ta = document.getElementById('prospMsgText'); ta.select(); document.execCommand('copy'); toast('Copiado ✓'); }
+async function prospSendMsg(messageId, prospectId) {
+  try { await prospApi(`/messages/${messageId}/send`, { method:'POST' }); await prospLoadStats(); await prospOpenDetail(prospectId); }
+  catch (e) { toast('Error al enviar: ' + e.message); }
+}
+async function prospMarkCopied(messageId, prospectId) {
+  try { await prospApi(`/messages/${messageId}/send`, { method:'POST' }); await prospOpenDetail(prospectId); }
+  catch (e) { toast('Error: ' + e.message); }
 }
 
 </script>
