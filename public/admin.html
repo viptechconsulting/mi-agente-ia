@@ -558,6 +558,9 @@
    #prospDetail h3{margin:0 0 4px}
    #prospDetail textarea{width:100%;min-height:110px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px;font-family:inherit;font-size:13px}
    #prospDetail .p-msgbox{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;font-size:12px;line-height:1.5}
+   #prospDetail .p-chat{max-width:90%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+   #prospDetail .p-chat-u{align-self:flex-end;background:linear-gradient(135deg,var(--gold),var(--blue));color:#04110a}
+   #prospDetail .p-chat-a{align-self:flex-start;background:var(--bg);border:1px solid var(--border);color:var(--text)}
   </style>
 
   <div class="card">
@@ -5887,7 +5890,7 @@ async function prospOpenDetail(id) {
   const body = document.getElementById('prospDetailBody');
   body.innerHTML = '<p class="p-muted">Cargando…</p>';
   detail.classList.add('open');
-  const { prospect, audits, messages, notes } = await prospApi('/prospects/' + id);
+  const { prospect, audits, messages, notes, auditChat } = await prospApi('/prospects/' + id);
   const latestAudit = audits[0];
   const issues = latestAudit ? JSON.parse(latestAudit.issues_json || '[]') : [];
   const nm = (prospect.name || '').replace(/'/g, "\\'");
@@ -5915,6 +5918,17 @@ async function prospOpenDetail(id) {
       ${issues.length ? '<ul>' + issues.map(i => `<li>${i}</li>`).join('') + '</ul>' : '<p class="p-muted">Sin auditoría todavía.</p>'}
       <button class="p-btn" onclick="prospRunAudit('${id}')" id="prospAuditBtn">Auditar ahora</button>
     </div>
+
+    <div class="card">
+      <h2>💬 Revisar auditoría con IA</h2>
+      <p class="p-muted" style="margin:-6px 0 10px">¿La auditoría se equivocó o le falta contexto? Pregúntale o corrígela — la IA ajusta el análisis con los datos del negocio.</p>
+      <div id="prospChatLog" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="prospChatInput" placeholder="Ej: el sitio sí tiene reservas online por Instagram, corrige eso" style="min-height:52px;flex:1" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();prospSendAuditChat('${id}')}"></textarea>
+        <button class="p-btn" id="prospChatSend" onclick="prospSendAuditChat('${id}')">Enviar</button>
+      </div>
+      <div style="margin-top:8px"><span class="p-muted" style="cursor:pointer;text-decoration:underline" onclick="prospClearChat('${id}')">Limpiar conversación</span></div>
+    </div>
     <div class="card">
       <h2>Paso 3 · Manda</h2>
       <form class="p-form" onsubmit="event.preventDefault()">
@@ -5928,6 +5942,44 @@ async function prospOpenDetail(id) {
       <h3 style="font-size:12px;color:var(--muted);margin-top:16px">Historial</h3>
       ${messages.map(m => `<div class="p-msgbox"><b>${m.stage}</b> · ${m.channel} · <span class="p-muted">${m.status}</span><br>${(m.message_text || '').replace(/\n/g,'<br>')}</div>`).join('') || '<p class="p-muted">Sin mensajes todavía.</p>'}
     </div>`;
+  prospRenderChat(auditChat || []);
+}
+function prospChatBubble(role, text) {
+  const div = document.createElement('div');
+  div.className = 'p-chat ' + (role === 'user' ? 'p-chat-u' : 'p-chat-a');
+  div.textContent = text;
+  return div;
+}
+function prospRenderChat(list) {
+  const log = document.getElementById('prospChatLog'); if (!log) return;
+  log.innerHTML = '';
+  if (!list || !list.length) { log.innerHTML = '<p class="p-muted">Aún no has chateado sobre esta auditoría.</p>'; return; }
+  list.forEach(m => log.appendChild(prospChatBubble(m.role, m.content)));
+  log.scrollTop = log.scrollHeight;
+}
+async function prospSendAuditChat(id) {
+  const input = document.getElementById('prospChatInput');
+  const msg = (input && input.value || '').trim();
+  if (!msg) return;
+  const log = document.getElementById('prospChatLog');
+  const send = document.getElementById('prospChatSend');
+  if (log.querySelector('.p-muted')) log.innerHTML = '';
+  log.appendChild(prospChatBubble('user', msg));
+  input.value = '';
+  const thinking = prospChatBubble('assistant', 'Pensando…'); thinking.style.opacity = '.6';
+  log.appendChild(thinking); log.scrollTop = log.scrollHeight;
+  send.disabled = true;
+  try {
+    const { reply } = await prospApi(`/prospects/${id}/audit-chat`, { method:'POST', body: JSON.stringify({ message: msg }) });
+    thinking.style.opacity = '1'; thinking.textContent = reply;
+  } catch (e) {
+    thinking.style.opacity = '1'; thinking.textContent = 'Error: ' + e.message;
+  } finally { send.disabled = false; log.scrollTop = log.scrollHeight; }
+}
+async function prospClearChat(id) {
+  if (!confirm('¿Limpiar toda la conversación de esta auditoría?')) return;
+  try { await prospApi(`/prospects/${id}/audit-chat`, { method:'DELETE' }); prospRenderChat([]); }
+  catch (e) { toast('Error: ' + e.message); }
 }
 function prospCloseDetail() { document.getElementById('prospDetail').classList.remove('open'); }
 async function prospSetStatus(id) {

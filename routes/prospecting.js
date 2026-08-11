@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { db } from '../db.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { runProspectingBatch } from '../services/prospecting-scraper.js'
-import { auditProspect } from '../services/prospecting-audit.js'
+import { auditProspect, sendAuditChat, clearAuditChat } from '../services/prospecting-audit.js'
 import { generateMessage } from '../services/prospecting-outreach.js'
 import { sendProspectMessage } from '../services/prospecting-send.js'
 import { painTier } from '../services/prospecting-score.js'
@@ -86,7 +86,25 @@ prospectingRouter.get('/prospects/:id', requireAdmin, (req, res) => {
   const audits = db.prepare('SELECT * FROM prospect_audits WHERE prospect_id = ? ORDER BY audited_at DESC').all(req.params.id)
   const messages = db.prepare('SELECT * FROM prospect_messages WHERE prospect_id = ? ORDER BY created_at DESC').all(req.params.id)
   const notes = db.prepare('SELECT * FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC').all(req.params.id)
-  res.json({ prospect: withTier(prospect), audits, messages, notes })
+  const auditChat = db.prepare('SELECT role, content, created_at FROM prospect_audit_chat WHERE prospect_id = ? ORDER BY created_at ASC').all(req.params.id)
+  res.json({ prospect: withTier(prospect), audits, messages, notes, auditChat })
+})
+
+// ── Chat con IA sobre la auditoría (corregir / refinar el análisis) ────
+prospectingRouter.post('/prospects/:id/audit-chat', requireAdmin, async (req, res) => {
+  const message = String(req.body?.message || '').trim()
+  if (!message) return res.status(400).json({ error: 'Escribe un mensaje' })
+  try {
+    const { reply } = await sendAuditChat(req.params.id, message)
+    res.json({ reply })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+prospectingRouter.delete('/prospects/:id/audit-chat', requireAdmin, (req, res) => {
+  clearAuditChat(req.params.id)
+  res.json({ ok: true })
 })
 
 // ── Borrar prospectos (individual + bulk) ──────────────────────────────
@@ -97,6 +115,7 @@ function deleteProspects(ids) {
     db.prepare(`DELETE FROM prospect_audits WHERE prospect_id IN (${ph})`).run(...ids)
     db.prepare(`DELETE FROM prospect_messages WHERE prospect_id IN (${ph})`).run(...ids)
     db.prepare(`DELETE FROM prospect_notes WHERE prospect_id IN (${ph})`).run(...ids)
+    db.prepare(`DELETE FROM prospect_audit_chat WHERE prospect_id IN (${ph})`).run(...ids)
     return db.prepare(`DELETE FROM prospects WHERE id IN (${ph})`).run(...ids).changes
   })
   return tx()

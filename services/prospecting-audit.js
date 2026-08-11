@@ -61,6 +61,47 @@ export async function generateAuditIssues(prospect, signals) {
   return text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3)
 }
 
+// ── Chat sobre la auditoría: el usuario puede corregir/refinar el análisis ──
+export async function sendAuditChat(prospectId, message) {
+  const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
+  if (!prospect) throw new Error('Prospecto no encontrado')
+  const audit = db.prepare('SELECT * FROM prospect_audits WHERE prospect_id = ? ORDER BY audited_at DESC').get(prospectId)
+  const issues = audit ? JSON.parse(audit.issues_json || '[]') : []
+  const history = db.prepare('SELECT role, content FROM prospect_audit_chat WHERE prospect_id = ? ORDER BY created_at ASC').all(prospectId)
+
+  const auditContext = audit
+    ? `Auditoría automática del sitio de ${prospect.name}${prospect.website ? ' (' + prospect.website + ')' : ''}:
+- Tiempo de carga: ${audit.load_time_ms ?? 'n/d'} ms
+- Meta viewport (adaptado a móvil): ${audit.mobile_friendly ? 'sí' : 'no'}
+- Formulario de contacto: ${audit.has_form ? 'sí' : 'no'}
+- Reservas online / chat: ${audit.has_booking_or_chat ? 'sí' : 'no'}
+Problemas detectados por la auditoría:
+${issues.map((x, i) => `${i + 1}. ${x}`).join('\n') || '(ninguno)'}`
+    : 'Todavía no se ha corrido una auditoría de este prospecto.'
+
+  const system = `Eres un consultor experto que ayuda a revisar y CORREGIR auditorías de negocios locales (el objetivo final es venderles un asistente/sitio con IA).
+La auditoría automática se basa en señales simples (un fetch del HTML + regex), así que PUEDE equivocarse: por ejemplo marcar que no hay reservas online cuando sí las hay, no detectar un chat embebido, o juzgar mal la velocidad.
+Tu trabajo: responder al usuario, ADMITIR cuando el análisis automático pudo estar mal, corregirlo con criterio, y dar un análisis más preciso y accionable. Sé concreto, honesto y breve, en español neutro, sin relleno ni jerga técnica innecesaria.
+
+DATOS DEL NEGOCIO: ${prospect.name} · ${prospect.category || 'sin categoría'} · ${prospect.address || 'sin dirección'} · rating ${prospect.rating ?? 'n/d'} (${prospect.reviews_count ?? 0} reseñas).
+
+${auditContext}`
+
+  const messages = [...history.map(h => ({ role: h.role, content: h.content })), { role: 'user', content: message }]
+  const resp = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 800, system, messages })
+  const reply = resp.content.filter(b => b.type === 'text').map(b => b.text).join('').trim() || '(sin respuesta)'
+
+  const now = Date.now()
+  const ins = db.prepare('INSERT INTO prospect_audit_chat (id, prospect_id, role, content, created_at) VALUES (?,?,?,?,?)')
+  ins.run(crypto.randomUUID(), prospectId, 'user', message, now)
+  ins.run(crypto.randomUUID(), prospectId, 'assistant', reply, now + 1)
+  return { reply }
+}
+
+export function clearAuditChat(prospectId) {
+  db.prepare('DELETE FROM prospect_audit_chat WHERE prospect_id = ?').run(prospectId)
+}
+
 export async function auditProspect(prospectId) {
   const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
   if (!prospect) throw new Error('Prospecto no encontrado')
