@@ -552,6 +552,16 @@
    #tab-prospecting .p-btn.sec{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--border)}
    #tab-prospecting .p-btn.small{padding:5px 10px;font-size:11px}
    #tab-prospecting .p-btn:disabled{opacity:.5;cursor:not-allowed}
+   /* móvil: la tabla de 7 columnas se apila en tarjetas */
+   @media(max-width:640px){
+    #tab-prospecting thead{position:absolute;left:-9999px}
+    #tab-prospecting table,#tab-prospecting tbody{display:block;width:100%}
+    #tab-prospecting tr{display:block;border:1px solid var(--border);border-radius:12px;margin-bottom:12px;background:var(--bg);padding:4px 2px}
+    #tab-prospecting tr:hover td{background:transparent}
+    #tab-prospecting td{display:flex;justify-content:space-between;align-items:center;gap:14px;border:none;padding:8px 14px}
+    #tab-prospecting td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;flex:0 0 auto}
+    #tab-prospecting td:last-child{justify-content:flex-end;flex-wrap:wrap}
+   }
    #prospDetail{position:fixed;top:0;right:0;width:440px;max-width:100%;height:100%;background:var(--card);border-left:1px solid var(--border);padding:22px;overflow-y:auto;transform:translateX(100%);transition:transform .25s;z-index:1000;box-shadow:-20px 0 60px rgba(0,0,0,.5)}
    #prospDetail.open{transform:translateX(0)}
    #prospDetail .p-close{float:right;cursor:pointer;color:var(--muted);font-size:13px}
@@ -5896,11 +5906,11 @@ function prospRenderProspects() {
   body.innerHTML = prospProspects.map(p => `
     <tr>
       <td><input type="checkbox" class="prosp-check" value="${p.id}" onchange="prospUpdateSel()" style="width:auto;margin:0"></td>
-      <td>${p.name || '—'}<br><span class="p-muted">${p.category || ''}</span></td>
-      <td>${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
-      <td>${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
-      <td><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
-      <td><span class="p-status">${p.status}</span></td>
+      <td data-label="Negocio">${p.name || '—'}<br><span class="p-muted">${p.category || ''}</span></td>
+      <td data-label="Contacto">${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
+      <td data-label="Reseñas">${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
+      <td data-label="Dolor"><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
+      <td data-label="Estado"><span class="p-status">${p.status}</span></td>
       <td style="white-space:nowrap"><button class="p-btn sec small" onclick="prospOpenDetail('${p.id}')">Ver</button> <button class="p-btn small" style="background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.3)" onclick="prospDeleteOne('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button></td>
     </tr>`).join('');
   prospUpdateSel();
