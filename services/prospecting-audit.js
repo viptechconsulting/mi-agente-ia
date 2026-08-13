@@ -9,19 +9,40 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const VIEWPORT_RE = /<meta[^>]+name=["']viewport["']/i
 const FORM_RE = /<form[\s>]/i
-const BOOKING_OR_CHAT_RE = /calendly\.com|wa\.me\/|api\.whatsapp\.com|tidio|intercom|crisp\.chat|livechat|zendesk|freshchat|drift\.com|book(?:ing)?\s*online|reserva[sn]?\s*online|acuity|square\s*appointments|calendar\.google/i
+// pista débil: un fetch no ejecuta JS, así que muchos widgets de reserva/chat no se ven aquí
+const BOOKING_OR_CHAT_RE = /calendly\.com|wa\.me\/|api\.whatsapp\.com|tidio|intercom|crisp\.chat|livechat|zendesk|freshchat|drift\.com|book(?:ing)?\s*online|reserva[sn]?\s*online|acuity|square\s*appointments|calendar\.google|vagaro|boulevard|blvd\.co|mangomint|glossgenius|fresha|booksy|setmore|schedulicity|janeapp|zenoti|mindbody|book\s*now|agendar|reservar/i
+
+// Extrae lo que un humano leería: título, meta descripción y texto visible (recortado).
+function extractContent(html) {
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '').replace(/\s+/g, ' ').trim()
+  const desc = (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i)?.[1] || '').replace(/\s+/g, ' ').trim()
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 3000)
+  return { title, desc, text }
+}
 
 export async function auditWebsite(url) {
   const start = Date.now()
   try {
-    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15000) })
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept': 'text/html' }
+    })
     const html = await res.text()
     return {
       reachable: res.ok,
       load_time_ms: Date.now() - start,
       mobile_friendly: VIEWPORT_RE.test(html) ? 1 : 0,
       has_form: FORM_RE.test(html) ? 1 : 0,
-      has_booking_or_chat: BOOKING_OR_CHAT_RE.test(html) ? 1 : 0
+      has_booking_or_chat: BOOKING_OR_CHAT_RE.test(html) ? 1 : 0,
+      ...extractContent(html)
     }
   } catch (err) {
     return {
@@ -30,35 +51,47 @@ export async function auditWebsite(url) {
       mobile_friendly: 0,
       has_form: 0,
       has_booking_or_chat: 0,
+      title: '', desc: '', text: '',
       error: err.message
     }
   }
 }
 
-function signalsSummary(prospect, signals) {
-  if (!prospect.website) return 'El negocio no tiene sitio web (o su único enlace público es Instagram).'
-  if (!signals.reachable) return `El sitio (${prospect.website}) no cargó al intentar auditarlo (${signals.error || 'sin respuesta'}).`
-  const bits = []
-  bits.push(`Tiempo de carga: ${signals.load_time_ms}ms.`)
-  bits.push(signals.mobile_friendly ? 'Tiene meta viewport (adaptado a celular).' : 'NO tiene meta viewport — probablemente no se ve bien en celular.')
-  bits.push(signals.has_form ? 'Tiene al menos un formulario.' : 'No tiene ningún formulario de contacto.')
-  bits.push(signals.has_booking_or_chat ? 'Tiene señales de reservas online o chat.' : 'No tiene reservas online ni chat visible.')
-  return bits.join(' ')
-}
-
 export async function generateAuditIssues(prospect, signals) {
-  const summary = signalsSummary(prospect, signals)
+  if (!prospect.website) {
+    return ['No tiene sitio web propio (solo redes o Google): quien lo busca en Google y no encuentra página se va con la competencia, y no hay dónde captar ni responder al cliente fuera de horario.']
+  }
+  if (!signals.reachable) {
+    return [`Su sitio (${prospect.website}) no cargó al auditarlo (${signals.error || 'sin respuesta'}) — si a ti no te carga, a sus clientes tampoco.`]
+  }
+
+  const hints = [
+    `Carga del HTML: ${signals.load_time_ms} ms.`,
+    signals.mobile_friendly ? 'Declara viewport móvil.' : 'No declara viewport móvil.',
+    `Detección automática SIN ejecutar JavaScript (poco confiable): formulario=${signals.has_form ? 'sí' : 'no visto'}, reservas/chat=${signals.has_booking_or_chat ? 'sí' : 'no visto'}.`
+  ].join(' ')
+
   const resp = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 400,
-    system: 'Eres un consultor que audita negocios locales para venderles un asistente/sitio con IA. Escribes en español neutro, directo, sin jerga técnica ni relleno. Cada problema debe sonar a algo que el dueño del negocio puede notar él mismo (no una métrica técnica).',
+    max_tokens: 500,
+    system: 'Eres un consultor que audita negocios locales para venderles un asistente de WhatsApp/chat con IA. Escribes en español neutro, directo, sin jerga ni relleno; cada problema suena a algo que el dueño puede notar él mismo. REGLA CRÍTICA: basa cada problema SOLO en la evidencia real del contenido de la página. NUNCA afirmes que le falta algo (reservas online, chat, formulario) si no estás seguro: la detección automática no ejecuta JavaScript y suele fallar, y el texto de la página puede mencionar reservas o chat aunque la detección diga que no. Ante la duda, NO lo afirmes. Es mejor 1 problema real y verificable que 3 inventados.',
     messages: [{
       role: 'user',
-      content: `Negocio: ${prospect.name} (${prospect.category || 'sin categoría'}).\nSeñales encontradas: ${summary}\n\nEscribe EXACTAMENTE 3 problemas concretos, cortos (una línea cada uno), que le estén costando clientes a este negocio HOY. Devuelve solo la lista, un problema por línea, sin numeración ni viñetas.`
+      content: `Negocio: ${prospect.name} (${prospect.category || 'sin categoría'}), rating ${prospect.rating ?? 'n/d'} con ${prospect.reviews_count ?? 0} reseñas.
+Título del sitio: ${signals.title || '(sin título)'}
+Meta descripción: ${signals.desc || '(sin descripción)'}
+Señales técnicas: ${hints}
+
+CONTENIDO REAL DE LA PÁGINA (texto extraído, puede estar recortado):
+"""
+${signals.text || '(no se pudo extraer texto)'}
+"""
+
+Basándote en el contenido real de arriba, escribe entre 1 y 3 problemas concretos que le estén costando clientes y que un asistente de WhatsApp/chat con IA resolvería (ej: no responde fuera de horario, tarda en contestar, no capta al que pregunta de noche, sin reservas 24/7). Solo problemas que puedas sostener con lo que ves; si el sitio ya hace algo bien, no inventes un problema para llenar, devuelve menos. Un problema por línea, sin numeración ni viñetas.`
     }]
   })
   const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
-  return text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3)
+  return text.split('\n').map(l => l.replace(/^[-*\d.)\s]+/, '').trim()).filter(Boolean).slice(0, 3)
 }
 
 // ── Chat sobre la auditoría: el usuario puede corregir/refinar el análisis ──
