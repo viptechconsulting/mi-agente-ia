@@ -12,16 +12,18 @@ const STAGES = ['opener', 'day2', 'day4', 'day7']
 // Google Maps/Apify solo da el nombre del NEGOCIO, nunca el del dueño — usar
 // la primera palabra (ej. "Taller" de "Taller El Rayo") como si fuera un
 // nombre de persona suena raro. Saludamos con el nombre completo del negocio.
-export function buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang = 'es' } = {}) {
+export function buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang = 'es', includeVideo = true } = {}) {
   const en = lang === 'en'
   const [p1, p2, p3] = issues && issues.length ? issues : (en
     ? ["your site doesn't open well on mobile", "there's no way to book appointments online", 'after-hours messages go unanswered']
     : ['su página no abre bien en celular', 'no tiene cómo agendar citas en línea', 'los mensajes fuera de horario se quedan sin responder'])
   const sender = senderName || (en ? 'your name' : 'tu nombre')
   const link = videoUrl || (en ? '[video link]' : '[link del video]')
+  // El video (Loom) es opcional; si no se incluye, el párrafo pasa directo a la oferta.
+  const video = includeVideo ? (en ? `I recorded it in a 90-sec video: ${link}. ` : `Se lo grabé en un video de 90 seg: ${link}. `) : ''
   return en
-    ? `Hi ${prospect.name} 👋 I'm ${sender}. I ran a quick audit on ${prospect.name} and found 3 things that are costing you customers right now:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nI recorded it in a 90-sec video: ${link}. If you want, I'll fix #1 for FREE so you can see how I work. Sound good?`
-    : `Hola ${prospect.name} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nSe lo grabé en un video de 90 seg: ${link}. Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
+    ? `Hi ${prospect.name} 👋 I'm ${sender}. I ran a quick audit on ${prospect.name} and found 3 things that are costing you customers right now:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\n${video}If you want, I'll fix #1 for FREE so you can see how I work. Sound good?`
+    : `Hola ${prospect.name} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\n${video}Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
 }
 
 export function buildFollowupMessage(prospect, day, lang = 'es') {
@@ -51,7 +53,7 @@ function latestIssues(prospectId) {
   try { return JSON.parse(audit.issues_json) } catch { return null }
 }
 
-export async function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl, lang = 'es' } = {}) {
+export async function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl, lang = 'es', includeVideo = true } = {}) {
   if (!STAGES.includes(stage)) throw new Error(`stage inválido: ${stage}`)
   const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
   if (!prospect) throw new Error('Prospecto no encontrado')
@@ -61,7 +63,7 @@ export async function generateMessage(prospectId, stage, { channel = 'whatsapp',
     if (!latestIssues(prospectId)) throw new Error('Este prospecto todavía no tiene auditoría — corre /audit primero')
     // Reconcilia auditoría (Paso 2) + "Revisar auditoría con IA" en los 3 problemas finales.
     const issues = await reconcileIssues(prospectId, lang)
-    text = buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang })
+    text = buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang, includeVideo })
   } else {
     text = buildFollowupMessage(prospect, { day2: 2, day4: 4, day7: 7 }[stage], lang)
   }

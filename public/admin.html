@@ -5965,6 +5965,7 @@ async function prospOpenDetail(id) {
         <div><label>Etapa</label><select id="prospMsgStage"><option value="opener">Opener</option><option value="day2">Día 2</option><option value="day4">Día 4</option><option value="day7">Día 7</option></select></div>
         <div><label>Canal</label><select id="prospMsgChannel"><option value="whatsapp">WhatsApp (envío real)</option><option value="instagram">Instagram (copiar/pegar)</option></select></div>
         <div><label>Idioma</label><select id="prospMsgLang"><option value="es">Español</option><option value="en">English</option></select></div>
+        <div><label>Video (Loom)</label><select id="prospMsgVideo"><option value="1">Sí, incluir</option><option value="0">No incluir</option></select></div>
       </form>
       <div style="margin-top:8px"><label>Tu nombre</label><input id="prospSenderName" placeholder="tu nombre" style="width:100%;margin-bottom:6px">
       <label>Link del video (90seg)</label><input id="prospVideoUrl" placeholder="https://..." style="width:100%"></div>
@@ -6028,12 +6029,13 @@ async function prospGenMessage(id) {
   const stage = document.getElementById('prospMsgStage').value;
   const channel = document.getElementById('prospMsgChannel').value;
   const lang = document.getElementById('prospMsgLang').value;
+  const includeVideo = document.getElementById('prospMsgVideo').value === '1';
   const senderName = document.getElementById('prospSenderName').value.trim();
   const videoUrl = document.getElementById('prospVideoUrl').value.trim();
   const result = document.getElementById('prospMsgResult');
   result.innerHTML = '<p class="p-muted">Generando…</p>';
   try {
-    const { message } = await prospApi(`/prospects/${id}/message`, { method:'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang }) });
+    const { message } = await prospApi(`/prospects/${id}/message`, { method:'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang, includeVideo }) });
     result.innerHTML = `
       <textarea id="prospMsgText" readonly>${message.message_text}</textarea>
       <div style="margin-top:8px;display:flex;gap:8px">

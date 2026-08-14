@@ -21,6 +21,20 @@ describe('buildOpenerMessage', () => {
     assert.match(text, /for FREE/)
     assert.doesNotMatch(text, /GRATIS/)
   })
+
+  test('includeVideo=false omite la frase del video pero mantiene la oferta', () => {
+    const es = buildOpenerMessage({ name: 'Negocio X' }, ['a', 'b', 'c'], { includeVideo: false, videoUrl: 'https://loom.com/x' })
+    assert.doesNotMatch(es, /video de 90 seg|loom\.com/)
+    assert.match(es, /le arreglo la #1 GRATIS/)
+    const en = buildOpenerMessage({ name: 'Shop' }, ['a', 'b', 'c'], { lang: 'en', includeVideo: false, videoUrl: 'https://loom.com/x' })
+    assert.doesNotMatch(en, /90-sec video|loom\.com/)
+    assert.match(en, /fix #1 for FREE/)
+  })
+
+  test('por defecto (includeVideo omitido) sí incluye el video', () => {
+    const text = buildOpenerMessage({ name: 'Negocio X' }, ['a', 'b', 'c'], { videoUrl: 'https://loom.com/x' })
+    assert.match(text, /video de 90 seg: https:\/\/loom\.com\/x/)
+  })
 })
 
 describe('buildFollowupMessage', () => {

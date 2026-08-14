@@ -306,6 +306,12 @@ async function openDetail(id) {
             <option value="en">English</option>
           </select>
         </div>
+        <div><label>Video (Loom)</label>
+          <select id="msgVideo">
+            <option value="1">Sí, incluir</option>
+            <option value="0">No incluir</option>
+          </select>
+        </div>
       </form>
       <div style="margin-top:8px"><label>Tu nombre</label><input id="senderName" placeholder="tu nombre" style="width:100%;margin-bottom:6px">
       <label>Link del video (90seg)</label><input id="videoUrl" placeholder="https://..." style="width:100%"></div>
@@ -342,12 +348,13 @@ async function genMessage(id) {
   const stage = document.getElementById('msgStage').value;
   const channel = document.getElementById('msgChannel').value;
   const lang = document.getElementById('msgLang').value;
+  const includeVideo = document.getElementById('msgVideo').value === '1';
   const senderName = document.getElementById('senderName').value.trim();
   const videoUrl = document.getElementById('videoUrl').value.trim();
   const result = document.getElementById('msgResult');
   result.innerHTML = '<p class="muted">Generando…</p>';
   try {
-    const { message } = await api(`/prospects/${id}/message`, { method: 'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang }) });
+    const { message } = await api(`/prospects/${id}/message`, { method: 'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang, includeVideo }) });
     result.innerHTML = `
       <textarea id="msgText" readonly>${message.message_text}</textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
