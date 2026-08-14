@@ -31,7 +31,7 @@ const rootDir = path.join(__dirname, '..')
 
 // Lynkro's own company — used both by the lead-qualification vertical
 // (processMessage, below) and by the LYNKRO_FU follow-up job further down.
-const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
+export const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -1636,7 +1636,7 @@ setInterval(runRetargeting, 30 * 60 * 1000) // check every 30 min
 
 // Phases: early = calificación (bot_count 1-2), mid = número de impacto mostrado (3), late = demo ofrecida (4+)
 // Copy agnóstica de rubro y orientada a agendar el próximo paso concreto.
-const LYNKRO_FU = {
+export const LYNKRO_FU = {
   fu1: {
     early: '¿Alcanzaste a ver mi mensaje? Sin robarte tiempo: ¿cuántos mensajes de clientes sientes que se te quedan sin responder a la semana?',
     mid:   '¿Qué te pareció el número? Con solo unos pocos mensajes perdidos por semana, el monto al mes suele sorprender. ¿Te muestro cómo lo resolvería el sistema con tu negocio real?',
@@ -1695,7 +1695,18 @@ async function sendLynkroFU(conv, cfg, text) {
   }
 }
 
-export async function runLynkroFollowUp() {
+// Mutex de proceso: el setInterval (abajo) y el trigger manual del admin comparten
+// este mismo proceso Node; dos corridas solapadas reenviaban el mismo follow-up.
+let lynkroFURunning = false
+
+export async function runLynkroFollowUp(send = sendLynkroFU) {
+  if (lynkroFURunning) { console.log('[Lynkro FU] ya corriendo, salto corrida'); return }
+  lynkroFURunning = true
+  try { await _lynkroFollowUpPass(send) }
+  finally { lynkroFURunning = false }
+}
+
+async function _lynkroFollowUpPass(send) {
   const now = Date.now()
   const H4  = 4  * 60 * 60 * 1000
   const H24 = 24 * 60 * 60 * 1000
@@ -1732,7 +1743,7 @@ export async function runLynkroFollowUp() {
         if (now < state.snooze_until) continue
         if (!state.snooze_done) {
           const msg = reengSituation(lq)
-          await sendLynkroFU(conv, cfg, msg)
+          await send(conv, cfg, msg)
           state.snooze_done = true
           delete state.snooze_until
           db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
@@ -1746,7 +1757,7 @@ export async function runLynkroFollowUp() {
       // en el dashboard. Independiente del silencio — se envía aunque el lead haya
       // respondido, porque es una invitación a dar feedback del demo.
       if (state.demo_done && state.demo_done_at && !state.post_demo_sent && (now - state.demo_done_at) >= H24) {
-        await sendLynkroFU(conv, cfg, POST_DEMO_MSG)
+        await send(conv, cfg, POST_DEMO_MSG)
         state.post_demo_sent = true
         db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
         db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', POST_DEMO_MSG, now)
@@ -1765,6 +1776,7 @@ export async function runLynkroFollowUp() {
       // el "5 prospectos/semana" y la agenda a gente que nunca contestó una pregunta (error #5).
       const counts = db.prepare(`SELECT SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as bot_count, SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) as user_count FROM messages WHERE conversation_id = ?`).get(conv.id)
       const bot_count = counts.bot_count || 0
+      const hasReplied = (counts.user_count || 0) > 0
       const engaged = (counts.user_count || 0) >= 2 || !!lq.volume_level || !!lq.business_type
       const phase = !engaged ? 'early' : (bot_count >= 4 ? 'late' : bot_count === 3 ? 'mid' : 'early')
 
@@ -1784,7 +1796,7 @@ export async function runLynkroFollowUp() {
 
       if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; fuText = LYNKRO_FU.fu1[phase] }
       else if (!isCold && elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
-      else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
+      else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3 && hasReplied) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
       // Etapa 6 — reactivación con ángulo nuevo. Descendente para que un lead ya
       // muy frío (p.ej. 100 días) reciba solo el ángulo más reciente, no los tres.
       else if (elapsedUser >= D90 && !state.reeng90) { fuKey = 'reeng90'; fuText = reengCase(lq, cfg) }
@@ -1798,7 +1810,18 @@ export async function runLynkroFollowUp() {
       // son de valor/curiosidad, no de push a agenda.
       if (!fuKey.startsWith('reeng') && phase !== 'early' && cfg.bookingUrl) fuText += `\n\nAgenda aquí: ${cfg.bookingUrl}`
 
-      await sendLynkroFU(conv, cfg, fuText)
+      // Idempotencia: nunca reenviar un texto idéntico al último saliente. Cubre la
+      // carrera de dos corridas y el reinicio del proceso entre enviar y marcar el
+      // flag — origen de los follow-ups duplicados vistos en producción.
+      const lastOut = db.prepare("SELECT content FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 1").get(conv.id)
+      if (lastOut && lastOut.content === fuText) {
+        state[fuKey] = true
+        db.prepare('UPDATE conversations SET flow_state = ? WHERE id = ?').run(JSON.stringify(state), conv.id)
+        console.log(`[Lynkro FU] dup evitado ${fuKey} → ${conv.visitor_id}`)
+        continue
+      }
+
+      await send(conv, cfg, fuText)
 
       state[fuKey] = true
       db.prepare('UPDATE conversations SET flow_state = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), now, conv.id)
