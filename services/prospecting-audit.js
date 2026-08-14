@@ -135,6 +135,43 @@ export function clearAuditChat(prospectId) {
   db.prepare('DELETE FROM prospect_audit_chat WHERE prospect_id = ?').run(prospectId)
 }
 
+// Reconcilia el Paso 2 (auditoría automática) con el "Revisar auditoría con IA"
+// (correcciones del humano + análisis refinado) en 1-3 problemas FINALES, en el
+// idioma pedido, para que el mensaje de outreach use AMBOS. Si no hubo chat, devuelve
+// los problemas originales tal cual (sin llamar a la IA). Ante error/vacío, cae a los
+// originales — nunca deja al generador sin problemas que insertar.
+export async function reconcileIssues(prospectId, lang = 'es') {
+  const audit = db.prepare('SELECT * FROM prospect_audits WHERE prospect_id = ? ORDER BY audited_at DESC').get(prospectId)
+  const original = audit ? JSON.parse(audit.issues_json || '[]') : []
+  const history = db.prepare("SELECT role, content FROM prospect_audit_chat WHERE prospect_id = ? ORDER BY created_at ASC").all(prospectId)
+  if (!history.length) return original
+
+  const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
+  const en = lang === 'en'
+  const transcript = history.map(h => `${h.role === 'user' ? (en ? 'HUMAN' : 'HUMANO') : 'IA'}: ${h.content}`).join('\n')
+  const system = en
+    ? 'You refine a local-business audit into the FINAL list of problems used to pitch a WhatsApp/chat AI assistant. Output ONLY 1-3 problems, one per line, no numbering or bullets, in natural English, each phrased as something the owner would notice themselves. The human review below CORRECTS the automated audit — trust the corrections over the raw audit, and never claim a missing feature the review says the business already has.'
+    : 'Refinas una auditoría de negocio local en la lista FINAL de problemas para venderle un asistente de WhatsApp/chat con IA. Devuelve SOLO 1-3 problemas, uno por línea, sin numeración ni viñetas, en español neutro, cada uno como algo que el dueño notaría él mismo. La revisión humana de abajo CORRIGE la auditoría automática — dale prioridad a las correcciones sobre el audit crudo, y nunca afirmes que le falta algo que la revisión dice que sí tiene.'
+  const userMsg = `${en ? 'Business' : 'Negocio'}: ${prospect?.name || ''} (${prospect?.category || (en ? 'no category' : 'sin categoría')}).
+${en ? 'Automated audit problems' : 'Problemas de la auditoría automática'}:
+${original.map((x, i) => `${i + 1}. ${x}`).join('\n') || (en ? '(none)' : '(ninguno)')}
+
+${en ? 'Human review with AI (corrections + refined analysis)' : 'Revisión con IA (correcciones + análisis refinado)'}:
+${transcript}
+
+${en ? 'Give the FINAL 1-3 problems, reconciling both.' : 'Da los 1-3 problemas FINALES, reconciliando ambos.'}`
+
+  try {
+    const resp = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 500, system, messages: [{ role: 'user', content: userMsg }] })
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('').trim()
+    const issues = text.split('\n').map(l => l.replace(/^[-*\d.)\s]+/, '').trim()).filter(Boolean).slice(0, 3)
+    return issues.length ? issues : original
+  } catch (e) {
+    console.error('[reconcileIssues]', e.message)
+    return original
+  }
+}
+
 export async function auditProspect(prospectId) {
   const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
   if (!prospect) throw new Error('Prospecto no encontrado')

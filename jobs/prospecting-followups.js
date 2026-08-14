@@ -49,7 +49,7 @@ export async function runProspectingFollowups() {
 
   for (const { prospect, stage } of listDueFollowups(now)) {
     try {
-      const { id } = generateMessage(prospect.id, stage, { channel: 'whatsapp' })
+      const { id } = await generateMessage(prospect.id, stage, { channel: 'whatsapp' })
       await sendProspectMessage(id)
       console.log(`[prospecting-followups] ${stage} enviado a ${prospect.name} (${prospect.id})`)
     } catch (err) {

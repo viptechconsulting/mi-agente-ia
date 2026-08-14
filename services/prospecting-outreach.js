@@ -5,6 +5,7 @@
 // varía por prospecto) ya vienen del paso de auditoría.
 import crypto from 'crypto'
 import { db } from '../db.js'
+import { reconcileIssues } from './prospecting-audit.js'
 
 const STAGES = ['opener', 'day2', 'day4', 'day7']
 
@@ -50,15 +51,16 @@ function latestIssues(prospectId) {
   try { return JSON.parse(audit.issues_json) } catch { return null }
 }
 
-export function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl, lang = 'es' } = {}) {
+export async function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl, lang = 'es' } = {}) {
   if (!STAGES.includes(stage)) throw new Error(`stage inválido: ${stage}`)
   const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
   if (!prospect) throw new Error('Prospecto no encontrado')
 
   let text
   if (stage === 'opener') {
-    const issues = latestIssues(prospectId)
-    if (!issues) throw new Error('Este prospecto todavía no tiene auditoría — corre /audit primero')
+    if (!latestIssues(prospectId)) throw new Error('Este prospecto todavía no tiene auditoría — corre /audit primero')
+    // Reconcilia auditoría (Paso 2) + "Revisar auditoría con IA" en los 3 problemas finales.
+    const issues = await reconcileIssues(prospectId, lang)
     text = buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang })
   } else {
     text = buildFollowupMessage(prospect, { day2: 2, day4: 4, day7: 7 }[stage], lang)
