@@ -5907,7 +5907,7 @@ function prospRenderProspects() {
     <tr>
       <td><input type="checkbox" class="prosp-check" value="${p.id}" onchange="prospUpdateSel()" style="width:auto;margin:0"></td>
       <td data-label="Negocio">${p.name || '—'}<br><span class="p-muted">${p.category || ''}</span></td>
-      <td data-label="Contacto">${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
+      <td data-label="Contacto">${p.phone ? '📱 <a href="https://wa.me/' + p.phone.replace(/\D/g,'') + '" target="_blank" rel="noopener">' + p.phone + '</a>' : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
       <td data-label="Reseñas">${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
       <td data-label="Dolor"><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
       <td data-label="Estado"><span class="p-status">${p.status}</span></td>
@@ -5927,7 +5927,7 @@ async function prospOpenDetail(id) {
   body.innerHTML = `
     <h3>${prospect.name}</h3>
     <p class="p-muted">${prospect.category || ''} · ${prospect.address || ''}</p>
-    <p>${prospect.phone ? '📱 ' + prospect.phone + '<br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
+    <p>${prospect.phone ? '📱 <a href="https://wa.me/' + prospect.phone.replace(/\D/g,'') + '" target="_blank" rel="noopener">' + prospect.phone + '</a><br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
     <p><span class="pill p-${prospPainTier(prospect.pain_score)}">pain_score: ${prospect.pain_score}</span> &nbsp; <span class="p-status">${prospect.status}</span></p>
     <div style="margin:12px 0"><button class="p-btn small" style="background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.3)" onclick="prospDeleteOne('${id}','${nm}',true)">🗑 Borrar prospecto</button></div>
 
@@ -5964,6 +5964,7 @@ async function prospOpenDetail(id) {
       <form class="p-form" onsubmit="event.preventDefault()">
         <div><label>Etapa</label><select id="prospMsgStage"><option value="opener">Opener</option><option value="day2">Día 2</option><option value="day4">Día 4</option><option value="day7">Día 7</option></select></div>
         <div><label>Canal</label><select id="prospMsgChannel"><option value="whatsapp">WhatsApp (envío real)</option><option value="instagram">Instagram (copiar/pegar)</option></select></div>
+        <div><label>Idioma</label><select id="prospMsgLang"><option value="es">Español</option><option value="en">English</option></select></div>
       </form>
       <div style="margin-top:8px"><label>Tu nombre</label><input id="prospSenderName" placeholder="tu nombre" style="width:100%;margin-bottom:6px">
       <label>Link del video (90seg)</label><input id="prospVideoUrl" placeholder="https://..." style="width:100%"></div>
@@ -6026,12 +6027,13 @@ async function prospRunAudit(id) {
 async function prospGenMessage(id) {
   const stage = document.getElementById('prospMsgStage').value;
   const channel = document.getElementById('prospMsgChannel').value;
+  const lang = document.getElementById('prospMsgLang').value;
   const senderName = document.getElementById('prospSenderName').value.trim();
   const videoUrl = document.getElementById('prospVideoUrl').value.trim();
   const result = document.getElementById('prospMsgResult');
   result.innerHTML = '<p class="p-muted">Generando…</p>';
   try {
-    const { message } = await prospApi(`/prospects/${id}/message`, { method:'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl }) });
+    const { message } = await prospApi(`/prospects/${id}/message`, { method:'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang }) });
     result.innerHTML = `
       <textarea id="prospMsgText" readonly>${message.message_text}</textarea>
       <div style="margin-top:8px;display:flex;gap:8px">

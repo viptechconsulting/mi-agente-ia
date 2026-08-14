@@ -176,9 +176,9 @@ prospectingRouter.post('/prospects/:id/audit', requireAdmin, async (req, res) =>
 
 // ── Paso "Manda": generar mensaje ──────────────────────────────────────
 prospectingRouter.post('/prospects/:id/message', requireAdmin, (req, res) => {
-  const { stage, channel, senderName, videoUrl } = req.body || {}
+  const { stage, channel, senderName, videoUrl, lang } = req.body || {}
   try {
-    const message = generateMessage(req.params.id, stage, { channel, senderName, videoUrl })
+    const message = generateMessage(req.params.id, stage, { channel, senderName, videoUrl, lang })
     res.json({ ok: true, message })
   } catch (err) {
     res.status(400).json({ error: err.message })

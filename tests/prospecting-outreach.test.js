@@ -14,6 +14,13 @@ describe('buildOpenerMessage', () => {
     const text = buildOpenerMessage({ name: 'Negocio X' }, [])
     assert.match(text, /su página no abre bien en celular/)
   })
+
+  test('lang=en genera el opener en inglés', () => {
+    const text = buildOpenerMessage({ name: 'Rayo Auto Shop' }, ['issue 1', 'issue 2', 'issue 3'], { senderName: 'Diego', lang: 'en' })
+    assert.ok(text.startsWith('Hi Rayo Auto Shop 👋'))
+    assert.match(text, /for FREE/)
+    assert.doesNotMatch(text, /GRATIS/)
+  })
 })
 
 describe('buildFollowupMessage', () => {
@@ -25,5 +32,10 @@ describe('buildFollowupMessage', () => {
 
   test('día inválido lanza error', () => {
     assert.throws(() => buildFollowupMessage({ name: 'X' }, 3))
+  })
+
+  test('lang=en genera los seguimientos en inglés', () => {
+    assert.match(buildFollowupMessage({ name: 'Hernandez Mechanics' }, 2, 'en'), /watch the video/)
+    assert.match(buildFollowupMessage({ name: 'Hernandez Mechanics' }, 7, 'en'), /last time I'll reach out/)
   })
 })

@@ -11,25 +11,35 @@ const STAGES = ['opener', 'day2', 'day4', 'day7']
 // Google Maps/Apify solo da el nombre del NEGOCIO, nunca el del dueño — usar
 // la primera palabra (ej. "Taller" de "Taller El Rayo") como si fuera un
 // nombre de persona suena raro. Saludamos con el nombre completo del negocio.
-export function buildOpenerMessage(prospect, issues, { senderName, videoUrl } = {}) {
-  const [p1, p2, p3] = issues && issues.length ? issues : [
-    'su página no abre bien en celular', 'no tiene cómo agendar citas en línea', 'los mensajes fuera de horario se quedan sin responder'
-  ]
-  const sender = senderName || 'tu nombre'
-  const link = videoUrl || '[link del video]'
-  return `Hola ${prospect.name} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nSe lo grabé en un video de 90 seg: ${link}. Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
+export function buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang = 'es' } = {}) {
+  const en = lang === 'en'
+  const [p1, p2, p3] = issues && issues.length ? issues : (en
+    ? ["your site doesn't open well on mobile", "there's no way to book appointments online", 'after-hours messages go unanswered']
+    : ['su página no abre bien en celular', 'no tiene cómo agendar citas en línea', 'los mensajes fuera de horario se quedan sin responder'])
+  const sender = senderName || (en ? 'your name' : 'tu nombre')
+  const link = videoUrl || (en ? '[video link]' : '[link del video]')
+  return en
+    ? `Hi ${prospect.name} 👋 I'm ${sender}. I ran a quick audit on ${prospect.name} and found 3 things that are costing you customers right now:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nI recorded it in a 90-sec video: ${link}. If you want, I'll fix #1 for FREE so you can see how I work. Sound good?`
+    : `Hola ${prospect.name} 👋 Soy ${sender}. Le hice una auditoría rápida a ${prospect.name} y encontré 3 cosas que ahorita le están costando clientes:\n\n1) ${p1}  2) ${p2}  3) ${p3}\n\nSe lo grabé en un video de 90 seg: ${link}. Si quiere, le arreglo la #1 GRATIS para que vea cómo trabajo. ¿Le late?`
 }
 
-export function buildFollowupMessage(prospect, day) {
+export function buildFollowupMessage(prospect, day, lang = 'es') {
   const name = prospect.name
+  const en = lang === 'en'
   if (day === 2) {
-    return `${name}, ¿alcanzó a ver el video? La parte de la página en celular es la que más rápido le sube las citas. Si me dice que sí, se la dejo lista esta semana sin costo.`
+    return en
+      ? `${name}, did you get a chance to watch the video? The mobile-site piece is the one that boosts your bookings fastest. Just say the word and I'll have it ready for you this week at no cost.`
+      : `${name}, ¿alcanzó a ver el video? La parte de la página en celular es la que más rápido le sube las citas. Si me dice que sí, se la dejo lista esta semana sin costo.`
   }
   if (day === 4) {
-    return `Se lo hago fácil: déjeme arreglarle ese punto GRATIS. Si le gusta el resultado, hablamos de lo demás. Si no, no perdió nada. ¿Mañana le marco 5 minutos?`
+    return en
+      ? `Let me make it easy: let me fix that one thing for FREE. If you like the result, we talk about the rest. If not, you've lost nothing. Can I grab 5 minutes with you tomorrow?`
+      : `Se lo hago fácil: déjeme arreglarle ese punto GRATIS. Si le gusta el resultado, hablamos de lo demás. Si no, no perdió nada. ¿Mañana le marco 5 minutos?`
   }
   if (day === 7) {
-    return `${name}, última vez que le escribo para no molestar 🙏 Le dejo el video por si después le sirve. Cuando quiera dar el paso, aquí estoy.`
+    return en
+      ? `${name}, last time I'll reach out so I don't bug you 🙏 I'll leave the video here in case it's useful later. Whenever you're ready to take the step, I'm here.`
+      : `${name}, última vez que le escribo para no molestar 🙏 Le dejo el video por si después le sirve. Cuando quiera dar el paso, aquí estoy.`
   }
   throw new Error(`día de seguimiento inválido: ${day}`)
 }
@@ -40,7 +50,7 @@ function latestIssues(prospectId) {
   try { return JSON.parse(audit.issues_json) } catch { return null }
 }
 
-export function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl } = {}) {
+export function generateMessage(prospectId, stage, { channel = 'whatsapp', senderName, videoUrl, lang = 'es' } = {}) {
   if (!STAGES.includes(stage)) throw new Error(`stage inválido: ${stage}`)
   const prospect = db.prepare('SELECT * FROM prospects WHERE id = ?').get(prospectId)
   if (!prospect) throw new Error('Prospecto no encontrado')
@@ -49,9 +59,9 @@ export function generateMessage(prospectId, stage, { channel = 'whatsapp', sende
   if (stage === 'opener') {
     const issues = latestIssues(prospectId)
     if (!issues) throw new Error('Este prospecto todavía no tiene auditoría — corre /audit primero')
-    text = buildOpenerMessage(prospect, issues, { senderName, videoUrl })
+    text = buildOpenerMessage(prospect, issues, { senderName, videoUrl, lang })
   } else {
-    text = buildFollowupMessage(prospect, { day2: 2, day4: 4, day7: 7 }[stage])
+    text = buildFollowupMessage(prospect, { day2: 2, day4: 4, day7: 7 }[stage], lang)
   }
 
   const id = crypto.randomUUID()

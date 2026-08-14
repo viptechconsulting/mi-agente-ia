@@ -244,7 +244,7 @@ function renderProspects() {
   body.innerHTML = prospects.map(p => `
     <tr>
       <td>${p.name || '—'}<br><span class="muted">${p.category || ''}</span></td>
-      <td>${p.phone ? '📱 ' + p.phone : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
+      <td>${p.phone ? '📱 <a href="https://wa.me/' + p.phone.replace(/\D/g,'') + '" target="_blank" rel="noopener">' + p.phone + '</a>' : ''}${p.instagram ? '<br>📷 ' + p.instagram : ''}${!p.phone && !p.instagram ? '—' : ''}</td>
       <td>${p.rating ?? '—'} ★ (${p.reviews_count ?? 0})</td>
       <td><span class="pill p-${p.pain_tier}">${p.pain_score}</span></td>
       <td><span class="status">${p.status}</span></td>
@@ -265,7 +265,7 @@ async function openDetail(id) {
   body.innerHTML = `
     <h2 style="margin-top:0">${prospect.name}</h2>
     <p class="muted">${prospect.category || ''} · ${prospect.address || ''}</p>
-    <p>${prospect.phone ? '📱 ' + prospect.phone + '<br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
+    <p>${prospect.phone ? '📱 <a href="https://wa.me/' + prospect.phone.replace(/\D/g,'') + '" target="_blank" rel="noopener">' + prospect.phone + '</a><br>' : ''}${prospect.website ? '🌐 <a href="' + prospect.website + '" target="_blank">' + prospect.website + '</a><br>' : ''}${prospect.instagram ? '📷 ' + prospect.instagram : ''}</p>
     <p><span class="pill p-${painTier(prospect.pain_score)}">pain_score: ${prospect.pain_score}</span> &nbsp; <span class="status">${prospect.status}</span></p>
 
     <div class="card" style="margin-top:14px">
@@ -298,6 +298,12 @@ async function openDetail(id) {
           <select id="msgChannel">
             <option value="whatsapp">WhatsApp (envío real)</option>
             <option value="instagram">Instagram (copiar/pegar)</option>
+          </select>
+        </div>
+        <div><label>Idioma</label>
+          <select id="msgLang">
+            <option value="es">Español</option>
+            <option value="en">English</option>
           </select>
         </div>
       </form>
@@ -335,12 +341,13 @@ async function runAudit(id) {
 async function genMessage(id) {
   const stage = document.getElementById('msgStage').value;
   const channel = document.getElementById('msgChannel').value;
+  const lang = document.getElementById('msgLang').value;
   const senderName = document.getElementById('senderName').value.trim();
   const videoUrl = document.getElementById('videoUrl').value.trim();
   const result = document.getElementById('msgResult');
   result.innerHTML = '<p class="muted">Generando…</p>';
   try {
-    const { message } = await api(`/prospects/${id}/message`, { method: 'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl }) });
+    const { message } = await api(`/prospects/${id}/message`, { method: 'POST', body: JSON.stringify({ stage, channel, senderName, videoUrl, lang }) });
     result.innerHTML = `
       <textarea id="msgText" readonly>${message.message_text}</textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
