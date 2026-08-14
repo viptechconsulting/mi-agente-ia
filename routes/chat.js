@@ -2098,6 +2098,28 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
 // ============================================================
 // WHATSAPP (resolved by instance)
 // ============================================================
+// Registra un mensaje SALIENTE del negocio/humano (WhatsApp fromMe / IG echo) como
+// 'assistant', para que el historial no quede de un solo lado y ni el inbox ni el
+// agente "escriban a ciegas". Crea el shell (human_mode=1) si no existe y deduplica
+// contra el eco del propio bot (Evolution/Meta reenvían lo que ya guardó processMessage).
+export function recordOutboundMessage(companyId, channel, visitorId, text) {
+  const outText = (text || '').trim()
+  if (!outText) return null
+  const now = Date.now()
+  let conv = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = ? AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorId, channel, companyId)
+  if (!conv) {
+    conv = { id: crypto.randomUUID() }
+    db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(conv.id, visitorId, channel, now, now, companyId)
+    console.log(`[${channel}] Business initiated — human_mode=1 for`, visitorId)
+  }
+  const lastA = db.prepare("SELECT content FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(conv.id)
+  if (!lastA || lastA.content !== outText) {
+    db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, 'assistant', ?, ?)").run(conv.id, outText, now)
+    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conv.id)
+  }
+  return conv.id
+}
+
 chatRouter.post('/whatsapp/webhook', async (req, res) => {
   try {
     res.sendStatus(200)
@@ -2131,14 +2153,9 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
         }
         return
       }
-      // Business initiated (not a command) — create conversation with human_mode=1 so AI won't respond when client replies
-      const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = 'whatsapp' AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
-      if (!existing) {
-        const newId = crypto.randomUUID()
-        const now = Date.now()
-        db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorId, 'whatsapp', now, now, company.id)
-        console.log('[WA webhook] Business initiated — human_mode=1 for', visitorId)
-      }
+      // Saliente del negocio/humano (no es comando). Antes se descartaba → el historial
+      // quedaba de un solo lado. Ahora se registra como 'assistant' (crea shell si hace falta).
+      recordOutboundMessage(company.id, 'whatsapp', visitorId, text)
       return
     }
 
@@ -2425,15 +2442,9 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
             console.log(`[Instagram] human_mode=${mode} para ${visitorId}`)
           }
         } else {
-          // Business initiated conversation — create with human_mode=1 so AI won't respond when client replies
-          const visitorId = `ig:${recipientId}`
-          const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND company_id = ? AND channel = 'instagram' ORDER BY updated_at DESC LIMIT 1").get(visitorId, company.id)
-          if (!existing) {
-            const newId = crypto.randomUUID()
-            const now = Date.now()
-            db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(newId, visitorId, 'instagram', now, now, company.id)
-            console.log('[Instagram] Business initiated — human_mode=1 for', visitorId)
-          }
+          // Saliente del negocio/humano (no comando). Antes se descartaba → historial de
+          // un solo lado. Ahora se registra como 'assistant' (crea shell si hace falta).
+          recordOutboundMessage(company.id, 'instagram', `ig:${recipientId}`, text)
         }
         continue
       }
