@@ -4651,6 +4651,9 @@ function renderTriggers() {
    '<div id="tsteps_' + i + '"></div>' +
    '<button onclick="addTriggerStep(' + i + ')" style="font-size:11px;padding:5px 14px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:7px;margin-top:4px">+ Agregar mensaje</button></div>' +
 
+   // Respuesta pública al comentario (Instagram) — propia de este activador; si vacía, usa la global de la empresa.
+   '<div style="margin-top:12px"><label style="font-size:11px;color:#888;display:block;margin-bottom:4px">Respuesta pública al comentario <span style="color:#555">(Instagram — la ven todos; si vacío usa la global)</span></label>' +
+   '<input value="' + (t.publicReply||'').replace(/"/g,'&quot;') + '" placeholder="Just sent it to your DMs 📩" data-ti="' + i + '" data-field="publicReply"></div>' +
    '<div style="margin-top:10px;padding:8px 10px;background:#1a1a2a;border-radius:6px;display:flex;align-items:center;gap:8px">' +
    '<input type="checkbox" id="tfu_' + i + '" data-ti="' + i + '" data-field="followupEnabled"' + (t.followupEnabled ? ' checked' : '') + ' style="width:auto;margin:0">' +
    '<label for="tfu_' + i + '" style="font-size:12px;color:#aaa;margin:0;cursor:pointer">Enviar seguimiento 1 hora después preguntando si tomó acción</label></div>' +

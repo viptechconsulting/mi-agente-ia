@@ -2478,7 +2478,8 @@ chatRouter.post('/instagram/webhook', async (req, res) => {
         if (result?.reply) {
           const pr = await sendInstagramCommentReply(cfg.igAccessToken, commentId, result.reply)
           // Además del DM, responde públicamente al comentario avisando que llegó el DM.
-          const publicText = cfg.igCommentPublicReply || 'Gracias, te envié un DM :) con la información'
+          // Prioridad: respuesta pública propia del activador → global de la empresa → default.
+          const publicText = match.trigger.publicReply || cfg.igCommentPublicReply || 'Gracias, te envié un DM :) con la información'
           const pub = await sendInstagramCommentPublicReply(cfg.igAccessToken, commentId, publicText)
           console.log(`[Instagram comment→DM] ${company.id} comment=${commentId} matched, DM sent=${pr.ok}, public reply=${pub.ok}${pr.error ? ' dmErr=' + pr.error : ''}${pub.error ? ' pubErr=' + pub.error : ''}`)
         }
