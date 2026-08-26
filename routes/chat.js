@@ -48,10 +48,19 @@ const AUTO_RESUME_AI = false
 // Responder al instante delata que es una IA. Esperamos como si alguien leyera
 // y tecleara: un arranque fijo + tiempo proporcional al largo, con tope y una
 // variación aleatoria para que no sea siempre igual.
-const HUMAN_DELAY_BASE_MS = 1200
-const HUMAN_DELAY_PER_CHAR_MS = 28
-const HUMAN_DELAY_MIN_MS = 800
-const HUMAN_DELAY_MAX_MS = 7000
+// Calibrado 2026-08-26 tras probarlo en vivo: 28ms/carácter (36 car/s) delataba
+// a la máquina igual. Una persona en el celular escribe entre 3 y 6 caracteres
+// por segundo; 65ms/carácter (~15 car/s) es el punto donde ya no canta a bot sin
+// desesperar al visitante.
+const HUMAN_DELAY_BASE_MS = 2000
+const HUMAN_DELAY_PER_CHAR_MS = 65
+const HUMAN_DELAY_MIN_MS = 1500
+const HUMAN_DELAY_MAX_MS = 12000
+// Piso de espera DESPUÉS de generar: aunque el modelo se haya tardado más que el
+// objetivo, siempre queda una pausa visible. Sin esto, las respuestas cortas
+// (objetivo bajo) salían instantáneas porque la generación se comía el objetivo
+// entero — que es justo lo que se veía en el chat de BeGlam.
+const HUMAN_DELAY_FLOOR_MS = 1500
 
 export function humanDelayMs(text, cfg = {}) {
   if (cfg.humanDelay === false) return 0
@@ -61,11 +70,17 @@ export function humanDelayMs(text, cfg = {}) {
   return Math.round(clamped * (0.8 + Math.random() * 0.4))
 }
 
-// El visitante ya estuvo esperando mientras el modelo generaba la respuesta, así
-// que ese tiempo cuenta como parte del "tecleo": esperamos solo lo que falte para
-// llegar al objetivo. Si el modelo tardó más que el objetivo, no esperamos nada.
+// El visitante ya estuvo esperando mientras el modelo generaba, así que ese
+// tiempo cuenta como parte del "tecleo": esperamos lo que falte para llegar al
+// objetivo, pero nunca menos del piso (si no, las respuestas cortas salen secas).
+export function humanPauseMs(text, cfg = {}, alreadyWaitedMs = 0) {
+  const target = humanDelayMs(text, cfg)
+  if (target === 0) return 0
+  return Math.max(target - alreadyWaitedMs, HUMAN_DELAY_FLOOR_MS)
+}
+
 async function humanPause(text, cfg, alreadyWaitedMs = 0) {
-  const ms = humanDelayMs(text, cfg) - alreadyWaitedMs
+  const ms = humanPauseMs(text, cfg, alreadyWaitedMs)
   if (ms > 0) await new Promise(r => setTimeout(r, ms))
 }
 

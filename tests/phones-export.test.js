@@ -7,7 +7,7 @@ import { test, describe, after } from 'node:test'
 import assert from 'node:assert/strict'
 import crypto from 'crypto'
 import { db } from '../db.js'
-import { collectPhones, humanDelayMs } from '../routes/chat.js'
+import { collectPhones, humanDelayMs, humanPauseMs } from '../routes/chat.js'
 
 const COMPANY = 'test-phones-' + crypto.randomUUID().slice(0, 8)
 const now = Date.now()
@@ -89,7 +89,7 @@ describe('humanDelayMs', () => {
     for (let i = 0; i < 200; i++) {
       const ms = humanDelayMs('x'.repeat(i * 20))
       assert.ok(ms >= 600, `demasiado rápido: ${ms}`)
-      assert.ok(ms <= 7000 * 1.2, `demasiado lento: ${ms}`)
+      assert.ok(ms <= 12000 * 1.2, `demasiado lento: ${ms}`)
     }
   })
 
@@ -104,17 +104,25 @@ describe('humanDelayMs', () => {
   })
 })
 
-describe('humanPause descuenta lo ya esperado', () => {
-  // El helper interno no se exporta; probamos la aritmética que usa: el retraso
-  // efectivo es el objetivo menos lo que tardó el modelo en generar.
-  test('si el modelo tardó más que el objetivo, no se espera nada extra', () => {
-    const objetivo = humanDelayMs('respuesta corta')
-    assert.ok(objetivo - 30000 <= 0, 'con 30s de generación no debe quedar espera')
+describe('humanPauseMs — descuento y piso', () => {
+  test('si el modelo fue rápido, se espera la diferencia hasta el objetivo', () => {
+    const objetivo = humanDelayMs('x'.repeat(150), { humanDelayMax: 12000 })
+    const espera = humanPauseMs('x'.repeat(150), { humanDelayMax: 12000 }, 1000)
+    assert.ok(espera > 1500, `debería descontar, no anular: ${espera}`)
+    assert.ok(espera < objetivo + 1, 'nunca más que el objetivo completo')
   })
 
-  test('si el modelo fue rápido, se espera la diferencia', () => {
-    const objetivo = humanDelayMs('x'.repeat(150), { humanDelayMax: 7000 })
-    const restante = objetivo - 1000
-    assert.ok(restante > 0 && restante < objetivo)
+  test('aunque el modelo tarde una eternidad, siempre queda una pausa visible', () => {
+    // Este es el bug que se vio en BeGlam: respuesta corta + generación lenta = respuesta seca.
+    assert.ok(humanPauseMs('¡Hola de nuevo! ¿En qué te puedo ayudar hoy?', {}, 30000) >= 1500)
+  })
+
+  test('apagado por empresa sigue siendo cero, sin piso', () => {
+    assert.equal(humanPauseMs('hola', { humanDelay: false }, 0), 0)
+  })
+
+  test('una respuesta de ~120 caracteres espera varios segundos, no milésimas', () => {
+    const espera = humanPauseMs('x'.repeat(120), {}, 2000)
+    assert.ok(espera >= 3000, `demasiado corta para parecer humana: ${espera}`)
   })
 })
