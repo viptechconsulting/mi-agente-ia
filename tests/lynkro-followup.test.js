@@ -2,15 +2,17 @@
 // Cubre los dos bugs de follow-up arreglados en runLynkroFollowUp:
 //   1) el breakup (fu3) NO se manda a un lead que nunca respondió.
 //   2) idempotencia: no se reenvía un texto idéntico al último saliente (duplicados).
-// El envío real (WhatsApp/IG) se inyecta como stub, así el test no toca la red.
-import { test, describe, beforeEach } from 'node:test'
+// El envío real (WhatsApp/IG) y la generación NEPQ (IA) se inyectan como stubs,
+// así el test no toca la red.
+import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import crypto from 'crypto'
 import { db } from '../db.js'
-import { runLynkroFollowUp, LYNKRO_FU, LYNKRO_COMPANY_ID } from '../routes/chat.js'
+import { runLynkroFollowUp, LYNKRO_COMPANY_ID } from '../routes/chat.js'
 
 const H = 60 * 60 * 1000
 const D = 24 * H
+const GEN_TEXT = '¿Cómo va todo? Quedé pensando en lo que hablamos.' // texto fijo del stub NEPQ
 
 // Crea un lead Lynkro (whatsapp) con updated_at relativo y una lista de mensajes.
 // msgs: [{ role, agoMs }] — created_at = now - agoMs. El último de la lista es el más nuevo.
@@ -30,10 +32,14 @@ function seedLead({ updatedAgoMs, msgs }) {
 
 const flags = id => JSON.parse(db.prepare('SELECT flow_state FROM conversations WHERE id = ?').get(id).flow_state || '{}')
 
-// Corre el job con un stub que graba los envíos y devuelve solo los de conv `id`.
-async function runAndCollect(id) {
+// Corre el job con stubs de envío y de generación NEPQ; devuelve solo los envíos de `id`.
+// El stub de generación devuelve un texto fijo (o lo que se le pase) sin llamar a la IA.
+async function runAndCollect(id, genText = GEN_TEXT) {
   const calls = []
-  await runLynkroFollowUp((conv, _cfg, text) => { calls.push({ id: conv.id, text }); return Promise.resolve() })
+  await runLynkroFollowUp(
+    (conv, _cfg, text) => { calls.push({ id: conv.id, text }); return Promise.resolve() },
+    async () => ({ action: 'send', text: genText }),
+  )
   return calls.filter(c => c.id === id)
 }
 
@@ -53,15 +59,15 @@ describe('runLynkroFollowUp: breakup (fu3) solo a quien respondió', () => {
     ] })
     const calls = await runAndCollect(id)
     assert.equal(calls.length, 1)
-    assert.equal(calls[0].text, LYNKRO_FU.fu3)
+    assert.equal(calls[0].text, GEN_TEXT, 'debe enviar el texto generado por la IA')
   })
 })
 
 describe('runLynkroFollowUp: idempotencia (no duplicar)', () => {
-  test('no reenvía si el último saliente es idéntico al texto del touch', async () => {
-    // Due para fu1 (6h de silencio), pero el último mensaje del bot YA es el fu1
-    // (simula: se envió pero el flag no quedó marcado — reinicio/carrera).
-    const id = seedLead({ updatedAgoMs: 6 * H, msgs: [{ role: 'assistant', content: LYNKRO_FU.fu1.early, agoMs: 6 * H }] })
+  test('no reenvía si el último saliente es idéntico al texto generado', async () => {
+    // Due para fu1 (6h de silencio), pero el último mensaje del bot YA es igual al
+    // texto que genera la IA (simula: se envió pero el flag no quedó marcado — carrera).
+    const id = seedLead({ updatedAgoMs: 6 * H, msgs: [{ role: 'assistant', content: GEN_TEXT, agoMs: 6 * H }] })
     const calls = await runAndCollect(id)
     assert.equal(calls.length, 0, 'no debe reenviar un texto idéntico al último saliente')
     assert.equal(flags(id).fu1, true, 'debe marcar el flag para no volver a intentarlo')
@@ -71,6 +77,6 @@ describe('runLynkroFollowUp: idempotencia (no duplicar)', () => {
     const id = seedLead({ updatedAgoMs: 6 * H, msgs: [{ role: 'assistant', content: 'Hola, soy el asistente 👋', agoMs: 6 * H }] })
     const calls = await runAndCollect(id)
     assert.equal(calls.length, 1)
-    assert.equal(calls[0].text, LYNKRO_FU.fu1.early)
+    assert.equal(calls[0].text, GEN_TEXT)
   })
 })

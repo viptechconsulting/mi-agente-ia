@@ -15,12 +15,16 @@
   let isOpen = false;
   let greetingShown = false;
   let pollTimer = null;
+  let sending = false;
   let lastMessageAt = Date.now();
 
   function startPolling() {
     if (pollTimer) return;
     pollTimer = setInterval(async () => {
-      if (!conversationId) return;
+      // Mientras hay un envío en curso el servidor ya guardó la respuesta pero
+      // todavía la está "escribiendo" (retraso humano): si consultáramos ahora,
+      // la burbuja saldría dos veces.
+      if (!conversationId || sending) return;
       try {
         const r = await fetch(`${API}/api/chat/poll${qs}&conversationId=${conversationId}&after=${lastMessageAt}`.replace('poll?', 'poll?'));
         const data = await r.json();
@@ -33,9 +37,12 @@
             }
           });
         }
-        if (!data.human_mode) stopPolling();
+        // Con el chat abierto seguimos consultando aunque la IA esté activa: si
+        // alguien del negocio toma la conversación mientras el visitante está
+        // quieto, su mensaje aparece igual sin que el visitante tenga que escribir.
+        if (!data.human_mode && !isOpen) stopPolling();
       } catch {}
-    }, 2500);
+    }, 3000);
   }
 
   function stopPolling() {
@@ -322,6 +329,7 @@
       renderQuickReplies();
     }
     setTimeout(() => inputEl.focus(), 200);
+    if (conversationId) startPolling();
   }
 
   function closePanel() {
@@ -358,6 +366,7 @@
     if (!text?.trim()) return;
     greeting.style.display = 'none';
     addBubble('user', text);
+    sending = true;
     sendBtn.disabled = true;
     inputEl.disabled = true;
     const typing = showTyping();
@@ -393,6 +402,7 @@
       typing.remove();
       addBubble('bot', t().connError);
     }
+    sending = false;
     sendBtn.disabled = false;
     inputEl.disabled = false;
     inputEl.focus();

@@ -161,6 +161,9 @@ export const defaultConfig = {
     { label: 'Ver FAQ', message: 'Muéstrame las preguntas frecuentes' }
   ],
   bookingUrl: '',
+  // Follow-up automático NEPQ (job en routes/chat.js). Opt-out: activo salvo
+  // que se ponga explícitamente en false desde el panel admin.
+  followupEnabled: true,
   // Lynkro Etapa 6 (reactivación 30/60/90) — links opcionales que el agente adjunta
   // en los follow-ups de días 60 (guía) y 90 (caso de éxito). Vacío ⇒ va solo texto.
   reengageGuideUrl: '',

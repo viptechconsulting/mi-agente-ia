@@ -1223,7 +1223,10 @@
  <div class="card">
  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
   <h2 style="margin:0" data-i18n="h2_leads">Leads capturados</h2>
-  <input id="leadSearch" placeholder="Buscar por nombre, email o telefono..." data-i18n-placeholder="leads_search_placeholder" style="width:260px;font-size:13px" oninput="filterLeads()">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+   <input id="leadSearch" placeholder="Buscar por nombre, email o telefono..." data-i18n-placeholder="leads_search_placeholder" style="width:260px;font-size:13px" oninput="filterLeads()">
+   <button onclick="downloadPhonesCsv()" title="Descargar todos los teléfonos que escribieron al chat" style="font-size:12px;padding:8px 12px;background:#161616;color:var(--gold);border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">⬇ Teléfonos CSV</button>
+  </div>
  </div>
  <div id="leadList"><p style="color:#666">Cargando...</p></div>
  </div>
@@ -4048,6 +4051,18 @@ function uploadPdf() {
  document.getElementById('pdfFile').value = '';
  toast(`PDF procesado: ${d.chunks} fragmentos `); loadDocs();
  });
+}
+
+// Descarga todos los teléfonos vistos en el chat de la empresa activa.
+function downloadPhonesCsv() {
+ fetch('/api/leads/phones.csv', { headers: { 'x-admin-password': password } })
+  .then(r => r.blob())
+  .then(b => {
+   const u = URL.createObjectURL(b);
+   const a = document.createElement('a');
+   a.href = u; a.download = 'telefonos.csv';
+   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+  });
 }
 
 let _allLeads = [];

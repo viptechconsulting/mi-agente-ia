@@ -25,15 +25,49 @@ import { splitVideoMessage } from '../services/wa-media.js'
 import { buildLynkroLeadPromptModule } from '../services/lynkro-lead-prompt.js'
 import { loadState as loadLeadState, saveState as saveLeadState, shouldNotifyQualified } from '../services/lynkro-lead-state.js'
 import { transcribeAudioBuffer } from '../services/transcribe.js'
+import { generateFollowUp, humanizeElapsed } from '../services/followup-prompt.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.join(__dirname, '..')
 
 // Lynkro's own company — used both by the lead-qualification vertical
-// (processMessage, below) and by the LYNKRO_FU follow-up job further down.
+// (processMessage, below) and by the NEPQ follow-up job further down.
 export const LYNKRO_COMPANY_ID = '4a945bfd-5090-472e-a3e4-a137c1da56c9'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+// Cuando un humano toma la conversación (human_mode=1) la IA se queda callada
+// hasta que alguien la reactive a mano (toggle del panel, ** en WhatsApp, o
+// POST /human-mode {mode:0}). Antes se reactivaba sola —10 min sin respuesta del
+// humano, o 30 min de conversación quieta— y el agente se metía en medio de una
+// charla real. El código viejo sigue abajo, apagado por esta constante: poner
+// true aquí lo devuelve tal cual estaba. (2026-08-26)
+const AUTO_RESUME_AI = false
+
+// ── Retraso "humano" antes de responder ──────────────────────────────────────
+// Responder al instante delata que es una IA. Esperamos como si alguien leyera
+// y tecleara: un arranque fijo + tiempo proporcional al largo, con tope y una
+// variación aleatoria para que no sea siempre igual.
+const HUMAN_DELAY_BASE_MS = 1200
+const HUMAN_DELAY_PER_CHAR_MS = 28
+const HUMAN_DELAY_MIN_MS = 800
+const HUMAN_DELAY_MAX_MS = 7000
+
+export function humanDelayMs(text, cfg = {}) {
+  if (cfg.humanDelay === false) return 0
+  const max = Number(cfg.humanDelayMax) > 0 ? Number(cfg.humanDelayMax) : HUMAN_DELAY_MAX_MS
+  const raw = HUMAN_DELAY_BASE_MS + (text || '').length * HUMAN_DELAY_PER_CHAR_MS
+  const clamped = Math.min(Math.max(raw, HUMAN_DELAY_MIN_MS), max)
+  return Math.round(clamped * (0.8 + Math.random() * 0.4))
+}
+
+// El visitante ya estuvo esperando mientras el modelo generaba la respuesta, así
+// que ese tiempo cuenta como parte del "tecleo": esperamos solo lo que falte para
+// llegar al objetivo. Si el modelo tardó más que el objetivo, no esperamos nada.
+async function humanPause(text, cfg, alreadyWaitedMs = 0) {
+  const ms = humanDelayMs(text, cfg) - alreadyWaitedMs
+  if (ms > 0) await new Promise(r => setTimeout(r, ms))
+}
 
 // Retries transient failures (network blips, rate limits, Anthropic 5xx) so a
 // single hiccup doesn't leave an inbound message with zero reply.
@@ -516,10 +550,13 @@ export async function processMessage({ companyId, message, conversationId, visit
       db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id) VALUES (?, ?, ?, ?, ?, ?)').run(convId, visitorId || 'anon', channel || 'web', now, now, companyId)
     } else {
       // Auto-reset human_mode for web conversations idle >30 min (prevents test pollution)
+      // Desactivado por AUTO_RESUME_AI: la vuelta del visitante sigue marcándose como
+      // reactivación, pero ya no le quita la conversación al humano que la tomó.
       const idleMs = now - (owner?.updated_at || 0)
       if (channel === 'web' && idleMs > 30 * 60 * 1000) {
         isReactivation = true
-        db.prepare('UPDATE conversations SET human_mode = 0, updated_at = ? WHERE id = ?').run(now, convId)
+        if (AUTO_RESUME_AI) db.prepare('UPDATE conversations SET human_mode = 0, updated_at = ? WHERE id = ?').run(now, convId)
+        else db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, convId)
       } else {
         db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, convId)
       }
@@ -543,8 +580,8 @@ export async function processMessage({ companyId, message, conversationId, visit
     setImmediate(() => sendWebChatAlert(companyId, convId, message))
   }
 
-  // Auto-expire human_mode if owner hasn't replied in 10 min
-  if (channel === 'web' && conv.human_mode) {
+  // Auto-expire human_mode if owner hasn't replied in 10 min (apagado por AUTO_RESUME_AI)
+  if (AUTO_RESUME_AI && channel === 'web' && conv.human_mode) {
     const lastOwner = db.prepare("SELECT MAX(created_at) as ts FROM messages WHERE conversation_id = ? AND role = 'assistant'").get(convId)
     if (!lastOwner?.ts || (now - lastOwner.ts) > 10 * 60 * 1000) {
       db.prepare('UPDATE conversations SET human_mode = 0 WHERE id = ?').run(convId)
@@ -1066,6 +1103,10 @@ export async function processMessage({ companyId, message, conversationId, visit
       setImmediate(() => sendNotification({ type: 'escalation', conversationId: convId, companyId }))
     }
   }
+  // Espera antes de entregar la respuesta para que no se sienta instantánea.
+  // Va acá (y no en cada canal) porque los 5 call sites de processMessage
+  // —web, WhatsApp, Instagram DM y comentario— pasan todos por este return.
+  await humanPause(reply, cfg, Date.now() - now) // `now` = inicio de processMessage
   return { conversationId: convId, reply, button: null, messageId: info.lastInsertRowid }
 }
 
@@ -1635,20 +1676,8 @@ setInterval(runRetargeting, 30 * 60 * 1000) // check every 30 min
 // ============================================================
 
 // Phases: early = calificación (bot_count 1-2), mid = número de impacto mostrado (3), late = demo ofrecida (4+)
-// Copy agnóstica de rubro y orientada a agendar el próximo paso concreto.
-export const LYNKRO_FU = {
-  fu1: {
-    early: '¿Alcanzaste a ver mi mensaje? Sin robarte tiempo: ¿cuántos mensajes de clientes sientes que se te quedan sin responder a la semana?',
-    mid:   '¿Qué te pareció el número? Con solo unos pocos mensajes perdidos por semana, el monto al mes suele sorprender. ¿Te muestro cómo lo resolvería el sistema con tu negocio real?',
-    late:  'Quedamos en que te mostraba el sistema en vivo — son 15 min, sin compromiso, y lo ves con tu caso real. ¿Lo agendamos?'
-  },
-  fu2: {
-    early: 'Sin apuro. Si me cuentas a qué se dedica tu negocio, te armo el cálculo de cuánto podrías estar dejando sobre la mesa cada mes. Un estimado alcanza.',
-    mid:   'Ese número es siendo conservador — la mayoría deja escapar más de lo que cree. ¿Le damos 15 minutos para verlo en vivo con tu caso?',
-    late:  'Sé que andas ocupado. ¿Lo dejamos agendado y listo? Eliges el horario que te quede y lo vemos en vivo, sin compromiso.'
-  },
-  fu3: 'Una última para cerrar el tema: ¿sigue siendo prioridad dejar de perder esos clientes que se van sin respuesta, o lo retomamos más adelante?'
-}
+// El texto de cada follow-up lo genera la IA (services/followup-prompt.js, NEPQ)
+// con el historial real; la fase solo decide si se adjunta el link de agenda.
 
 // Follow-up post-demo (Etapa 4C) — se dispara 24h después de que un humano marca
 // "Demo hecho" en el dashboard (state.demo_done + state.demo_done_at), no antes.
@@ -1659,22 +1688,6 @@ const POST_DEMO_MSG = 'Gracias por el tiempo del demo 🙌 ¿Qué te quedó dand
 function reengSituation(lq) {
   const neg = lq?.business_type ? `tu ${lq.business_type}` : 'tu negocio'
   return `Hola, ¿cómo va todo? La última vez me contabas de ${neg}. ¿Cambió algo en cómo manejas los mensajes con tus clientes, o sigue más o menos igual? Lo pregunto sin intención de venderte nada — solo por saber si el tema sigue ahí.`
-}
-function reengGuide(cfg) {
-  const base = 'Hola 👋 Armamos una guía gratis de 7 puntos para responder a tus clientes en menos de 2 minutos, sin contratar a nadie nuevo. Te la dejo por si te sirve para tu operación'
-  const tail = ' — sin compromiso, cero venta detrás.'
-  return cfg?.reengageGuideUrl ? `${base}: ${cfg.reengageGuideUrl}${tail}` : `${base}${tail}`
-}
-function reengCase(lq, cfg) {
-  const byVertical = {
-    clinica_estetica: 'Hace poco una clínica en Brickell bajó su tiempo de respuesta de 4 horas a 90 segundos y recuperó 11 citas que se le escapaban, en el primer mes.',
-    salon_belleza: 'Hace poco un salón dejó de perder clientas que reservaban con la competencia solo porque no alcanzaban a contestar a tiempo — el sistema les respondía al instante.',
-    ecommerce: 'Hace poco una tienda recuperó ventas que se le perdían en preguntas de producto que quedaban sin responder — el sistema contestaba al toque y cerraba.'
-  }
-  const base = byVertical[lq?.vertical] || 'Hace poco un negocio como el tuyo dejó de perder clientes por no responder a tiempo — el sistema contesta al instante, como lo harías tú.'
-  const intro = 'Hola 👋 '
-  const outro = ' No sé si tu situación cambió, pero quería compartirte el caso por si te resulta útil'
-  return cfg?.reengageCaseUrl ? `${intro}${base}${outro}: ${cfg.reengageCaseUrl}` : `${intro}${base}${outro}.`
 }
 
 // Envío de un follow-up de Lynkro por el canal correcto (WhatsApp builtin/Twilio o Instagram).
@@ -1699,14 +1712,16 @@ async function sendLynkroFU(conv, cfg, text) {
 // este mismo proceso Node; dos corridas solapadas reenviaban el mismo follow-up.
 let lynkroFURunning = false
 
-export async function runLynkroFollowUp(send = sendLynkroFU) {
+async function _defaultGenerate(opts) { return generateFollowUp(client, opts) }
+
+export async function runLynkroFollowUp(send = sendLynkroFU, generate = _defaultGenerate) {
   if (lynkroFURunning) { console.log('[Lynkro FU] ya corriendo, salto corrida'); return }
   lynkroFURunning = true
-  try { await _lynkroFollowUpPass(send) }
+  try { await _lynkroFollowUpPass(send, generate) }
   finally { lynkroFURunning = false }
 }
 
-async function _lynkroFollowUpPass(send) {
+async function _lynkroFollowUpPass(send, generate = _defaultGenerate) {
   const now = Date.now()
   const H4  = 4  * 60 * 60 * 1000
   const H24 = 24 * 60 * 60 * 1000
@@ -1716,16 +1731,23 @@ async function _lynkroFollowUpPass(send) {
   const D60 = 60 * 24 * 60 * 60 * 1000
   const D90 = 90 * 24 * 60 * 60 * 1000
 
-  const convs = db.prepare(`
-    SELECT id, visitor_id, channel, updated_at, flow_state, company_id
+  // Todas las empresas con follow-up activo (opt-out: activo salvo false explícito).
+  // Lynkro va siempre — su config predatea el flag y trae la cadencia completa.
+  const companyIds = new Set(db.prepare('SELECT id FROM companies WHERE active = 1').all().map(r => r.id))
+  companyIds.add(LYNKRO_COMPANY_ID)
+
+  for (const companyId of companyIds) {
+   const cfg = loadConfig(companyId)
+   if (cfg.followupEnabled === false && companyId !== LYNKRO_COMPANY_ID) continue
+
+   const convs = db.prepare(`
+    SELECT id, visitor_id, channel, updated_at, flow_state, company_id, lead_name
     FROM conversations
     WHERE company_id = ?
       AND channel IN ('whatsapp','instagram')
       AND human_mode = 0
       AND do_not_contact = 0
-  `).all(LYNKRO_COMPANY_ID)
-
-  const cfg = loadConfig(LYNKRO_COMPANY_ID)
+  `).all(companyId)
 
   for (const conv of convs) {
     try {
@@ -1792,18 +1814,45 @@ async function _lynkroFollowUpPass(send) {
       const lu = db.prepare("SELECT MAX(created_at) as t FROM messages WHERE conversation_id = ? AND role = 'user'").get(conv.id)
       const elapsedUser = now - (lu?.t || conv.updated_at)
       let fuKey = null
-      let fuText = null
+      let stageLabel = null
+      let elapsedForLabel = elapsed
 
-      if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; fuText = LYNKRO_FU.fu1[phase] }
-      else if (!isCold && elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; fuText = LYNKRO_FU.fu2[phase] }
-      else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3 && hasReplied) { fuKey = 'fu3'; fuText = LYNKRO_FU.fu3 }
+      if      (elapsed >= H4  && elapsed < H24 && !state.fu1) { fuKey = 'fu1'; stageLabel = 'STAGE 1 — reopen the conversation gently' }
+      else if (!isCold && elapsed >= H24 && elapsed < D3  && !state.fu2) { fuKey = 'fu2'; stageLabel = 'STAGE 2 — uncover priority, uncertainty, or the real obstacle' }
+      else if (!isCold && elapsed >= D3  && elapsed < D7  && !state.fu3 && hasReplied) { fuKey = 'fu3'; stageLabel = 'STAGE 4 — obtain clarity and respectfully close the loop; give permission to say no' }
       // Etapa 6 — reactivación con ángulo nuevo. Descendente para que un lead ya
       // muy frío (p.ej. 100 días) reciba solo el ángulo más reciente, no los tres.
-      else if (elapsedUser >= D90 && !state.reeng90) { fuKey = 'reeng90'; fuText = reengCase(lq, cfg) }
-      else if (elapsedUser >= D60 && elapsedUser < D90 && !state.reeng60) { fuKey = 'reeng60'; fuText = reengGuide(cfg) }
-      else if (elapsedUser >= D30 && elapsedUser < D60 && !state.reeng30) { fuKey = 'reeng30'; fuText = reengSituation(lq) }
+      else if (elapsedUser >= D90 && !state.reeng90) { fuKey = 'reeng90'; stageLabel = 'RE-ENGAGEMENT after ~90 days of silence — fresh angle, curiosity/value, zero sales pressure'; elapsedForLabel = elapsedUser }
+      else if (elapsedUser >= D60 && elapsedUser < D90 && !state.reeng60) { fuKey = 'reeng60'; stageLabel = 'RE-ENGAGEMENT after ~60 days of silence — fresh angle, curiosity/value, zero sales pressure'; elapsedForLabel = elapsedUser }
+      else if (elapsedUser >= D30 && elapsedUser < D60 && !state.reeng30) { fuKey = 'reeng30'; stageLabel = 'RE-ENGAGEMENT after ~30 days of silence — fresh angle, curiosity/value, zero sales pressure'; elapsedForLabel = elapsedUser }
 
-      if (!fuKey || !fuText) continue
+      if (!fuKey) continue
+
+      // NEPQ: cada mensaje lo genera la IA con el historial real. Si devuelve un
+      // stop-token, no se manda (y HUMAN_REPLY_REQUIRED escala a humano).
+      const history = db.prepare('SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY created_at ASC').all(conv.id)
+      const transcript = history.slice(-40)
+        .map(m => `${m.role === 'user' ? 'Prospect' : 'Salesperson'}: ${m.content}`).join('\n')
+      const gen = await generate({
+        model: cfg.model,
+        prospectName: conv.lead_name || lq.name || '',
+        businessName: lq.business_type || lq.business_name || '',
+        service: cfg.description || cfg.products || cfg.businessName || '',
+        stage: stageLabel,
+        timeSinceLast: humanizeElapsed(elapsedForLabel),
+        conversationHistory: transcript,
+        prospectContext: Object.keys(lq).length ? JSON.stringify(lq) : '',
+      })
+
+      if (gen.action !== 'send' || !gen.text) {
+        // skip / human: consumimos la etapa para no reintentar cada 30 min.
+        state[fuKey] = true
+        const cols = gen.action === 'human' ? 'flow_state = ?, human_mode = 1' : 'flow_state = ?'
+        db.prepare(`UPDATE conversations SET ${cols} WHERE id = ?`).run(JSON.stringify(state), conv.id)
+        console.log(`[Lynkro FU] ${gen.action} ${fuKey} → ${conv.visitor_id}`)
+        continue
+      }
+      let fuText = gen.text
 
       // En etapas de demo/cierre (mid/late), adjunta el link de agendamiento para
       // que el próximo paso quede a un clic. Las reactivaciones (reeng*) NO lo llevan:
@@ -1828,6 +1877,7 @@ async function _lynkroFollowUpPass(send) {
       db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)').run(conv.id, 'assistant', fuText, now)
       console.log(`[Lynkro FU] ${fuKey} → ${conv.visitor_id} (phase:${phase})`)
     } catch (e) { console.error('[Lynkro FU]', e.message) }
+  }
   }
 }
 setInterval(runLynkroFollowUp, 30 * 60 * 1000)
@@ -1981,6 +2031,62 @@ chatRouter.get('/leads', requireAdmin, withCompany, (req, res) => {
     ORDER BY updated_at DESC
   `).all(req.company.id)
   res.json(leads)
+})
+
+// Export CSV de TODOS los teléfonos que pasaron por el chat de esta empresa:
+// los que la gente escribió en cualquier canal, el número de quien llegó por
+// WhatsApp, y el lead_phone guardado en la conversación. Se arma al vuelo desde
+// los mensajes ya guardados, así que el histórico entra solo — sin tabla nueva
+// ni migración. Escala de sobra con el volumen actual (decenas de miles de filas).
+export function collectPhones(companyId) {
+  const phones = new Map()
+  // ponytail: dedupe por los últimos 10 dígitos, así "786-669-6831" y
+  // "17866696831" (el mismo número con prefijo de país) no salen duplicados.
+  const keyOf = d => d.length > 10 ? d.slice(-10) : d
+  const add = (raw, ts, channel, name) => {
+    const digits = String(raw || '').replace(/\D/g, '')
+    if (digits.length < 8 || digits.length > 15) return
+    const key = keyOf(digits)
+    const cur = phones.get(key)
+    if (!cur) { phones.set(key, { phone: String(raw).trim(), channel, name: name || '', first: ts, last: ts }); return }
+    if (ts < cur.first) cur.first = ts
+    if (ts > cur.last) cur.last = ts
+    if (!cur.name && name) cur.name = name
+    if (digits.length > cur.phone.replace(/\D/g, '').length) cur.phone = String(raw).trim() // preferimos la versión con prefijo
+  }
+
+  for (const m of db.prepare(`
+    SELECT m.content, m.created_at, c.channel, c.lead_name
+    FROM messages m JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.company_id = ? AND m.role = 'user'
+    ORDER BY m.created_at ASC
+  `).all(companyId)) {
+    for (const p of extractContacts(m.content).phones) add(p, m.created_at, m.channel, m.lead_name)
+  }
+
+  for (const c of db.prepare(`
+    SELECT visitor_id, channel, lead_name, lead_phone, created_at, updated_at
+    FROM conversations WHERE company_id = ?
+  `).all(companyId)) {
+    if (c.visitor_id?.startsWith('wa:')) add(c.visitor_id.slice(3), c.created_at, 'whatsapp', c.lead_name)
+    if (c.lead_phone) add(c.lead_phone, c.updated_at, c.channel, c.lead_name)
+  }
+
+  return [...phones.values()].sort((a, b) => b.last - a.last)
+}
+
+chatRouter.get('/leads/phones.csv', requireAdmin, withCompany, (req, res) => {
+  const esc = v => '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"'
+  const chLabel = { whatsapp: 'WhatsApp', instagram: 'Instagram', web: 'Chat web' }
+  const fecha = ts => ts ? new Date(ts).toISOString().slice(0, 10) : ''
+  const out = [['Teléfono', 'Nombre', 'Canal', 'Primera vez', 'Última vez'].map(esc).join(',')]
+  for (const p of collectPhones(req.company.id)) {
+    out.push([p.phone, p.name, chLabel[p.channel] || p.channel || '', fecha(p.first), fecha(p.last)].map(esc).join(','))
+  }
+  const csv = String.fromCharCode(0xFEFF) + out.join('\r\n') // BOM para que Excel respete acentos
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="telefonos-${(req.company.name || 'empresa').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv"`)
+  res.send(csv)
 })
 
 chatRouter.patch('/leads/:id', requireAdmin, withCompany, (req, res) => {

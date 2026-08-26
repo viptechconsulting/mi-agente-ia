@@ -6,10 +6,10 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { webcrypto } from 'crypto';
+import { webcrypto, createHash } from 'crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import {
-  db, listCompanies, getCompany, getCompanyByToken
+  db, listCompanies, getCompany, getCompanyByToken, getServerSetting
 } from './db.js';
 import { applyCommerceSchema } from './db-commerce.js';
 import { applyProspectingSchema } from './db-prospecting.js';
@@ -51,6 +51,57 @@ app.get('/dentistas', (_req, res) => {
 // Public route: landing page para plomería (campaña Meta, EN)
 app.get('/plumbing', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'plumbing.html'));
+});
+
+// Public route: landing page para MedSpas (Recepción Inteligente, ES)
+app.get('/medspa', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'medspa.html'));
+});
+
+// Meta Conversions API (server-side). El navegador manda el mismo event_id que el
+// pixel, así Meta deduplica y no cuenta doble. Token en server_config (volumen),
+// nunca en el código. IP/User-Agent se toman del request (mejoran el match).
+const META_PIXEL_ID = '2268672906993327';
+const capiSha256 = (v) => createHash('sha256').update(String(v).trim().toLowerCase()).digest('hex');
+const capiLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.post('/api/meta-capi', capiLimiter, async (req, res) => {
+  try {
+    const token = getServerSetting('meta_capi_token');
+    if (!token) return res.status(200).json({ ok: false, skipped: 'no-token' });
+    const b = req.body || {};
+    if (!b.event_name || !b.event_id) return res.status(400).json({ ok: false, error: 'missing event_name/event_id' });
+
+    const user_data = {
+      client_ip_address: req.ip,
+      client_user_agent: req.headers['user-agent'] || '',
+    };
+    if (b.fbp) user_data.fbp = b.fbp;
+    if (b.fbc) user_data.fbc = b.fbc;
+    if (b.email) user_data.em = capiSha256(b.email);
+    if (b.phone) user_data.ph = capiSha256(String(b.phone).replace(/[^0-9]/g, ''));
+
+    const payload = { data: [{
+      event_name: b.event_name,
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: b.event_id,
+      action_source: 'website',
+      event_source_url: b.event_source_url || req.headers.referer || 'https://chat.lynkro.io/medspa',
+      user_data,
+      custom_data: b.custom_data || {},
+    }]};
+
+    const r = await fetch(`https://graph.facebook.com/v21.0/${META_PIXEL_ID}/events?access_token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error('[meta-capi]', r.status, JSON.stringify(j)); return res.status(200).json({ ok: false, meta: j }); }
+    res.json({ ok: true, events_received: j.events_received });
+  } catch (e) {
+    console.error('[meta-capi] error', e.message);
+    res.status(200).json({ ok: false, error: e.message });
+  }
 });
 
 // Public route: onboarding page for Discovery Call

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '2268672906993327');
+window.__pvId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())+Math.random().toString(16).slice(2);
+fbq('track', 'PageView', {}, {eventID: window.__pvId});
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=2268672906993327&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+
+<title>Lynkro para MedSpas — Convierte más visitantes en consultas, 24/7</title>
+<meta name="description" content="Tu página web recibe visitas fuera de horario. Lynkro le da a tu MedSpa una Recepción Inteligente con IA que responde sobre tratamientos al instante, captura leads y ayuda a convertir interés en consultas. 24/7, en inglés y español.">
+<meta name="keywords" content="IA para MedSpa, recepción inteligente medspa, chatbot medspa, capturar leads medspa, agente IA botox rellenos, Lynkro medspa">
+<link rel="canonical" href="https://chat.lynkro.io/medspa">
+<link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://chat.lynkro.io/medspa">
+<meta property="og:title" content="Lynkro para MedSpas — Convierte más visitantes en consultas, 24/7">
+<meta property="og:description" content="Una Recepción Inteligente con IA que responde sobre tus tratamientos al instante, captura leads y ayuda a convertir el interés en consultas. 24/7.">
+<meta property="og:image" content="https://chat.lynkro.io/logo.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0B0F14; --s1:#141C26; --s2:#0e1219; --s3:#111720;
+    --green:#27F59B; --green-2:#27F59B; --green-glow:rgba(39,245,155,.18); --green-bg:rgba(39,245,155,.08);
+    --red:#EF4444; --red-bg:rgba(239,68,68,.08); --red-bdr:rgba(239,68,68,.22);
+    --border:#252A38; --border2:rgba(255,255,255,.07);
+    --text:#F5F7FA; --text2:#A9B7C6; --muted:#64748B;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --display:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --r:16px; --r-sm:10px; --maxw:1120px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  section{position:relative}
+  ::selection{background:var(--green-2);color:#04110a}
+
+  h1{font-family:var(--display);font-weight:800;font-size:clamp(2.3rem,5.4vw,4.1rem);line-height:1.05;letter-spacing:-.035em}
+  h2{font-family:var(--display);font-weight:800;font-size:clamp(1.8rem,3.7vw,2.9rem);line-height:1.1;letter-spacing:-.03em}
+  h3{font-weight:700;font-size:1.15rem;letter-spacing:-.01em}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--green-2)}
+  .lead{font-size:clamp(1.02rem,1.5vw,1.18rem);color:var(--text2);max-width:46ch}
+  em{font-style:normal;color:var(--green-2)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:15px 28px;border-radius:var(--r-sm);font-family:var(--font);font-size:15px;font-weight:700;letter-spacing:.2px;cursor:pointer;border:none;transition:transform .15s,box-shadow .25s,background .2s;white-space:nowrap}
+  .btn-primary{background:linear-gradient(135deg,#27F59B,#3BA5FF);color:#04110a;box-shadow:0 0 34px rgba(39,245,155,.34),0 6px 20px rgba(0,0,0,.35)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 54px rgba(39,245,155,.5),0 10px 28px rgba(0,0,0,.4)}
+  .btn-ghost{background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--border)}
+  .btn-ghost:hover{background:rgba(255,255,255,.09);border-color:#38414f}
+  .btn-lg{padding:17px 34px;font-size:16px}
+  .btn-wa{background:rgba(37,211,102,.12);color:#3ddc84;border:1px solid rgba(37,211,102,.32)}
+  .btn-wa:hover{background:rgba(37,211,102,.2);border-color:#25D366;transform:translateY(-2px)}
+  .wa-fab{position:fixed;right:22px;bottom:22px;z-index:55;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 10px 28px rgba(37,211,102,.45);transition:transform .15s,box-shadow .25s;animation:float 6s ease-in-out infinite}
+  .wa-fab:hover{transform:scale(1.07);box-shadow:0 14px 36px rgba(37,211,102,.6)}
+  @media(max-width:620px){.wa-fab{display:none}}
+  a.btn:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid var(--green-2);outline-offset:3px;border-radius:6px}
+
+  .nav{position:sticky;top:0;z-index:50;background:rgba(11,15,20,.72);backdrop-filter:blur(14px);border-bottom:1px solid var(--border2)}
+  .nav-inner{max-width:var(--maxw);margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  .nav-logo img{height:26px}
+  .nav-cta{display:flex;align-items:center;gap:12px}
+  .nav-link{font-size:14px;font-weight:600;color:var(--text2);cursor:pointer}
+  .nav-link:hover{color:var(--text)}
+  @media(max-width:620px){.nav-link{display:none}}
+
+  .hero{position:relative;padding:64px 0 88px;overflow:hidden}
+  .orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;pointer-events:none;z-index:0}
+  .orb-a{width:520px;height:520px;background:radial-gradient(circle,rgba(39,245,155,.28),transparent 70%);top:-160px;right:-140px;animation:float 14s ease-in-out infinite}
+  .orb-b{width:420px;height:420px;background:radial-gradient(circle,rgba(39,245,155,.16),transparent 70%);bottom:-180px;left:-120px;animation:float 18s ease-in-out infinite reverse}
+  .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000,transparent 75%);z-index:0}
+  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(-24px,26px)}}
+
+  .hero-inner{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  @media(max-width:920px){.hero-inner{grid-template-columns:1fr;gap:44px}}
+  .hero-visual{position:relative;max-width:400px;margin:0 0 0 auto}
+  @media(max-width:920px){.hero-visual{margin:0 auto}}
+
+  .flag{display:inline-flex;align-items:center;gap:9px;padding:7px 14px;border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:100px;font-size:12.5px;font-weight:600;color:var(--text2);margin-bottom:26px}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(39,245,155,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(39,245,155,.55)}70%{box-shadow:0 0 0 9px rgba(39,245,155,0)}100%{box-shadow:0 0 0 0 rgba(39,245,155,0)}}
+  .hero h1{margin-bottom:22px}
+  .hero .lead{margin-bottom:32px}
+  .hero-ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px}
+  .hero-note{font-size:13.5px;color:var(--muted);font-weight:500}
+  .hero-proof{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);font-weight:500;margin-top:8px}
+  .hero-proof b{color:var(--text2)}
+  .hero-proof .sep{color:var(--border)}
+  @media(max-width:620px){.hero-proof{flex-direction:column;gap:7px}.hero-proof .sep{display:none}}
+
+  .chat{position:relative;z-index:2;background:linear-gradient(180deg,#151d28,#0e141d);border:1px solid var(--border);border-radius:22px;box-shadow:0 34px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.02) inset;overflow:hidden;max-width:400px;margin:0 auto;width:100%}
+  .chat-top{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border2);background:rgba(255,255,255,.02)}
+  .chat-top .tdots{display:flex;gap:6px}
+  .chat-top .tdots span{width:9px;height:9px;border-radius:50%;background:#2b3441}
+  .chat-top .turl{flex:1;text-align:center;font-size:11.5px;color:var(--muted)}
+  .chat-hd{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--border2)}
+  .chat-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#27F59B,#3BA5FF);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#04110a;flex-shrink:0}
+  .chat-name{font-weight:700;font-size:14.5px}
+  .chat-chan{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);margin-top:1px}
+  .chat-ai{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--green-2);border:1px solid var(--green-bg);background:var(--green-bg);padding:4px 8px;border-radius:6px}
+  .chat-body{padding:18px 16px;display:flex;flex-direction:column;gap:11px;min-height:326px;background:radial-gradient(circle at 50% 0,rgba(39,245,155,.04),transparent 60%)}
+  .bub{max-width:82%;padding:11px 14px;border-radius:16px;font-size:13.6px;line-height:1.5}
+  .bub-in{align-self:flex-start;background:#1c2531;border:1px solid var(--border2);border-bottom-left-radius:5px}
+  .bub-out{align-self:flex-end;background:linear-gradient(135deg,#27F59B,#3BA5FF);color:#04110a;font-weight:500;border-bottom-right-radius:5px}
+  .bub-meta{display:block;margin-top:6px;font-size:10.5px;font-weight:700;opacity:.72}
+  .typing{align-self:flex-start;background:#1c2531;border:1px solid var(--border2);padding:12px 15px;border-radius:16px;border-bottom-left-radius:5px;display:flex;gap:4px}
+  .typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+  .booked{margin-top:2px;display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--green-bg);border:1px solid rgba(39,245,155,.28);border-radius:12px}
+  .booked-ic{width:26px;height:26px;border-radius:50%;background:var(--green);color:#04110a;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0}
+  .booked-t{font-size:12.5px;font-weight:700;color:var(--green-2)}
+  .booked-s{font-size:11px;color:var(--text2)}
+  @keyframes pop{to{opacity:1;transform:translateY(0) scale(1)}}
+  .chat-body .bub,.chat-body .typing,.chat-body .booked{opacity:0;animation-iteration-count:infinite;animation-duration:11s}
+  .a1{animation-name:s1}.a2{animation-name:s2}.a3{animation-name:s3}.a4{animation-name:s4}.a5{animation-name:s5}
+  @keyframes s1{0%,3%{opacity:0;transform:translateY(8px)}8%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s2{0%,14%{opacity:0}18%,26%{opacity:1}30%,100%{opacity:0;height:0;margin:0;padding:0}}
+  @keyframes s3{0%,30%{opacity:0;transform:translateY(8px)}36%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s4{0%,52%{opacity:0;transform:translateY(8px)}58%,100%{opacity:1;transform:translateY(0)}}
+  @keyframes s5{0%,72%{opacity:0;transform:translateY(8px)}80%,100%{opacity:1;transform:translateY(0)}}
+  .chat-foot{display:flex;align-items:center;padding:13px 16px;border-top:1px solid var(--border2);background:rgba(255,255,255,.02)}
+  .cf{flex:1;text-align:center}
+  .cf-n{font-weight:800;font-size:15px;color:var(--green-2)}
+  .cf-l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .cf-div{width:1px;height:24px;background:var(--border2)}
+  .float-tag{position:absolute;right:-14px;top:64px;z-index:3;display:flex;align-items:center;gap:7px;background:#141c26;border:1px solid var(--border);border-radius:100px;padding:8px 13px;font-size:12px;font-weight:700;box-shadow:0 12px 30px rgba(0,0,0,.4);animation:float 6s ease-in-out infinite}
+  @media(max-width:920px){.float-tag{right:0}}
+
+  .sec{padding:88px 0}
+  section[id]{scroll-margin-top:84px}
+  .sec-head{max-width:680px;margin:0 auto 52px;text-align:center}
+  .sec-head .eyebrow{display:block;margin-bottom:16px}
+  .sec-head p{color:var(--text2);margin-top:16px;font-size:1.05rem}
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.3,1),transform .7s cubic-bezier(.2,.7,.3,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  /* questions bubbles */
+  .qchips{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:820px;margin:0 auto}
+  .qchip{padding:13px 18px;background:var(--s1);border:1px solid var(--border);border-radius:100px;font-size:14.5px;font-weight:600;color:var(--text)}
+  .qchip.q-brand{border-color:rgba(39,245,155,.3);background:var(--green-bg);color:var(--green-2)}
+
+  /* learn list */
+  .learn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:900px;margin:0 auto}
+  @media(max-width:720px){.learn-grid{grid-template-columns:1fr 1fr}}
+  .learn{display:flex;align-items:center;gap:10px;padding:15px 16px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-weight:600}
+  .learn svg{color:var(--green-2);flex-shrink:0}
+
+  /* features */
+  .feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;max-width:900px;margin:0 auto}
+  @media(max-width:720px){.feat-grid{grid-template-columns:1fr}}
+  .feat-grid.three{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:820px){.feat-grid.three{grid-template-columns:1fr}}
+  .feat{padding:28px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);transition:transform .2s,border-color .2s}
+  .feat:hover{transform:translateY(-3px);border-color:#38414f}
+  .feat-ic{width:44px;height:44px;border-radius:11px;background:var(--green-bg);border:1px solid rgba(39,245,155,.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .feat h3{margin-bottom:7px}
+  .feat p{color:var(--text2);font-size:14.5px}
+
+  /* numbered steps */
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;max-width:1000px;margin:0 auto}
+  @media(max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.steps{grid-template-columns:1fr}}
+  .step{padding:24px 20px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);position:relative}
+  .step-n{font-family:var(--display);font-weight:800;font-size:1.6rem;letter-spacing:-.03em;background:linear-gradient(135deg,#fff,#27F59B);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
+  .step h3{font-size:1rem;margin-bottom:8px}
+  .step p{color:var(--text2);font-size:13.5px}
+  .steps-note{text-align:center;max-width:640px;margin:34px auto 0;color:var(--green-2);font-weight:600;font-size:15px}
+
+  /* before/after */
+  .beat{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:860px;margin:0 auto}
+  @media(max-width:720px){.beat{grid-template-columns:1fr}}
+  .beat-card{padding:26px;border-radius:var(--r);border:1px solid var(--border)}
+  .beat-before{background:var(--red-bg);border-color:var(--red-bdr)}
+  .beat-after{background:var(--green-bg);border-color:rgba(39,245,155,.24)}
+  .beat-tag{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+  .beat-before .beat-tag{color:#ff8080}
+  .beat-after .beat-tag{color:var(--green-2)}
+  .beat-card h3{margin-bottom:12px}
+  .beat-card ul{list-style:none;color:var(--text2);font-size:14.5px;display:flex;flex-direction:column;gap:9px}
+  .beat-card li{padding-left:22px;position:relative}
+  .beat-before li:before{content:'✗';position:absolute;left:0;color:#ff8080;font-weight:800}
+  .beat-after li:before{content:'✓';position:absolute;left:0;color:var(--green-2);font-weight:800}
+
+  /* flow line */
+  .flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;max-width:900px;margin:0 auto}
+  .flow-node{padding:12px 20px;background:var(--s1);border:1px solid var(--border);border-radius:100px;font-weight:700;font-size:14px}
+  .flow-node.hot{border-color:rgba(39,245,155,.4);background:var(--green-bg);color:var(--green-2)}
+  .flow-arw{color:var(--muted);font-weight:800}
+
+  /* insights */
+  .insights{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .insight{display:flex;gap:14px;align-items:flex-start;padding:16px 20px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm);font-size:15px;color:var(--text)}
+  .insight .qic{color:var(--green-2);font-weight:800;flex-shrink:0}
+
+  /* demo */
+  .demo-box{max-width:760px;margin:0 auto;background:linear-gradient(135deg,#141c26,#0e141d);border:1px solid var(--border);border-radius:var(--r);padding:48px 40px;text-align:center;position:relative;overflow:hidden}
+  .demo-box::before{content:'';position:absolute;top:-50%;left:50%;width:340px;height:340px;transform:translateX(-50%);background:radial-gradient(circle,var(--green-glow),transparent 70%);pointer-events:none}
+  .demo-box>*{position:relative}
+  .demo-box h2{margin-bottom:14px}
+  .demo-box p{color:var(--text2);margin-bottom:22px;max-width:52ch;margin-left:auto;margin-right:auto}
+  .demo-tries{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-bottom:28px}
+  .demo-try{font-size:13px;padding:9px 14px;border-radius:100px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text2)}
+
+  /* form */
+  .form-box{max-width:560px;margin:0 auto;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:36px 32px}
+  .form-box h2{font-size:1.7rem;margin-bottom:8px}
+  .form-box>p{color:var(--text2);font-size:14.5px;margin-bottom:24px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text2);margin-bottom:7px}
+  .field input{width:100%;padding:13px 15px;background:#0e141d;border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-family:var(--font);font-size:15px}
+  .field input:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 3px var(--green-bg)}
+  .form-box .btn{width:100%;margin-top:6px}
+  .form-note{text-align:center;color:var(--muted);font-size:12.5px;margin-top:16px}
+
+  /* brand */
+  .brand-box{max-width:760px;margin:0 auto;text-align:center}
+  .brand-box .lead{max-width:none}
+
+  /* faq */
+  .faq{max-width:760px;margin:0 auto}
+  .faq-item{border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:12px;background:var(--s1);overflow:hidden;cursor:pointer}
+  .faq-q{padding:18px 22px;font-weight:600;font-size:15.5px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  .faq-q .chev{color:var(--green-2);transition:transform .3s;flex-shrink:0;font-size:20px;line-height:1}
+  .faq-item.open .chev{transform:rotate(45deg)}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease;color:var(--text2);font-size:14.5px}
+  .faq-item.open .faq-a{max-height:340px}
+  .faq-a-inner{padding:0 22px 20px}
+
+  #final{padding:100px 0;text-align:center;background:radial-gradient(ellipse 80% 100% at 50% 100%,rgba(39,245,155,.1),transparent)}
+  #final h2{max-width:20ch;margin:0 auto 18px}
+  #final p{color:var(--text2);max-width:56ch;margin:0 auto 34px}
+
+  footer{border-top:1px solid var(--border2);padding:34px 0;text-align:center}
+  footer img{height:26px;margin:0 auto 14px;opacity:.85}
+  footer p{color:var(--muted);font-size:13px}
+
+  .sticky-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:none;padding:12px 16px;background:rgba(11,15,20,.92);backdrop-filter:blur(12px);border-top:1px solid var(--border);gap:10px}
+  .sticky-bar .btn{flex:1;padding:14px}
+  @media(max-width:620px){.sticky-bar{display:flex}body{padding-bottom:76px}}
+
+  .modal{position:fixed;inset:0;z-index:100;display:none}
+  .modal.open{display:block}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(5,8,12,.78);backdrop-filter:blur(4px)}
+  .modal-card{position:absolute;top:3vh;left:50%;transform:translateX(-50%);width:min(460px,94vw);height:94vh;background:var(--bg);border:1px solid var(--border);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 40px 100px rgba(0,0,0,.6)}
+  .modal-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px 11px 16px;border-bottom:1px solid var(--border2);background:var(--s1)}
+  .modal-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;white-space:nowrap}
+  .modal-actions{display:flex;align-items:center;gap:8px}
+  .modal-close{width:34px;height:34px;flex-shrink:0;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .modal-close:hover{background:rgba(255,255,255,.12)}
+  .modal-body{flex:1;background:#0B0F14}
+  .modal-body iframe{width:100%;height:100%;border:0;display:block}
+
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+    .bub,.typing,.booked{opacity:1;transform:none}
+  }
+</style>
+<noscript><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="https://lynkro.io" class="nav-logo" aria-label="Lynkro"><img src="/logo.png" alt="Lynkro"></a>
+    <div class="nav-cta">
+      <a class="nav-link" onclick="openDemo();return false">Ver demo</a>
+      <a href="#demo-form" class="btn btn-primary" style="padding:11px 20px;font-size:14px">Solicitar demo</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="grid-bg"></div>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="wrap">
+    <div class="hero-inner">
+
+      <div class="hero-copy">
+        <div class="flag"><span class="dot-live"></span> Recepción Inteligente con IA &middot; para tu MedSpa</div>
+        <h1>Convierte más visitantes de tu web en <em>consultas para tu MedSpa</em> — 24/7.</h1>
+        <p class="lead">Lynkro responde al instante las preguntas sobre tus tratamientos, captura leads calificados y ayuda a convertir el interés en consultas — mientras tu equipo atiende pacientes.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary btn-lg" onclick="openDemo();return false">Ver cómo funciona</a>
+          <a href="#demo-form" class="btn btn-ghost btn-lg">Solicitar demo</a>
+        </div>
+        <p class="hero-note">Sin formularios para empezar. Pruébalo tú mismo.</p>
+        <div class="hero-proof">
+          <span><b>Responde en segundos</b></span><span class="sep">&middot;</span>
+          <span><b>24/7, también fuera de horario</b></span><span class="sep">&middot;</span>
+          <span><b>Inglés y español</b></span>
+        </div>
+      </div>
+
+      <!-- SIGNATURE: live web reception chat -->
+      <div class="hero-visual">
+        <div class="chat" role="img" aria-label="Conversación: una visitante pregunta por Botox en la web y la Recepción Inteligente responde al instante y captura el lead.">
+          <div class="chat-top">
+            <div class="tdots"><span></span><span></span><span></span></div>
+            <div class="turl">tumedspa.com &mdash; Recepción Inteligente</div>
+          </div>
+          <div class="chat-hd">
+            <div class="chat-av">RS</div>
+            <div>
+              <div class="chat-name">Sofía &mdash; Recepción IA</div>
+              <div class="chat-chan"><span class="dot-live"></span> En tu página web</div>
+            </div>
+            <div class="chat-ai">IA</div>
+          </div>
+          <div class="chat-body">
+            <div class="bub bub-in a1">Estoy pensando en ponerme Botox por primera vez 🙈 ¿qué debería saber?</div>
+            <div class="typing a2"><span></span><span></span><span></span></div>
+            <div class="bub bub-out a3">¡Genial! Es un tratamiento rápido y sin tiempo de recuperación. Trabajamos dosis naturales según tu rostro. ¿Te gustaría que te agende una consulta de valoración sin costo? ✨
+              <span class="bub-meta">⚡ Lynkro · respondió en 3s</span>
+            </div>
+            <div class="bub bub-in a4">Sí, me interesa 🙌</div>
+            <div class="booked a5">
+              <div class="booked-ic">✓</div>
+              <div>
+                <div class="booked-t">Lead capturado</div>
+                <div class="booked-s">Interés: Botox · valoración · siguiente paso enviado</div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-foot">
+            <div class="cf"><div class="cf-n">3s</div><div class="cf-l">Respuesta</div></div>
+            <div class="cf-div"></div>
+            <div class="cf"><div class="cf-n">24/7</div><div class="cf-l">Activo</div></div>
+            <div class="cf-div"></div>
+            <div class="cf"><div class="cf-n">2</div><div class="cf-l">Idiomas</div></div>
+          </div>
+        </div>
+        <div class="float-tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="#27F59B"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Lead capturado
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<!-- QUESTIONS -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Ahora mismo, en tu web</span>
+      <h2>Tu próximo paciente podría estar ahora mismo en tu página web.</h2>
+      <p>Alguien entra interesado en Botox. Otra persona quiere información sobre rellenos. Otra compara tratamientos láser. Y tienen preguntas:</p>
+    </div>
+    <div class="qchips reveal">
+      <span class="qchip">¿Cuánto dura el Botox?</span>
+      <span class="qchip">¿Ofrecen relleno de labios?</span>
+      <span class="qchip">¿Qué tratamiento sería adecuado para mí?</span>
+      <span class="qchip">¿Atienden los sábados?</span>
+      <span class="qchip">¿Cómo solicito una consulta?</span>
+    </div>
+    <p class="steps-note reveal">Un formulario les pide que esperen. Lynkro comienza la conversación ahora.</p>
+  </div>
+</section>
+
+<!-- WHAT IT LEARNS -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Recepción Inteligente</span>
+      <h2>Un asistente que conoce tu MedSpa.</h2>
+      <p>Lo configuramos para que aprenda todo lo que un potencial paciente necesita saber — así no tiene que recorrer tu web ni esperar a tu equipo. Simplemente pregunta.</p>
+    </div>
+    <div class="learn-grid">
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Tratamientos y servicios</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Horarios</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Ubicaciones</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Preguntas frecuentes</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Proceso de consulta</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Opciones de reserva</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Políticas</div>
+      <div class="learn reveal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Promociones aprobadas</div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="demo" class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="demo-box reveal">
+      <span class="eyebrow">No te pedimos que nos creas</span>
+      <h2 style="margin-top:14px">Pruébalo tú mismo.</h2>
+      <p>Usa la Recepción Inteligente como si fueras un potencial paciente. Esta es la experiencia que tendrían tus visitantes directamente en tu página web.</p>
+      <div class="demo-tries">
+        <span class="demo-try">"Quiero ponerme Botox por primera vez, ¿qué debería saber?"</span>
+        <span class="demo-try">"¿Ofrecen relleno de labios?"</span>
+        <span class="demo-try">"¿Qué tienen para rejuvenecimiento de la piel?"</span>
+        <span class="demo-try">"¿Atienden este fin de semana?"</span>
+        <span class="demo-try">"Quiero solicitar una consulta."</span>
+      </div>
+      <div style="display:flex;justify-content:center">
+        <a class="btn btn-primary btn-lg" onclick="openDemo();return false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="9 7 17 12 9 17 9 7"/></svg>
+          Abrir demo interactiva
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FROM QUESTION TO OPPORTUNITY -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">De una pregunta a una oportunidad real</span>
+      <h2>No solo responde. Hace avanzar la conversación.</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="step-n">01</div><h3>Un visitante pregunta</h3><p>Llega a tu página investigando un tratamiento o servicio.</p></div>
+      <div class="step reveal"><div class="step-n">02</div><h3>Responde al instante</h3><p>Sin buscar entre páginas ni esperar a tu equipo.</p></div>
+      <div class="step reveal"><div class="step-n">03</div><h3>Identifica su intención</h3><p>Detecta qué le interesa y recopila información relevante.</p></div>
+      <div class="step reveal"><div class="step-n">04</div><h3>Captura el lead</h3><p>Pide los datos de contacto y registra el tratamiento de interés.</p></div>
+      <div class="step reveal"><div class="step-n">05</div><h3>Da el siguiente paso</h3><p>Lo dirige a una reserva, una consulta o tu equipo.</p></div>
+    </div>
+    <p class="steps-note reveal">Tu equipo recibe una oportunidad con contexto — no otro formulario sin información.</p>
+  </div>
+</section>
+
+<!-- 24/7 -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="beat">
+      <div class="beat-card beat-before reveal">
+        <div class="beat-tag">Tu equipo</div>
+        <h3>No puede estar disponible cada minuto.</h3>
+        <ul>
+          <li>Está atendiendo pacientes</li>
+          <li>Contestando llamadas</li>
+          <li>Gestionando citas y la recepción</li>
+          <li>Y eventualmente termina su jornada</li>
+        </ul>
+      </div>
+      <div class="beat-card beat-after reveal">
+        <div class="beat-tag">Tu página web</div>
+        <h3>Sí puede — con Lynkro.</h3>
+        <ul>
+          <li>Los visitantes llegan a cualquier hora</li>
+          <li>Inician la conversación al instante</li>
+          <li>Incluso cuando nadie está disponible</li>
+          <li>24 horas al día, 7 días a la semana</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MORE THAN A CHATBOT -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Mucho más que un chatbot</span>
+      <h2>Los chatbots siguen guiones. Lynkro mantiene conversaciones.</h2>
+      <p>En lugar de obligar al visitante a elegir "opción 1, opción 2, deja tus datos y espera", Lynkro permite preguntar con naturalidad. Se parece menos a un menú y más a hablar con una recepción que conoce tu negocio.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CONFIGURED FOR YOUR MEDSPA -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Configurado para tu MedSpa</span>
+      <h2>No se instala con respuestas genéricas.</h2>
+      <p>La configuramos alrededor de tu negocio real.</p>
+    </div>
+    <div class="feat-grid three">
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg></div><h3>Tratamientos</h3><p>Botox, fillers, faciales, láser, corporales, rejuvenecimiento y los servicios que realmente ofreces.</p></div>
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><h3>Ubicaciones y horarios</h3><p>Para que sepan rápido dónde y cuándo pueden atenderse.</p></div>
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div><h3>Preguntas frecuentes</h3><p>Con información revisada y aprobada por tu negocio.</p></div>
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><h3>Proceso de consulta</h3><p>Ayuda a cada persona a entender el siguiente paso.</p></div>
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div><h3>Reservas</h3><p>Dirige a los interesados hacia tu proceso actual de reserva cuando corresponde.</p></div>
+      <div class="feat reveal"><div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Captura de leads</h3><p>Recopila la información que tu equipo necesita para continuar.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- DOESN'T REPLACE TEAM -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal" style="margin-bottom:0">
+      <span class="eyebrow">No reemplaza a tu equipo</span>
+      <h2>Cubre el espacio antes de que empiece la relación.</h2>
+      <p>Lynkro no reemplaza la relación entre tu equipo y tus pacientes. Responde las primeras preguntas, identifica qué busca el visitante, captura sus datos, lo ayuda a avanzar — y entrega la conversación a tu equipo cuando se necesita atención humana. Así tu personal se concentra en lo que realmente lo requiere.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ALREADY PAYING -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Ya pagas por atraer tráfico</span>
+      <h2>Google Ads, Meta, SEO, redes, referidos…</h2>
+      <p>Todos llevan personas a tu web. Pero conseguir la visita es solo la primera parte. La pregunta importante es qué sucede después de que llegan. Lynkro agrega una capa conversacional:</p>
+    </div>
+    <div class="flow reveal">
+      <span class="flow-node">Visitante</span><span class="flow-arw">→</span>
+      <span class="flow-node">Pregunta</span><span class="flow-arw">→</span>
+      <span class="flow-node">Conversación</span><span class="flow-arw">→</span>
+      <span class="flow-node hot">Lead</span><span class="flow-arw">→</span>
+      <span class="flow-node hot">Siguiente paso</span>
+    </div>
+    <p class="steps-note reveal">No solo sabes cuántos visitaron tu página — también qué buscaban y qué preguntaron antes de convertirse en oportunidad.</p>
+  </div>
+</section>
+
+<!-- INSIGHTS -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Inteligencia comercial</span>
+      <h2>Cada conversación te ayuda a entender a tus pacientes.</h2>
+      <p>En lugar de asumir lo que quieren tus visitantes, aprendes de lo que realmente preguntan.</p>
+    </div>
+    <div class="insights">
+      <div class="insight reveal"><span class="qic">?</span> ¿Qué tratamientos preguntan con mayor frecuencia?</div>
+      <div class="insight reveal"><span class="qic">?</span> ¿Qué dudas aparecen una y otra vez?</div>
+      <div class="insight reveal"><span class="qic">?</span> ¿Qué objeciones tienen antes de solicitar una consulta?</div>
+      <div class="insight reveal"><span class="qic">?</span> ¿Qué información no encuentran fácilmente en tu página?</div>
+      <div class="insight reveal"><span class="qic">?</span> ¿Qué servicios están generando mayor interés?</div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS + BILINGUAL -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="feat-grid">
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+        <h3>Se adapta a tus herramientas</h3>
+        <p>Según tu implementación, se conecta con lo que ya usas: sistemas de reservas, CRM, formularios, calendarios, mensajería, automatizaciones y flujos de seguimiento. No reconstruyes tu negocio alrededor de Lynkro — construimos Lynkro alrededor de tu negocio.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#27F59B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+        <h3>¿Inglés? ¿Español? Ambos.</h3>
+        <p>Tus potenciales pacientes no siempre se comunican en el mismo idioma. Lynkro mantiene conversaciones en inglés y español, para que cada visitante hable en el idioma con el que se siente más cómodo. Una Recepción Inteligente, múltiples conversaciones, 24/7.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT LYNKRO CAN DO -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Capacidades</span>
+      <h2>Lo que Lynkro puede hacer por tu MedSpa.</h2>
+    </div>
+    <div class="feat-grid three">
+      <div class="feat reveal"><h3>Responder sobre tratamientos</h3><p>Explica tus servicios usando información previamente aprobada.</p></div>
+      <div class="feat reveal"><h3>Responder preguntas frecuentes</h3><p>Horarios, ubicaciones, servicios, políticas y proceso de consulta.</p></div>
+      <div class="feat reveal"><h3>Identificar oportunidades</h3><p>Entiende qué tratamiento le interesa al visitante antes de que intervenga tu equipo.</p></div>
+      <div class="feat reveal"><h3>Capturar leads</h3><p>Recopila datos de contacto e información dentro de la conversación.</p></div>
+      <div class="feat reveal"><h3>Detectar intención de reserva</h3><p>Ayuda a los interesados a avanzar hacia tu proceso de consulta o reserva.</p></div>
+      <div class="feat reveal"><h3>Transferir a una persona</h3><p>Cuando se requiere atención humana, dirige al canal apropiado.</p></div>
+    </div>
+    <p class="steps-note reveal">Y según tu configuración, los leads capturados pueden entrar en flujos de seguimiento automatizados — la conversación no termina cuando el visitante abandona la página.</p>
+  </div>
+</section>
+
+<!-- FORM -->
+<section id="demo-form" class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Demo personalizada</span>
+      <h2>Mira cómo funcionaría Lynkro en tu MedSpa.</h2>
+      <p>No necesitas imaginarlo — podemos mostrártelo. Revisamos cómo tus visitantes pasan hoy de <b>visita → pregunta → contacto → consulta</b>, y dónde una experiencia conversacional podría mejorar el proceso.</p>
+    </div>
+    <div class="form-box reveal">
+      <h2>Solicita tu demo personalizada</h2>
+      <p>Sin compromiso. Primero revisamos si Lynkro tiene sentido para tu página web y tu proceso actual.</p>
+      <form id="leadForm" onsubmit="return sendLead(event)">
+        <div class="field"><label for="f-negocio">Nombre del negocio</label><input id="f-negocio" name="negocio" required autocomplete="organization"></div>
+        <div class="field"><label for="f-web">Página web</label><input id="f-web" name="web" placeholder="https://" autocomplete="url"></div>
+        <div class="field"><label for="f-nombre">Tu nombre</label><input id="f-nombre" name="nombre" required autocomplete="name"></div>
+        <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" required autocomplete="email"></div>
+        <div class="field"><label for="f-tel">Teléfono</label><input id="f-tel" name="tel" type="tel" required autocomplete="tel"></div>
+        <button type="submit" class="btn btn-primary btn-lg">Quiero ver Lynkro en mi MedSpa</button>
+      </form>
+      <p class="form-note">Al enviar se abrirá WhatsApp con tus datos para coordinar la demo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT HAPPENS NEXT -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">¿Qué sucede después?</span>
+      <h2>Cuatro pasos simples.</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal"><div class="step-n">1</div><h3>Analizamos tu página web</h3><p>Revisamos servicios, el recorrido actual de tus visitantes, opciones de contacto y dónde se pierden oportunidades.</p></div>
+      <div class="feat reveal"><div class="step-n">2</div><h3>Identificamos dónde ayuda</h3><p>Determinamos en qué partes del proceso una Recepción Inteligente aporta valor real.</p></div>
+      <div class="feat reveal"><div class="step-n">3</div><h3>Te mostramos la experiencia</h3><p>Si hay buen encaje, te mostramos cómo funcionaría Lynkro específicamente para tu MedSpa.</p></div>
+      <div class="feat reveal"><div class="step-n">4</div><h3>Tú decides</h3><p>Si ves valor, hablamos de la implementación. Si no, no tienes ningún compromiso.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- BRAND -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="brand-box reveal">
+      <span class="eyebrow">Desarrollado por Lynkro</span>
+      <h2 style="margin:16px 0">No vendemos otro chatbot.</h2>
+      <p class="lead" style="margin:0 auto">Construimos arquitecturas inteligentes que conectan conversaciones con resultados de negocio. Lynkro combina IA conversacional, automatización, integraciones y lógica de negocio para crear sistemas adaptados a cómo realmente opera tu empresa. La tecnología funciona detrás — tu potencial paciente simplemente recibe una mejor experiencia.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="final">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>Tu próximo potencial paciente tiene una pregunta.</h2>
+      <p>¿Qué sucede cuando nadie está disponible para responderla? Dale a tu página web una Recepción Inteligente capaz de iniciar la conversación, capturar la oportunidad y ayudar al visitante a dar el siguiente paso. 24/7.</p>
+      <div class="hero-ctas" style="justify-content:center">
+        <a href="#demo-form" class="btn btn-primary btn-lg">Quiero ver Lynkro en mi MedSpa</a>
+        <a class="btn btn-ghost btn-lg" onclick="openDemo();return false">Probar el demo</a>
+      </div>
+      <p class="hero-note" style="margin-top:18px">Comienza con tu página web. Nosotros hacemos el resto.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Preguntas frecuentes</span>
+      <h2>Lo que suelen preguntarnos.</h2>
+    </div>
+    <div class="faq">
+      <div class="faq-item reveal"><div class="faq-q">¿Lynkro es simplemente otro chatbot?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">No. Se configura alrededor de tu negocio, servicios, información aprobada, proceso comercial y las acciones que quieres que realicen tus visitantes. El objetivo no es solo contestar, sino ayudar a que las conversaciones relevantes avancen al siguiente paso.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Va a reemplazar al personal de recepción?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">No. Complementa a tu equipo gestionando conversaciones iniciales, preguntas frecuentes y captura de leads. Tu equipo sigue encargándose de lo que requiere atención humana.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Puede responder preguntas médicas?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">No sustituye a un profesional médico ni da diagnósticos. Puede ofrecer información general previamente aprobada sobre los servicios del MedSpa y dirigir al visitante hacia tu equipo cuando una pregunta requiere orientación médica profesional.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Puede agendar citas?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">Según tu sistema de reservas y la configuración implementada, puede dirigir visitantes hacia tu proceso de reserva o integrarse con flujos compatibles.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Puede hablar español?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">Sí. Lynkro mantiene conversaciones tanto en inglés como en español.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Necesito cambiar mi página web?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">No. Está diseñado para integrarse con tu página web y proceso actuales.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Qué pasa si la IA no sabe una respuesta?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">Puede configurarse para no inventar información y dirigir al visitante hacia una persona o el siguiente paso apropiado cuando no dispone de una respuesta aprobada.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Cuánto tarda la implementación?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">Depende de tu página web, servicios, integraciones, sistema de reservas y automatizaciones. Revisamos tu proceso actual antes de definir la implementación.</div></div></div>
+      <div class="faq-item reveal"><div class="faq-q">¿Puedo verlo funcionando antes de decidir?<span class="chev">+</span></div><div class="faq-a"><div class="faq-a-inner">Sí. Esa es la idea de la demo personalizada: primero analizamos tu página y, cuando hay buen encaje, te mostramos cómo funcionaría Lynkro específicamente para tu negocio.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="https://lynkro.io"><img src="/logo.png" alt="Lynkro"></a>
+    <p>© Lynkro — Recepción Inteligente con IA que responde, entiende y convierte. Tu página web ya habla de tus servicios; ahora deja que tus visitantes también hablen con ella.</p>
+  </div>
+</footer>
+
+<!-- STICKY MOBILE CTA -->
+<div class="sticky-bar">
+  <a class="btn btn-ghost" onclick="openDemo();return false">Ver demo</a>
+  <a href="#demo-form" class="btn btn-primary">Solicitar demo</a>
+</div>
+
+<!-- WhatsApp flotante (desktop) -->
+<a href="https://wa.me/17866696831?text=Hola%20%F0%9F%91%8B%20Vengo%20de%20la%20p%C3%A1gina%20de%20Lynkro%20para%20MedSpas%20y%20quiero%20ver%20una%20demo%20personalizada." class="wa-fab" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12.05 2C6.5 2 2 6.5 2 12.05c0 1.77.46 3.5 1.34 5.02L2 22l5.05-1.32a10 10 0 0 0 5 1.27C17.6 21.95 22 17.5 22 12.05 22 6.5 17.6 2 12.05 2zm0 18.13a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3 .78.8-2.92-.2-.3a8.3 8.3 0 1 1 6.94 3.78z"/><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.21 3.07.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.28-.2-.58-.35z"/></svg>
+</a>
+
+<!-- DEMO MODAL -->
+<div id="demoModal" class="modal" aria-hidden="true" role="dialog" aria-label="Demo MedSpa en vivo">
+  <div class="modal-backdrop" onclick="closeDemo()"></div>
+  <div class="modal-card">
+    <div class="modal-bar">
+      <div class="modal-title"><span class="dot-live"></span> Recepción Inteligente &mdash; demo en vivo</div>
+      <div class="modal-actions">
+        <a href="#demo-form" class="btn btn-primary" style="padding:9px 16px;font-size:13px" onclick="closeDemo()">Solicitar demo</a>
+        <button class="modal-close" onclick="closeDemo()" aria-label="Cerrar demo">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="demoFrameWrap"></div>
+  </div>
+</div>
+
+<script>
+  var DEMO_TOKEN = 'BhbrI-UXGq8Ov8eKVogRTQAp';
+  // Meta Pixel + Conversions API (server-side) — mismo event_id en navegador y servidor => Meta deduplica.
+  // Tiers: ViewContent = interés (paso intermedio), Lead = contacto real.
+  function _uuid(){ return (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())+Math.random().toString(16).slice(2); }
+  function _cookie(n){ var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return m ? m.pop() : ''; }
+  function _capi(eventName, eventId, custom, user){
+    try{
+      fetch('/api/meta-capi', {method:'POST', keepalive:true, headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ event_name:eventName, event_id:eventId, event_source_url:location.href,
+          fbp:_cookie('_fbp'), fbc:_cookie('_fbc'), custom_data:custom||{},
+          email:(user&&user.email)||'', phone:(user&&user.phone)||'' })});
+    }catch(e){}
+  }
+  function trackInterest(name){
+    var id=_uuid(), cd={content_name:name,content_category:'medspa-interes'};
+    if(window.fbq) fbq('track','ViewContent',cd,{eventID:id});
+    _capi('ViewContent', id, cd);
+  }
+  function trackLead(name, user){
+    var id=_uuid(), cd={content_name:name};
+    if(window.fbq) fbq('track','Lead',cd,{eventID:id});
+    _capi('Lead', id, cd, user);
+  }
+  // PageView también server-side, con el event_id generado en el <head> (dedup con el pixel)
+  if(window.__pvId) _capi('PageView', window.__pvId, {});
+  function openDemo(){
+    trackInterest('abrir-demo');
+    var m=document.getElementById('demoModal'), w=document.getElementById('demoFrameWrap');
+    if(!w.querySelector('iframe')){
+      var f=document.createElement('iframe');
+      f.src='/demo/'+DEMO_TOKEN; f.title='Demo MedSpa Lynkro';
+      w.appendChild(f);
+    }
+    m.classList.add('open'); m.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  function closeDemo(){
+    var m=document.getElementById('demoModal');
+    m.classList.remove('open'); m.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDemo(); });
+
+  // Form → WhatsApp (no backend; abre WA con los datos prellenados)
+  function sendLead(e){
+    e.preventDefault();
+    var f=e.target;
+    var v=function(n){return (f.elements[n].value||'').trim();};
+    var msg='Hola 👋 Quiero ver Lynkro en mi MedSpa.\n\n'+
+      'Negocio: '+v('negocio')+'\n'+
+      'Web: '+(v('web')||'—')+'\n'+
+      'Nombre: '+v('nombre')+'\n'+
+      'Email: '+v('email')+'\n'+
+      'Teléfono: '+v('tel');
+    trackLead('form-medspa', {email:v('email'), phone:v('tel')});
+    window.open('https://wa.me/17866696831?text='+encodeURIComponent(msg),'_blank','noopener');
+    return false;
+  }
+
+  // FAQ accordion
+  document.querySelectorAll('.faq-item').forEach(function(it){
+    it.addEventListener('click', function(){ it.classList.toggle('open'); });
+  });
+  // Scroll reveal
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.14});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  // Meta Pixel: botones que llevan al formulario = interés (ViewContent); WhatsApp directo = Lead
+  document.querySelectorAll('a[href="#demo-form"]').forEach(function(a){
+    a.addEventListener('click', function(){ trackInterest('solicitar-demo'); });
+  });
+  document.querySelectorAll('.wa-fab').forEach(function(a){
+    a.addEventListener('click', function(){ trackLead('whatsapp-fab'); });
+  });
+</script>
+</body>
+</html>
