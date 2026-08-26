@@ -106,10 +106,13 @@ describe('humanDelayMs', () => {
 
 describe('humanPauseMs — descuento y piso', () => {
   test('si el modelo fue rápido, se espera la diferencia hasta el objetivo', () => {
-    const objetivo = humanDelayMs('x'.repeat(150), { humanDelayMax: 12000 })
-    const espera = humanPauseMs('x'.repeat(150), { humanDelayMax: 12000 }, 1000)
-    assert.ok(espera > 1500, `debería descontar, no anular: ${espera}`)
-    assert.ok(espera < objetivo + 1, 'nunca más que el objetivo completo')
+    // Ojo: humanDelayMs y humanPauseMs sortean su propio jitter, así que no se
+    // pueden comparar entre sí — hay que acotar contra los límites del rango.
+    for (let i = 0; i < 100; i++) {
+      const espera = humanPauseMs('x'.repeat(150), { humanDelayMax: 12000 }, 1000)
+      assert.ok(espera > 1500, `debería descontar, no anular: ${espera}`)
+      assert.ok(espera <= 12000 * 1.2, `nunca más que el tope: ${espera}`)
+    }
   })
 
   test('aunque el modelo tarde una eternidad, siempre queda una pausa visible', () => {
