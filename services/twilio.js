@@ -1,5 +1,7 @@
 // services/twilio.js — Twilio REST API wrapper for outbound SMS.
 // No SDK dependency — Twilio's Messages API is a single POST endpoint.
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
 const API_BASE = 'https://api.twilio.com/2010-04-01'
 
 export function authHeader(accountSid, authToken) {
@@ -30,6 +32,25 @@ export function toE164(phone = '') {
   if (digits.length === 10) return `+${DEFAULT_CC}${digits}`
   if (digits.length < 8 || digits.length > 15) return null
   return `+${digits}`
+}
+
+// Twilio signs each webhook as base64(HMAC-SHA1(authToken, fullUrl + every
+// POST param appended as key+value in alphabetical order)).
+// https://www.twilio.com/docs/usage/security#validating-requests
+export function buildSignatureBase(url, params = {}) {
+  return Object.keys(params).sort().reduce((acc, k) => acc + k + params[k], url)
+}
+
+// The inbound webhook is a public route, so this is the only thing stopping
+// anyone from POSTing fake SMS into a customer's inbox. Fails closed.
+export function verifyTwilioSignature(authToken, url, params, signature) {
+  if (!authToken || !signature) return false
+  const expected = createHmac('sha1', authToken)
+    .update(Buffer.from(buildSignatureBase(url, params), 'utf8'))
+    .digest('base64')
+  const a = Buffer.from(expected)
+  const b = Buffer.from(String(signature))
+  return a.length === b.length && timingSafeEqual(a, b)
 }
 
 // The numbers actually bought in this Twilio account, so the admin picks a

@@ -31,6 +31,60 @@ describe('twilio service — pure helpers', () => {
   })
 })
 
+describe('verifyTwilioSignature — inbound webhook auth', () => {
+  // Vector from Twilio's own docs for the signing algorithm.
+  const TOKEN = '12345'
+  const URL = 'https://mycompany.com/myapp.php?foo=1&bar=2'
+  const PARAMS = { CallSid: 'CA1234567890ABCDE', Caller: '+14158675309', Digits: '1234', From: '+14158675309', To: '+18005551212' }
+
+  const sign = async (token, url, params) => {
+    const { buildSignatureBase } = await import('../services/twilio.js')
+    const { createHmac } = await import('node:crypto')
+    return createHmac('sha1', token).update(Buffer.from(buildSignatureBase(url, params), 'utf8')).digest('base64')
+  }
+
+  test('buildSignatureBase appends params sorted by key, not by insertion order', async () => {
+    const { buildSignatureBase } = await import('../services/twilio.js')
+    const shuffled = { To: 'b', CallSid: 'a', From: 'c' }
+    assert.equal(buildSignatureBase('https://x/y', shuffled), 'https://x/yCallSidaFromcTob')
+  })
+
+  test('accepts a correctly signed request', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    assert.equal(verifyTwilioSignature(TOKEN, URL, PARAMS, await sign(TOKEN, URL, PARAMS)), true)
+  })
+
+  test('rejects a tampered body — the whole point of signing', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    const sig = await sign(TOKEN, URL, PARAMS)
+    assert.equal(verifyTwilioSignature(TOKEN, URL, { ...PARAMS, Digits: '9999' }, sig), false)
+  })
+
+  test('rejects a signature made with a different auth token', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    assert.equal(verifyTwilioSignature(TOKEN, URL, PARAMS, await sign('otro-token', URL, PARAMS)), false)
+  })
+
+  test('rejects when the URL differs (replay against another route)', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    const sig = await sign(TOKEN, URL, PARAMS)
+    assert.equal(verifyTwilioSignature(TOKEN, 'https://mycompany.com/otra', PARAMS, sig), false)
+  })
+
+  test('fails closed on missing token or signature', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    const sig = await sign(TOKEN, URL, PARAMS)
+    assert.equal(verifyTwilioSignature('', URL, PARAMS, sig), false)
+    assert.equal(verifyTwilioSignature(TOKEN, URL, PARAMS, ''), false)
+    assert.equal(verifyTwilioSignature(TOKEN, URL, PARAMS, undefined), false)
+  })
+
+  test('rejects a signature of the wrong length without throwing', async () => {
+    const { verifyTwilioSignature } = await import('../services/twilio.js')
+    assert.equal(verifyTwilioSignature(TOKEN, URL, PARAMS, 'corta'), false)
+  })
+})
+
 describe('toE164 — lead phone normalization', () => {
   test('keeps an already-E.164 number and strips formatting', async () => {
     const { toE164 } = await import('../services/twilio.js')

@@ -8,6 +8,8 @@ import nodemailer from 'nodemailer'
 import Anthropic from '@anthropic-ai/sdk'
 import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, downloadMediaMessage } from '@whiskeysockets/baileys'
 import { fileURLToPath } from 'url'
+import rateLimit from 'express-rate-limit'
+import { verifyTwilioSignature } from '../services/twilio.js'
 import { requireAdmin, withCompany, signState, verifyState } from '../middleware/auth.js'
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
@@ -1977,7 +1979,7 @@ chatRouter.post('/rate', (req, res) => {
 chatRouter.get('/conversations', requireAdmin, withCompany, (req, res) => {
   const channel = req.query.channel || null
   const rows = db.prepare(`
-    SELECT c.id, c.visitor_id, c.channel, c.unresolved, c.human_mode, c.created_at, c.updated_at,
+    SELECT c.id, c.visitor_id, c.channel, c.unresolved, c.human_mode, c.needs_attention, c.created_at, c.updated_at,
       (SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_role,
       (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_content
     FROM conversations c
@@ -1988,7 +1990,7 @@ chatRouter.get('/conversations', requireAdmin, withCompany, (req, res) => {
 })
 
 chatRouter.get('/conversations/:id', requireAdmin, withCompany, (req, res) => {
-  const conv = db.prepare('SELECT id, human_mode, channel, visitor_id FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
+  const conv = db.prepare('SELECT id, human_mode, needs_attention, channel, visitor_id FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
   if (!conv) return res.status(404).json({ error: 'No encontrada' })
   const msgs = db.prepare('SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id').all(req.params.id)
   res.json({ conv, msgs })
@@ -2154,6 +2156,93 @@ chatRouter.delete('/leads/:id', requireAdmin, withCompany, (req, res) => {
   if (!conv) return res.status(404).json({ error: 'No encontrado' })
   // Clear lead fields only — keeps conversation history intact
   db.prepare('UPDATE conversations SET lead_name = NULL, lead_email = NULL, lead_phone = NULL, lead_notified = 0 WHERE id = ?').run(req.params.id)
+  res.json({ ok: true })
+})
+
+// ============================================================
+// SMS ENTRANTE (webhook de Twilio)
+// ============================================================
+// Qué empresa es se deduce del número destino (To), porque cada una configura
+// su propio número en cfg.twilio.fromNumber. Recorrer 15 empresas por SMS es
+// más barato que mantener un índice aparte.
+function findCompanyByTwilioNumber(number) {
+  const digits = String(number || '').replace(/\D/g, '')
+  if (!digits) return null
+  for (const c of listCompanies()) {
+    const t = loadConfig(c.id).twilio
+    if (t?.fromNumber && String(t.fromNumber).replace(/\D/g, '') === digits) return { company: c, twilio: t }
+  }
+  return null
+}
+
+// Busca a quién pertenece el número que respondió. lead_phone se guardó en el
+// formato que trajo cada canal, así que se compara por dígitos, y como último
+// intento por los últimos 10 (cubre el mismo número con y sin código de país).
+function findConversationByPhone(companyId, e164) {
+  const digits = e164.replace(/\D/g, '')
+  const rows = db.prepare(
+    'SELECT id, lead_phone FROM conversations WHERE company_id = ? AND lead_phone IS NOT NULL ORDER BY updated_at DESC'
+  ).all(companyId)
+  const exact = rows.find(r => String(r.lead_phone).replace(/\D/g, '') === digits)
+  if (exact) return exact.id
+  const tail = digits.slice(-10)
+  const loose = tail.length === 10 && rows.find(r => String(r.lead_phone).replace(/\D/g, '').endsWith(tail))
+  if (loose) return loose.id
+  const bySms = db.prepare(
+    "SELECT id FROM conversations WHERE company_id = ? AND channel = 'sms' AND visitor_id = ? ORDER BY updated_at DESC LIMIT 1"
+  ).get(companyId, e164)
+  return bySms?.id || null
+}
+
+// Ruta pública: la llama Twilio, no el panel. La firma es lo único que impide
+// que un tercero inyecte mensajes falsos en la bandeja de un cliente.
+const twilioWebhookLimiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false })
+chatRouter.post('/twilio/webhook', twilioWebhookLimiter, express.urlencoded({ extended: false }), (req, res) => {
+  // TwiML vacío: Twilio no auto-responde nada al remitente ni reintenta.
+  const done = () => res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>')
+  try {
+    const p = req.body || {}
+    const from = String(p.From || '').trim()
+    const to = String(p.To || '').trim()
+    const body = String(p.Body || '').trim()
+    if (!from || !to) return res.sendStatus(400)
+
+    const match = findCompanyByTwilioNumber(to)
+    if (!match) { console.warn('[SMS in] Número no registrado en ninguna empresa:', to); return res.sendStatus(404) }
+
+    const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`
+    if (!verifyTwilioSignature(match.twilio.authToken, url, p, req.get('X-Twilio-Signature'))) {
+      console.warn('[SMS in] Firma inválida para', to)
+      return res.sendStatus(403)
+    }
+
+    const cid = match.company.id
+    const now = Date.now()
+    let convId = findConversationByPhone(cid, from)
+    if (!convId) {
+      // Alguien escribe por SMS sin conversación previa: se abre una en vez de
+      // perder el mensaje. human_mode=1 para que la IA no conteste sola.
+      convId = crypto.randomUUID()
+      db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode, lead_phone) VALUES (?, ?, ?, ?, ?, ?, 1, ?)')
+        .run(convId, from, 'sms', now, now, cid, from)
+    }
+    db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, 'user', ?, ?)")
+      .run(convId, body || '(mensaje sin texto)', now)
+    db.prepare('UPDATE conversations SET updated_at = ?, needs_attention = 1 WHERE id = ?').run(now, convId)
+    console.log(`[SMS in] ${from} -> empresa ${cid.substring(0, 8)} conv ${convId.substring(0, 8)}`)
+    return done()
+  } catch (e) {
+    console.error('[SMS in]', e.message)
+    return res.sendStatus(500)
+  }
+})
+
+// Apaga el badge "REQUIERE ATENCIÓN". El panel ya llamaba a esta ruta, que
+// hasta ahora no existía.
+chatRouter.post('/conversations/:id/attention-clear', requireAdmin, withCompany, (req, res) => {
+  const conv = db.prepare('SELECT id FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
+  if (!conv) return res.status(404).json({ error: 'No encontrado' })
+  db.prepare('UPDATE conversations SET needs_attention = 0 WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
 })
 

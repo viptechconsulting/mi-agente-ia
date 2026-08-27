@@ -2006,6 +2006,13 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
      <button onclick="sendTwilioProbe()" style="font-size:12px;padding:7px 14px;white-space:nowrap">Enviar prueba</button>
     </div>
     <div id="twilio-probe-result" style="display:none;margin-top:8px;font-size:12px;padding:8px 12px;border-radius:8px"></div>
+
+    <label style="font-size:11px;color:var(--muted);display:block;margin:14px 0 4px">Recibir respuestas — pegá esta URL en Twilio</label>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+     <input id="twilio-webhook-url" readonly value="https://chat.lynkro.io/api/twilio/webhook" style="font-family:monospace;font-size:12px;width:330px">
+     <button onclick="navigator.clipboard.writeText(document.getElementById('twilio-webhook-url').value).then(()=>toast('URL copiada'))" style="font-size:12px;padding:7px 14px;white-space:nowrap">Copiar</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">Twilio Console → Phone Numbers → tu número → <b>Messaging</b> → "A message comes in" → Webhook, HTTP POST. Las respuestas entran a Leads y la conversación queda marcada como <b style="color:#f97316">REQUIERE ATENCIÓN</b>. La IA no contesta los SMS.</div>
    </div>
   </div>
 
@@ -4122,7 +4129,7 @@ function renderLeads(rows) {
    <td style="padding:8px 6px">${l.lead_name || '<span style="color:#555">—</span>'}</td>
    <td style="padding:8px 6px">${l.lead_email ? `<a href="mailto:${l.lead_email}" style="color:var(--gold)">${l.lead_email}</a>` : '<span style="color:#555">—</span>'}</td>
    <td style="padding:8px 6px">${l.lead_phone || '<span style="color:#555">—</span>'}</td>
-   <td style="padding:8px 6px;color:#888">${l.channel === 'whatsapp' ? 'WhatsApp' : l.channel === 'instagram' ? 'Instagram' : 'Web'}</td>
+   <td style="padding:8px 6px;color:#888">${l.channel === 'whatsapp' ? 'WhatsApp' : l.channel === 'instagram' ? 'Instagram' : l.channel === 'sms' ? 'SMS' : 'Web'}</td>
    <td style="padding:8px 6px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(l.first_msg||'').slice(0,60)}</td>
    <td style="padding:8px 6px;color:#666;white-space:nowrap">${new Date(l.updated_at).toLocaleDateString()}</td>
    <td style="padding:8px 6px;white-space:nowrap">
@@ -4618,8 +4625,8 @@ function loadFollowUp(filter) {
   if (!filtered.length) { el.innerHTML = '<p style="color:#666;font-size:13px">No hay conversaciones en este filtro.</p>'; return; }
   const levelColors = { 0:'#4ade80', 1:'#facc15', 2:'#f97316', 3:'#ef4444' };
   el.innerHTML = filtered.map(c => {
-   const ch = c.channel === 'whatsapp' ? 'WA' : 'IG';
-   const chColor = c.channel === 'whatsapp' ? '#25D366' : '#fd1d1d';
+   const ch = c.channel === 'whatsapp' ? 'WA' : c.channel === 'sms' ? 'SMS' : c.channel === 'instagram' ? 'IG' : 'Web';
+   const chColor = c.channel === 'whatsapp' ? '#25D366' : c.channel === 'sms' ? '#3BA5FF' : c.channel === 'instagram' ? '#fd1d1d' : '#7c8ca8';
    const since = c.last_lead_msg_at ? Math.round((Date.now()-c.last_lead_msg_at)/3600000) + 'h' : '—';
    const levelBadge = c.followup_paused
     ? '<span style="font-size:11px;background:#333;color:#666;padding:2px 8px;border-radius:10px">⏸ Pausado</span>'

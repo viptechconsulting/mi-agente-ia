@@ -102,6 +102,9 @@ softAlter('ALTER TABLE conversations ADD COLUMN retargeting_sent INTEGER DEFAULT
 softAlter('ALTER TABLE conversations ADD COLUMN flow_state TEXT');
 softAlter('ALTER TABLE conversations ADD COLUMN web_alert_sent INTEGER DEFAULT 0');
 softAlter('ALTER TABLE conversations ADD COLUMN do_not_contact INTEGER DEFAULT 0');
+// El panel ya dibujaba el badge "REQUIERE ATENCIÓN" y el botón Resolver, pero
+// la columna no existía y nada la encendía. La prende el SMS entrante.
+softAlter('ALTER TABLE conversations ADD COLUMN needs_attention INTEGER DEFAULT 0');
 
 // ============================================================
 // DEFAULT CONFIG (shape of per-company config)
