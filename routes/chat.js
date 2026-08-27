@@ -2118,6 +2118,37 @@ chatRouter.patch('/leads/:id', requireAdmin, withCompany, (req, res) => {
   res.json({ ok: true })
 })
 
+// Manual SMS to a captured lead. Calls the Twilio service directly instead of
+// the fire-and-forget sendSMS() above so a failure reaches the admin UI.
+chatRouter.post('/leads/:id/sms', requireAdmin, withCompany, async (req, res) => {
+  const text = (req.body?.text || '').trim()
+  if (!text) return res.status(400).json({ error: 'El mensaje está vacío' })
+  if (text.length > 1600) return res.status(400).json({ error: 'Máximo 1600 caracteres' })
+
+  const cfg = loadConfig(req.company.id)
+  const t = cfg.twilio || {}
+  if (!t.accountSid || !t.authToken || !t.fromNumber) {
+    return res.status(400).json({ error: 'Twilio no está conectado. Configuralo en Campañas.' })
+  }
+
+  const lead = db.prepare('SELECT id, lead_phone FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
+  if (!lead) return res.status(404).json({ error: 'No encontrado' })
+
+  const { toE164, sendSMS: twilioSend } = await import('../services/twilio.js')
+  const to = toE164(lead.lead_phone || '')
+  if (!to) return res.status(400).json({ error: 'Este lead no tiene un teléfono válido para SMS' })
+
+  try {
+    const msg = await twilioSend(t.accountSid, t.authToken, t.fromNumber, to, text)
+    db.prepare('INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)')
+      .run(lead.id, 'assistant', `[SMS] ${text}`, Date.now())
+    res.json({ ok: true, to, sid: msg.sid })
+  } catch (e) {
+    console.error('[Lead SMS]', e.message)
+    res.status(502).json({ error: e.message })
+  }
+})
+
 chatRouter.delete('/leads/:id', requireAdmin, withCompany, (req, res) => {
   const conv = db.prepare('SELECT id FROM conversations WHERE id = ? AND company_id = ?').get(req.params.id, req.company.id)
   if (!conv) return res.status(404).json({ error: 'No encontrado' })

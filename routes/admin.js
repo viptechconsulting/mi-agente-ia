@@ -1098,6 +1098,40 @@ adminRouter.post('/twilio/test', requireAdmin, withCompany, async (req, res) => 
   }
 })
 
+// Lists the numbers bought in the Twilio account. Accepts credentials from the
+// body so the admin can browse numbers before saving the connection.
+adminRouter.post('/twilio/numbers', requireAdmin, withCompany, async (req, res) => {
+  const saved = loadConfig(req.company.id).twilio || {}
+  const accountSid = req.body?.accountSid || saved.accountSid
+  const authToken = req.body?.authToken || saved.authToken
+  if (!accountSid || !authToken) return res.status(400).json({ error: 'Falta Account SID o Auth Token' })
+  try {
+    const { listNumbers } = await import('../services/twilio.js')
+    res.json({ ok: true, numbers: await listNumbers(accountSid, authToken) })
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
+
+// Sends a real SMS so the admin can confirm the connection end to end.
+// /twilio/test only checks that the credentials authenticate.
+adminRouter.post('/twilio/send-test', requireAdmin, withCompany, async (req, res) => {
+  const t = loadConfig(req.company.id).twilio || {}
+  if (!t.accountSid || !t.authToken || !t.fromNumber) {
+    return res.status(400).json({ error: 'Conectá Twilio primero' })
+  }
+  const { toE164, sendSMS } = await import('../services/twilio.js')
+  const to = toE164(req.body?.to || '')
+  if (!to) return res.status(400).json({ error: 'Número de destino inválido' })
+  const text = (req.body?.text || '').trim() || 'Prueba de Lynkro — tu conexión con Twilio funciona. ✅'
+  try {
+    const msg = await sendSMS(t.accountSid, t.authToken, t.fromNumber, to, text)
+    res.json({ ok: true, to, from: t.fromNumber, sid: msg.sid, status: msg.status })
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
+
 adminRouter.delete('/twilio/disconnect', requireAdmin, withCompany, (req, res) => {
   const cfg = loadConfig(req.company.id)
   delete cfg.twilio

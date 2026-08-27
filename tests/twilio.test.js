@@ -30,3 +30,33 @@ describe('twilio service — pure helpers', () => {
     assert.equal(msg, 'Twilio getAccountInfo failed: 401')
   })
 })
+
+describe('toE164 — lead phone normalization', () => {
+  test('keeps an already-E.164 number and strips formatting', async () => {
+    const { toE164 } = await import('../services/twilio.js')
+    assert.equal(toE164('+1 (786) 555-1234'), '+17865551234')
+    assert.equal(toE164('+54 9 11 2345-6789'), '+5491123456789')
+  })
+
+  test('assumes +1 for a bare 10-digit US number', async () => {
+    const { toE164 } = await import('../services/twilio.js')
+    assert.equal(toE164('(786) 555-1234'), '+17865551234')
+    assert.equal(toE164('7865551234'), '+17865551234')
+  })
+
+  test('prefixes + for a bare number that already carries a country code', async () => {
+    const { toE164 } = await import('../services/twilio.js')
+    assert.equal(toE164('17865551234'), '+17865551234')
+    assert.equal(toE164('5491123456789'), '+5491123456789')
+  })
+
+  test('rejects values that cannot be a phone number', async () => {
+    const { toE164 } = await import('../services/twilio.js')
+    assert.equal(toE164(''), null)
+    assert.equal(toE164(null), null)
+    assert.equal(toE164('1234567'), null)             // too short
+    assert.equal(toE164('1234567890123456'), null)    // too long — WhatsApp @lid pseudo-id
+    assert.equal(toE164('sin telefono'), null)
+    assert.equal(toE164('+123'), null)                // explicit + but not a real number
+  })
+})

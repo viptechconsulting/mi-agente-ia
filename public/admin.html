@@ -1230,6 +1230,17 @@
  </div>
  <div id="leadList"><p style="color:#666">Cargando...</p></div>
  </div>
+
+ <dialog id="smsModal" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:22px;width:420px;max-width:92vw">
+  <div style="font-weight:600;margin-bottom:2px">Enviar SMS</div>
+  <div id="smsTo" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+  <textarea id="smsText" rows="4" maxlength="1600" placeholder="Escribí tu mensaje..." oninput="smsCount()" style="width:100%;background:var(--input-bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-family:inherit;font-size:13px;resize:vertical"></textarea>
+  <div id="smsCount" style="font-size:11px;color:var(--muted);margin-top:6px">0 caracteres · 1 SMS</div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+   <button class="secondary" onclick="document.getElementById('smsModal').close()" style="font-size:12px;padding:7px 14px;text-transform:none;letter-spacing:0">Cancelar</button>
+   <button id="smsSend" onclick="sendLeadSms()" style="font-size:12px;padding:7px 16px;text-transform:none;letter-spacing:0">Enviar</button>
+  </div>
+ </dialog>
  </div>
 
  <div id="tab-convs" class="tab">
@@ -1977,11 +1988,24 @@ Responde CONFIRMO para confirmar tu asistencia o CANCELAR si necesitas reagendar
      <div>
       <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Número From</label>
       <input id="twilio-from-number" type="text" placeholder="+17865551234" style="font-size:12px;width:100%">
+      <select id="twilio-from-select" onchange="document.getElementById('twilio-from-number').value=this.value" style="display:none;font-size:12px;width:100%;padding:8px 10px"></select>
      </div>
      <button onclick="testTwilioConn()" style="font-size:12px;padding:7px 14px;white-space:nowrap">Probar y guardar</button>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">En Twilio Console → Account → API keys &amp; tokens</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+     <button onclick="loadTwilioNumbers()" style="font-size:11px;padding:5px 12px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer">Buscar mis números de Twilio</button>
+     <span style="font-size:11px;color:var(--muted)">En Twilio Console → Account → API keys &amp; tokens</span>
+    </div>
     <div id="twilio-test-result" style="display:none;margin-top:10px;font-size:12px;padding:8px 12px;border-radius:8px"></div>
+   </div>
+
+   <div id="twilio-probe" style="display:none;margin-top:14px;border-top:1px solid rgba(239,68,68,.1);padding-top:14px">
+    <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px">Enviar un SMS de prueba</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+     <input id="twilio-probe-to" type="text" placeholder="Tu número, ej. +17865551234" style="font-size:12px;width:220px">
+     <button onclick="sendTwilioProbe()" style="font-size:12px;padding:7px 14px;white-space:nowrap">Enviar prueba</button>
+    </div>
+    <div id="twilio-probe-result" style="display:none;margin-top:8px;font-size:12px;padding:8px 12px;border-radius:8px"></div>
    </div>
   </div>
 
@@ -4101,10 +4125,49 @@ function renderLeads(rows) {
    <td style="padding:8px 6px;color:#888">${l.channel === 'whatsapp' ? 'WhatsApp' : l.channel === 'instagram' ? 'Instagram' : 'Web'}</td>
    <td style="padding:8px 6px;color:#aaa;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(l.first_msg||'').slice(0,60)}</td>
    <td style="padding:8px 6px;color:#666;white-space:nowrap">${new Date(l.updated_at).toLocaleDateString()}</td>
-   <td style="padding:8px 6px"><button class="secondary" onclick="deleteLead('${l.id}')" style="font-size:11px;padding:4px 10px;text-transform:none;letter-spacing:0;border-color:#e55;color:#e55">Borrar</button></td>
+   <td style="padding:8px 6px;white-space:nowrap">
+    ${l.lead_phone ? `<button class="secondary" onclick="openSms('${l.id}')" style="font-size:11px;padding:4px 10px;text-transform:none;letter-spacing:0;margin-right:6px">SMS</button>` : ''}
+    <button class="secondary" onclick="deleteLead('${l.id}')" style="font-size:11px;padding:4px 10px;text-transform:none;letter-spacing:0;border-color:#e55;color:#e55">Borrar</button>
+   </td>
   </tr>`).join('')}
   </tbody></table></div>`;
 }
+let _smsLeadId = null;
+function openSms(id) {
+ const l = _allLeads.find(x => x.id === id);
+ if (!l) return;
+ _smsLeadId = id;
+ document.getElementById('smsTo').textContent = `Para: ${l.lead_name || 'Sin nombre'} · ${l.lead_phone}`;
+ document.getElementById('smsText').value = '';
+ smsCount();
+ document.getElementById('smsModal').showModal();
+ document.getElementById('smsText').focus();
+}
+function smsCount() {
+ const v = document.getElementById('smsText').value;
+ // GSM-7 segmenta a 160; con acentos/emoji Twilio usa UCS-2 (70). Mostramos el peor caso.
+ const unicode = /[^\x00-\x7F]/.test(v);
+ const per = unicode ? 70 : 160;
+ const segs = Math.max(1, Math.ceil(v.length / per));
+ document.getElementById('smsCount').textContent = `${v.length} caracteres · ${segs} SMS${unicode ? ' (con acentos/emoji)' : ''}`;
+}
+function sendLeadSms() {
+ const text = document.getElementById('smsText').value.trim();
+ if (!text) return toast('Escribí un mensaje');
+ const btn = document.getElementById('smsSend');
+ btn.disabled = true; btn.textContent = 'Enviando...';
+ fetch('/api/leads/' + _smsLeadId + '/sms', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+  body: JSON.stringify({ text })
+ }).then(r => r.json()).then(d => {
+  if (d.error) return toast('Error: ' + d.error);
+  document.getElementById('smsModal').close();
+  toast('SMS enviado a ' + d.to);
+ }).catch(e => toast('Error: ' + e.message))
+ .finally(() => { btn.disabled = false; btn.textContent = 'Enviar' });
+}
+
 function deleteLead(id) {
  if (!confirm('Borrar este lead? Se eliminan los datos de contacto pero se conserva la conversacion.')) return;
  fetch('/api/leads/' + id, { method: 'DELETE', headers: { 'x-admin-password': password } })
@@ -5585,11 +5648,13 @@ async function loadTwilioStatus() {
       txt.textContent = `Conectado · ${r.fromNumber} · desde ${r.connected_at ? new Date(r.connected_at).toLocaleDateString() : 'hoy'}`
       btnCon.style.display = 'none'
       btnDis.style.display = 'inline-flex'
+      document.getElementById('twilio-probe').style.display = 'block'
     } else {
       dot.style.background = '#6b7280'
       txt.textContent = 'No conectado · Los recordatorios de cita también se mandan por SMS si conectas Twilio'
       btnCon.style.display = 'inline-flex'
       btnDis.style.display = 'none'
+      document.getElementById('twilio-probe').style.display = 'none'
     }
   } catch (e) {}
 }
@@ -5597,6 +5662,62 @@ async function loadTwilioStatus() {
 function toggleTwilioForm() {
   const f = document.getElementById('twilio-form')
   f.style.display = f.style.display === 'none' ? 'block' : 'none'
+}
+
+async function loadTwilioNumbers() {
+  const accountSid = document.getElementById('twilio-account-sid').value.trim()
+  const authToken  = document.getElementById('twilio-auth-token').value.trim()
+  const res = document.getElementById('twilio-test-result')
+  res.style.display = 'block'
+  res.style.background = 'rgba(100,100,100,.15)'
+  res.style.color = 'var(--muted)'
+  res.textContent = 'Buscando números...'
+  try {
+    const r = await api('/api/twilio/numbers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ accountSid, authToken }) })
+    if (r.error) throw new Error(r.error)
+    const sms = (r.numbers || []).filter(n => n.sms)
+    if (!sms.length) {
+      res.style.background = 'rgba(239,68,68,.1)'
+      res.style.color = '#ef4444'
+      res.textContent = r.numbers?.length
+        ? '✗ Tenés números en Twilio pero ninguno con SMS habilitado.'
+        : '✗ No hay números comprados en esta cuenta de Twilio.'
+      return
+    }
+    const sel = document.getElementById('twilio-from-select')
+    sel.innerHTML = sms.map(n => `<option value="${n.phoneNumber}">${n.phoneNumber} — ${n.friendlyName}</option>`).join('')
+    sel.style.display = 'block'
+    document.getElementById('twilio-from-number').style.display = 'none'
+    document.getElementById('twilio-from-number').value = sms[0].phoneNumber
+    res.style.background = 'rgba(74,222,128,.1)'
+    res.style.color = '#4ade80'
+    res.textContent = `✓ ${sms.length} número(s) con SMS. Elegí uno en "Número From".`
+  } catch (e) {
+    res.style.background = 'rgba(239,68,68,.1)'
+    res.style.color = '#ef4444'
+    res.textContent = `✗ ${e.message}`
+  }
+}
+
+async function sendTwilioProbe() {
+  const to = document.getElementById('twilio-probe-to').value.trim()
+  const res = document.getElementById('twilio-probe-result')
+  if (!to) { toast('Poné el número que va a recibir la prueba'); return }
+  res.style.display = 'block'
+  res.style.background = 'rgba(100,100,100,.15)'
+  res.style.color = 'var(--muted)'
+  res.textContent = 'Enviando...'
+  try {
+    const r = await api('/api/twilio/send-test', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ to }) })
+    if (r.error) throw new Error(r.error)
+    res.style.background = 'rgba(74,222,128,.1)'
+    res.style.color = '#4ade80'
+    res.textContent = `✓ Enviado de ${r.from} a ${r.to} · estado: ${r.status} · SID ${r.sid}`
+  } catch (e) {
+    res.style.background = 'rgba(239,68,68,.1)'
+    res.style.color = '#ef4444'
+    res.textContent = `✗ ${e.message}`
+  }
 }
 
 async function testTwilioConn() {
