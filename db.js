@@ -106,6 +106,27 @@ softAlter('ALTER TABLE conversations ADD COLUMN do_not_contact INTEGER DEFAULT 0
 // la columna no existía y nada la encendía. La prende el SMS entrante.
 softAlter('ALTER TABLE conversations ADD COLUMN needs_attention INTEGER DEFAULT 0');
 
+// Confirmación de citas en 2 pasos + asistencia. Estado por cita, separado de
+// campaign_log (que es bitácora de envíos, no estado).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appointment_status (
+    company_id     TEXT NOT NULL,
+    appointment_id TEXT NOT NULL,
+    contact_id     TEXT,
+    contact_name   TEXT,
+    phone          TEXT,
+    start_time     TEXT,
+    first_sent_at  TEXT,
+    second_sent_at TEXT,
+    confirm_state  TEXT DEFAULT 'pending',
+    confirmed_at   TEXT,
+    attendance     TEXT,
+    attendance_at  TEXT,
+    PRIMARY KEY (company_id, appointment_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_appt_pending ON appointment_status(company_id, confirm_state, start_time);
+`);
+
 // ============================================================
 // DEFAULT CONFIG (shape of per-company config)
 // ============================================================

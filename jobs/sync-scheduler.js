@@ -116,3 +116,20 @@ async function runProspectingFollowupsJob() {
 }
 
 scheduleDaily(9, runProspectingFollowupsJob)
+
+// ============================================================
+// SEGUNDO AVISO DE CONFIRMACIÓN DE CITA (cada hora)
+// ============================================================
+// Horario y no diario: el segundo aviso sale 6h después del primero, y el
+// primero puede salir a cualquier hora según cuándo corrió el recordatorio.
+async function runConfirmationSecondTouchJob() {
+  try {
+    const { runConfirmationSecondTouch } = await import('./campaign-scheduler.js')
+    await runConfirmationSecondTouch()
+  } catch (e) {
+    console.error('[confirm-2] Fatal:', e.message)
+  }
+}
+
+setInterval(runConfirmationSecondTouchJob, 60 * 60 * 1000)
+console.log('[confirm-2] Segundo aviso de confirmación: cada hora')

@@ -549,6 +549,23 @@ export async function processMessage({ companyId, message, conversationId, visit
   let convId = conversationId
   const now = Date.now()
 
+  // Confirmación de cita: solo registra el estado y deja seguir el mensaje.
+  // No corta el flujo ni responde por su cuenta — quien contesta sigue siendo
+  // el agente, que además sabe reagendar si la persona dice que no puede.
+  if (['whatsapp', 'sms'].includes(channel) && visitorId) {
+    try {
+      const { classifyConfirmation, findPendingByPhone, setConfirmState } = await import('../services/appointment-confirm.js')
+      const veredicto = classifyConfirmation(message)
+      if (veredicto !== 'unclear') {
+        const cita = findPendingByPhone(companyId, visitorId)
+        if (cita) {
+          setConfirmState(companyId, cita.appointment_id, veredicto)
+          console.log(`[confirm] ${visitorId} -> ${veredicto} (cita ${cita.appointment_id})`)
+        }
+      }
+    } catch (e) { console.error('[confirm]', e.message) }
+  }
+
   if (!convId && visitorId && channel !== 'web') {
     const existing = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = ? AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorId, channel, companyId)
     if (existing) convId = existing.id
@@ -2234,6 +2251,34 @@ chatRouter.post('/twilio/webhook', twilioWebhookLimiter, express.urlencoded({ ex
   } catch (e) {
     console.error('[SMS in]', e.message)
     return res.sendStatus(500)
+  }
+})
+
+// ============================================================
+// CITAS — confirmación y asistencia
+// ============================================================
+chatRouter.get('/citas/asistencia', requireAdmin, withCompany, async (req, res) => {
+  const { listForAttendance, noShowStats } = await import('../services/appointment-confirm.js')
+  const days = Math.min(parseInt(req.query.days) || 7, 90)
+  res.json({
+    citas: listForAttendance(req.company.id, days),
+    stats: noShowStats(req.company.id, Math.min(parseInt(req.query.statsDays) || 30, 365))
+  })
+})
+
+chatRouter.post('/citas/:id/asistencia', requireAdmin, withCompany, async (req, res) => {
+  const { markAttendance } = await import('../services/appointment-confirm.js')
+  const { attendance } = req.body || {}
+  if (!['showed', 'noshow'].includes(attendance)) {
+    return res.status(400).json({ error: 'Valor inválido: usá showed o noshow' })
+  }
+  try {
+    if (!markAttendance(req.company.id, req.params.id, attendance)) {
+      return res.status(404).json({ error: 'Cita no encontrada' })
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
   }
 })
 

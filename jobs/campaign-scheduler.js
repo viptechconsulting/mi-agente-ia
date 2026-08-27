@@ -4,6 +4,7 @@
 import { db, loadConfig } from '../db.js'
 import { getAllContacts, getAppointments, getContact, normalizePhone, fillTemplate } from '../services/ghl.js'
 import { sendWhatsApp, sendSMS } from '../routes/chat.js'
+import { upsertAppointment, pendingSecondTouch, markSecondSent } from '../services/appointment-confirm.js'
 
 // ────────────────────────────────────────────────────────────
 // DB table (idempotent)
@@ -229,6 +230,15 @@ async function runAppointmentReminders(companyId, cfg, apiKey, locationId, citas
       const normalized = normalizePhone(c.phone || '')
       await send(cfg, normalized, msg, companyId, a.contactId, type, 'whatsapp', a.id)
       await sendSMS(cfg, normalized, msg)
+      // Solo el aviso de 24h abre la ventana de confirmación: el del mismo día
+      // ya no da tiempo a reasignar el cupo si la persona dice que no viene.
+      if (type === 'cita_24h') {
+        upsertAppointment({
+          companyId, appointmentId: a.id, contactId: a.contactId,
+          contactName: contactName(c), phone: normalized,
+          startTime: apptDate.toISOString()
+        })
+      }
     }
   }
 
@@ -239,6 +249,53 @@ async function runAppointmentReminders(companyId, cfg, apiKey, locationId, citas
   if (citasCfg?.reminder_day?.enabled) {
     const appts = await getAppointments(apiKey, locationId, todayStart.toISOString(), todayEnd.toISOString())
     await sendReminder(appts, 'cita_day', citasCfg.reminder_day.message)
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// Segundo paso de la confirmación — corre cada hora
+// ────────────────────────────────────────────────────────────
+// El primer aviso sale 24h antes junto al recordatorio. Si a las 6 horas la
+// persona no dijo ni sí ni no, se insiste una vez. Una sola: el objetivo es
+// enterarse a tiempo de que no viene, no perseguir a nadie.
+const SEGUNDO_AVISO_HORAS = 6
+const SEGUNDO_AVISO_DEFAULT = 'Hola {nombre}, no llegamos a confirmar tu cita de {fecha} a las {hora}. ¿Nos confirmás si podés venir? Respondé SÍ para confirmar, o avisanos si preferís moverla.'
+
+export async function runConfirmationSecondTouch() {
+  const companies = db.prepare('SELECT id, config FROM companies WHERE active = 1').all()
+  for (const co of companies) {
+    let cfg
+    try { cfg = JSON.parse(co.config || '{}') } catch { continue }
+    const citas = cfg.citas || {}
+    if (!citas.reminder_24h?.enabled || citas.confirm_second?.enabled === false) continue
+
+    const horas = Number(citas.confirm_second?.hours) || SEGUNDO_AVISO_HORAS
+    const plantilla = citas.confirm_second?.message || SEGUNDO_AVISO_DEFAULT
+    const pendientes = pendingSecondTouch(co.id, horas)
+    if (!pendientes.length) continue
+
+    console.log(`[confirm-2] ${co.id.substring(0, 8)}: ${pendientes.length} cita(s) sin confirmar`)
+    for (const a of pendientes) {
+      if (!a.phone) { markSecondSent(co.id, a.appointment_id); continue }
+      const d = new Date(a.start_time)
+      const msg = fillTemplate(plantilla, {
+        nombre: a.contact_name || 'cliente',
+        negocio: cfg.businessName || 'tu negocio',
+        fecha: d.toLocaleDateString('es-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+        hora: d.toLocaleTimeString('es-US', { hour: '2-digit', minute: '2-digit' }),
+        link_reserva: cfg.bookingUrl || ''
+      })
+      try {
+        await sendWhatsApp(cfg, a.phone, msg)
+        await sendSMS(cfg, a.phone, msg)
+      } catch (e) {
+        console.error('[confirm-2]', e.message)
+      }
+      // Se marca pase lo que pase: si el envío falla, insistir cada hora sería
+      // peor que perder un aviso.
+      markSecondSent(co.id, a.appointment_id)
+      logSent(co.id, a.contact_id || a.appointment_id, 'cita_confirm_2', 'whatsapp', a.appointment_id)
+    }
   }
 }
 

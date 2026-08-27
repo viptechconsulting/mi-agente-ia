@@ -970,6 +970,21 @@
 
  <div id="tab-reports" class="tab">
 
+  <!-- CITAS: no-shows y marcado de asistencia -->
+  <div class="card" style="margin-bottom:18px">
+   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+    <h2 style="margin:0;font-size:16px;font-weight:600">Citas — confirmación y ausentismo</h2>
+    <select id="citasDays" onchange="loadCitas()" style="padding:6px 12px;border-radius:8px;background:var(--input-bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer">
+     <option value="7">Últimos 7 días</option>
+     <option value="15">Últimos 15 días</option>
+     <option value="30" selected>Últimos 30 días</option>
+    </select>
+   </div>
+   <p style="color:var(--muted);font-size:12px;margin:0 0 14px">Las tasas se calculan solo sobre las citas que marcaste. Las que quedan sin marcar no cuentan como asistidas.</p>
+   <div id="citasStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
+   <div id="citasList"></div>
+  </div>
+
   <!-- Period selector -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
     <h2 style="margin:0;font-size:16px;font-weight:600" data-i18n="h2_stats">Estadísticas</h2>
@@ -2751,7 +2766,7 @@ function switchCompany(id) {
   else if (activeTab === 'dashboard') loadDashboard();
   else if (activeTab === 'knowledge') loadDocs();
   else if (activeTab === 'training') loadTraining();
-  else if (activeTab === 'reports') loadStats();
+  else if (activeTab === 'reports') { loadStats(); loadCitas(); }
   toast('Empresa cambiada ✓'); if (window.__aiChatReload) window.__aiChatReload(id);
  });
 }
@@ -3367,7 +3382,7 @@ function tab(name) {
  if (name === 'demos') loadDemos();
  if (name === 'embed') updateShareLink();
  if (name === 'users') loadUsers();
- if (name === 'reports') loadStats();
+ if (name === 'reports') { loadStats(); loadCitas(); }
  if (name === 'triggers') renderTriggers();
  if (name === 'billing') loadBillingStatus();
  if (name === 'prospecting') prospLoadAll();
@@ -4139,6 +4154,70 @@ function renderLeads(rows) {
   </tr>`).join('')}
   </tbody></table></div>`;
 }
+// ── Citas: ausentismo y marcado de asistencia ──────────────────
+function loadCitas() {
+ const days = document.getElementById('citasDays').value;
+ fetch(`/api/citas/asistencia?days=${days}&statsDays=${days}`, { headers: { 'x-admin-password': password } })
+  .then(r => r.json()).then(d => { renderCitasStats(d.stats); renderCitasList(d.citas); })
+  .catch(() => {});
+}
+function renderCitasStats(s) {
+ const tile = (label, val, sub, color) =>
+  `<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px">
+    <div style="font-size:22px;font-weight:700;color:${color||'var(--text)'}">${val}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">${label}</div>
+    ${sub ? `<div style="font-size:10px;color:var(--muted);margin-top:4px">${sub}</div>` : ''}
+   </div>`;
+ const pct = v => v === null ? '—' : v + '%';
+ // Rojo solo cuando hay dato y supera 10%: pintar de rojo un "—" confunde.
+ const nsColor = s.noShowRate === null ? 'var(--muted)' : s.noShowRate > 10 ? '#ef4444' : '#4ade80';
+ document.getElementById('citasStats').innerHTML =
+  tile('Tasa de no-show', pct(s.noShowRate), `${s.noshow} de ${s.marcadas} marcadas`, nsColor) +
+  tile('Confirmaron', pct(s.confirmRate), `${s.confirmadas} de ${s.total} citas`, '#3BA5FF') +
+  tile('Asistieron', s.showed, `${s.total} citas en el período`) +
+  tile('Sin marcar', s.sinMarcar, s.sinMarcar ? 'no entran en las tasas' : 'todo al día', s.sinMarcar ? '#f97316' : 'var(--muted)') +
+  tile('No-show si confirmó', pct(s.noShowRateConfirmados), 'los que dijeron que venían', '#4ade80') +
+  tile('No-show sin confirmar', pct(s.noShowRateSinConfirmar), 'los que nunca respondieron', '#ef4444');
+}
+function renderCitasList(rows) {
+ const el = document.getElementById('citasList');
+ if (!rows.length) {
+  el.innerHTML = '<p style="color:var(--muted);font-size:13px;margin:0">Todavía no hay citas registradas. Aparecen acá cuando sale el recordatorio de 24h, que necesita un calendario conectado (Square o GHL).</p>';
+  return;
+ }
+ const estado = { confirmed: '<span style="color:#4ade80">✓ confirmó</span>', declined: '<span style="color:#ef4444">✗ avisó que no</span>', pending: '<span style="color:var(--muted)">sin responder</span>' };
+ el.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead><tr style="border-bottom:1px solid var(--border);color:var(--muted)">
+   <th style="text-align:left;padding:8px 6px">Cita</th><th style="text-align:left;padding:8px 6px">Paciente</th>
+   <th style="text-align:left;padding:8px 6px">Confirmación</th><th style="text-align:left;padding:8px 6px">Asistencia</th>
+  </tr></thead><tbody>
+  ${rows.map(c => {
+   const d = new Date(c.start_time);
+   const marcado = c.attendance === 'showed' ? '<span style="color:#4ade80">✓ asistió</span>'
+                 : c.attendance === 'noshow' ? '<span style="color:#ef4444">✗ no vino</span>'
+                 : `<button onclick="marcarAsistencia('${c.appointment_id}','showed')" style="font-size:11px;padding:4px 10px;text-transform:none;letter-spacing:0;margin-right:6px">✓ Asistió</button>
+                    <button class="secondary" onclick="marcarAsistencia('${c.appointment_id}','noshow')" style="font-size:11px;padding:4px 10px;text-transform:none;letter-spacing:0;border-color:#e55;color:#e55">✗ No vino</button>`;
+   return `<tr style="border-bottom:1px solid #1a1f2a">
+    <td style="padding:8px 6px;white-space:nowrap;color:#aaa">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+    <td style="padding:8px 6px">${c.contact_name || '<span style="color:#555">—</span>'}<div style="font-size:11px;color:var(--muted)">${c.phone || ''}</div></td>
+    <td style="padding:8px 6px">${estado[c.confirm_state] || c.confirm_state}${c.second_sent_at ? '<div style="font-size:10px;color:var(--muted)">2º aviso enviado</div>' : ''}</td>
+    <td style="padding:8px 6px;white-space:nowrap">${marcado}</td>
+   </tr>`;
+  }).join('')}
+  </tbody></table></div>`;
+}
+function marcarAsistencia(id, attendance) {
+ fetch('/api/citas/' + encodeURIComponent(id) + '/asistencia', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+  body: JSON.stringify({ attendance })
+ }).then(r => r.json()).then(d => {
+  if (d.error) return toast('Error: ' + d.error);
+  toast(attendance === 'showed' ? 'Marcada como asistida' : 'Marcada como no-show');
+  loadCitas();
+ });
+}
+
 let _smsLeadId = null;
 function openSms(id) {
  const l = _allLeads.find(x => x.id === id);
