@@ -113,6 +113,28 @@ const SQUARE_GET_SERVICES_TOOL = {
   input_schema: { type: 'object', properties: {}, required: [] }
 }
 
+const SQUARE_GET_SLOTS_TOOL = {
+  name: 'square_get_slots',
+  description: 'Devuelve los horarios REALMENTE libres de un servicio, agrupados por día y en hora de Miami. Llámalo antes de agendar para OFRECERLE las opciones al cliente en vez de preguntarle qué día le queda mejor.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      service_variation_id: { type: 'string', description: 'variationId del servicio (de square_get_services)' },
+      from_date: { type: 'string', description: 'Opcional. YYYY-MM-DD desde donde buscar, si el cliente pidió un día concreto. Omítelo para mostrar lo más próximo.' }
+    },
+    required: ['service_variation_id']
+  }
+}
+
+// Un solo texto para el flujo de Square: lo usan el chat real y el demo. Estaban
+// duplicados palabra por palabra y se desincronizaban al tocar uno solo.
+const SQUARE_BOOKING_PROMPT = `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:
+1) Usa square_get_services para mostrar los servicios disponibles.
+2) En un mismo mensaje pide: nombre completo y teléfono del cliente.
+3) Cuando tengas servicio + nombre + teléfono, llama a square_get_slots y OFRÉCELE los horarios que devuelva, agrupados por día (ej: "Lunes 8: 10:00 AM, 11:30 AM, 2:00 PM. Martes 9: 10:00 AM, 3:00 PM. ¿Cuál te sirve?"). Si pidió un día concreto, pásalo en from_date; si ese día no tiene cupo, dilo y ofrécele los días que sí tienen.
+4) Cuando elija uno de esos horarios, llama a square_book_appointment con esa fecha y hora.
+NUNCA le preguntes "¿qué día y hora te queda mejor?" ni le pidas que proponga un horario — las opciones se las das tú desde square_get_slots. NUNCA ofrezcas un horario que no venga de square_get_slots. NUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono.`
+
 // Single combined tool: finds the best available slot and books it atomically
 const SQUARE_BOOK_APPOINTMENT_TOOL = {
   name: 'square_book_appointment',
@@ -181,6 +203,55 @@ const CANCEL_APPOINTMENT_TOOL = {
     },
     required: ['appointment_id']
   }
+}
+
+const SQUARE_TZ = 'America/New_York'
+// Fecha calendario del slot EN MIAMI (YYYY-MM-DD). en-CA da ese formato ya
+// ordenable, y el timeZone resuelve el horario de verano solo — a diferencia
+// del offset -04:00 hardcodeado que hay más abajo, que miente medio año.
+const squareDay = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: SQUARE_TZ })
+
+// Disponibilidad real agrupada por día, ya formateada en hora de Miami, para
+// que el agente OFREZCA horarios en vez de preguntar "¿qué día te queda mejor?"
+// y terminar proponiendo uno que no existe (lo que pasaba: el cliente pedía
+// lunes 8am, el negocio abre a las 10, y la reserva reventaba).
+export function groupSquareSlots(slots, { fromDate = null, days = 14, maxDays = 5, maxPerDay = 4 } = {}) {
+  const byDay = new Map()
+  for (const s of [...slots].sort((a, b) => new Date(a.startAt) - new Date(b.startAt))) {
+    const date = squareDay(s.startAt)
+    if (fromDate && date < fromDate) continue
+    if (!byDay.has(date)) {
+      if (byDay.size >= maxDays) continue
+      byDay.set(date, { dia: new Date(s.startAt).toLocaleDateString('es-US', { timeZone: SQUARE_TZ, weekday: 'long', day: 'numeric', month: 'long' }), horarios: [] })
+    }
+    const day = byDay.get(date)
+    if (day.horarios.length < maxPerDay) {
+      // en-US para la hora a propósito: es-US escupe "8:30 p. m.", que se lee mal en WhatsApp.
+      day.horarios.push(new Date(s.startAt).toLocaleTimeString('en-US', { timeZone: SQUARE_TZ, hour: 'numeric', minute: '2-digit', hour12: true }))
+    }
+  }
+  const dias = [...byDay.entries()].map(([date, d]) => ({ date, ...d }))
+  return dias.length
+    ? { zonaHoraria: 'Miami (ET)', dias }
+    : { zonaHoraria: 'Miami (ET)', dias: [], aviso: `Sin disponibilidad en los próximos ${days} días para ese servicio.` }
+}
+
+async function squareGetSlots(accessToken, { serviceVariationId, fromDate, days = 14 }) {
+  const locations = await getLocations(accessToken)
+  if (!locations.length) throw new Error('No hay ubicaciones configuradas en Square')
+
+  // Square rechaza ventanas que empiecen en el pasado; +1h además evita ofrecer
+  // un hueco que ya no da tiempo de tomar.
+  const startAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  const endAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+
+  const all = []
+  for (const loc of locations) {
+    try {
+      all.push(...await searchAvailability(accessToken, { serviceVariationId, startAt, endAt, locationId: loc.id }))
+    } catch {}
+  }
+  return groupSquareSlots(all, { fromDate, days })
 }
 
 // Atomic: find best slot near requested time and book it
@@ -730,7 +801,7 @@ export async function processMessage({ companyId, message, conversationId, visit
 
   const hasSquare = !!(cfg.square?.access_token)
   const squareSystemBlock = hasSquare
-    ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
+    ? SQUARE_BOOKING_PROMPT
     : ''
 
   // Med Spa vertical: forces structured output via respond_to_patient instead
@@ -774,7 +845,7 @@ export async function processMessage({ companyId, message, conversationId, visit
     activeTools.push(RESPOND_TO_LEAD_TOOL)
   } else {
     if (hasCommercePro) activeTools.push(SEARCH_PRODUCTS_TOOL)
-    if (hasSquare) activeTools.push(SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL)
+    if (hasSquare) activeTools.push(SQUARE_GET_SERVICES_TOOL, SQUARE_GET_SLOTS_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL)
     if (hasCalendarProvider) activeTools.push(FIND_MY_APPOINTMENTS_TOOL, CHECK_AVAILABILITY_TOOL, RESCHEDULE_APPOINTMENT_TOOL, CANCEL_APPOINTMENT_TOOL)
   }
 
@@ -857,6 +928,12 @@ export async function processMessage({ companyId, message, conversationId, visit
           const token = cfg.square.access_token
           const services = await getServices(token)
           resultContent = JSON.stringify({ services })
+        } else if (block.name === 'square_get_slots') {
+          const slots = await squareGetSlots(cfg.square.access_token, {
+            serviceVariationId: block.input.service_variation_id,
+            fromDate: block.input.from_date || null
+          })
+          resultContent = JSON.stringify(slots)
         } else if (block.name === 'square_book_appointment') {
           const token = cfg.square.access_token
           const { service_variation_id, service_variation_version, requested_date, requested_time, customer_name, customer_phone, customer_email, note } = block.input
@@ -2356,7 +2433,7 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
         : ''
       const hasSquareDemo = !!(cfg.square?.access_token)
       const squareSysDemo = hasSquareDemo
-        ? `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:\n1) Usa square_get_services para mostrar los servicios disponibles.\n2) En un mismo mensaje pide: nombre completo y teléfono del cliente.\n3) Cuando tengas servicio + nombre + teléfono, pregunta la fecha y hora preferida.\n4) Llama a square_book_appointment — el sistema reserva el slot más cercano disponible automáticamente.\nNUNCA pidas correo electrónico. NUNCA muestres horarios antes de tener nombre y teléfono. NUNCA inventes disponibilidad.`
+        ? SQUARE_BOOKING_PROMPT
         : ''
       const demoCallParams = {
         model: cfg.model || 'claude-haiku-4-5-20251001',
@@ -2364,7 +2441,7 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
         system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO]' + squareSysDemo,
         messages: msgs
       }
-      if (hasSquareDemo) demoCallParams.tools = [SQUARE_GET_SERVICES_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL]
+      if (hasSquareDemo) demoCallParams.tools = [SQUARE_GET_SERVICES_TOOL, SQUARE_GET_SLOTS_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL]
       let demoResp = await client.messages.create(demoCallParams)
       let demoIterations = 0
       while (demoResp.stop_reason === 'tool_use' && demoIterations < 3) {
@@ -2378,6 +2455,11 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
             if (block.name === 'square_get_services') {
               const services = await getServices(token)
               resultContent = JSON.stringify({ services })
+            } else if (block.name === 'square_get_slots') {
+              resultContent = JSON.stringify(await squareGetSlots(token, {
+                serviceVariationId: block.input.service_variation_id,
+                fromDate: block.input.from_date || null
+              }))
             } else if (block.name === 'square_book_appointment') {
               const { service_variation_id, service_variation_version, requested_date, requested_time, customer_name, customer_phone, customer_email, note } = block.input
               console.log('[Square demo] book_appointment:', requested_date, requested_time, customer_name)
