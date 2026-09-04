@@ -392,6 +392,17 @@ export function usesEvolution(cfg) {
   return !!(cfg && cfg.waBaseUrl && cfg.waInstance && cfg.waApiKey)
 }
 
+// A JID we should actually hold a conversation with. Statuses/stories
+// (status@broadcast), channels (@newsletter) and groups (@g.us) arrive on the
+// exact same message stream as real DMs — replying to one answers into the
+// *poster's* chat and files them all under a single bogus contact. Observed
+// 2026-09-04: BeGlam's agent "atendió" 16 status updates (reels, cadenas de
+// GoFundMe) as if they were leads. @lid is WhatsApp's newer privacy addressing
+// for real people — those stay.
+export function isConversableJid(jid) {
+  return typeof jid === 'string' && (jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid'))
+}
+
 async function evoPost(cfg, action, body) {
   return fetch(`${cfg.waBaseUrl.replace(/\/$/, '')}/message/${action}/${cfg.waInstance}`, {
     method: 'POST',
@@ -1265,9 +1276,21 @@ async function sendCriticalAlert(kind, message) {
   const fullText = `⚠️ ${kind}\n\n${message}\n\n🕐 ${new Date().toISOString()}`
 
   try {
+    // Sale por el transporte DE LYNKRO, nunca por "el socket que esté abierto":
+    // eso agarraba el socket builtin de una empresa cliente y mandaba alertas
+    // internas (UUIDs, errores crudos) desde el WhatsApp del cliente
+    // (2026-09-04: el número de BeGlam enviando las alertas de Lynkro).
     const alertPhone = (cfg.webAlertPhone || '').replace(/\D/g, '')
-    const conn = [...waConnections.values()].find(c => c.state?.status === 'open' && c.sock)
-    if (alertPhone && conn) await conn.sock.sendMessage(`${alertPhone}@s.whatsapp.net`, { text: fullText })
+    if (alertPhone) {
+      if (usesEvolution(cfg)) {
+        await sendWhatsApp(cfg, alertPhone, fullText)
+      } else {
+        const own = waConnections.get(LYNKRO_COMPANY_ID)
+        if (own?.state?.status === 'open' && own.sock) {
+          await own.sock.sendMessage(`${alertPhone}@s.whatsapp.net`, { text: fullText })
+        }
+      }
+    }
   } catch (err) { console.log('[CriticalAlert] Canal WhatsApp falló:', err.message) }
 
   try {
@@ -1418,6 +1441,16 @@ export async function startBuiltinWhatsApp(companyId) {
     // path can evict a corrupted contact's session (cache + disk) on demand.
     const sigKeys = makeCacheableSignalKeyStore(state.keys, SILENT_LOGGER)
     conn._sigKeys = sigKeys
+
+    // UN solo socket vivo por empresa, siempre. `_starting` solo cubre los pocos
+    // ms hasta que makeWASocket() retorna, y el lock de la DB se renueva para el
+    // mismo holder → nada impedía que un segundo llamante (clearAndRestart del
+    // endpoint QR, el barrido de 30s, el timer del close handler) abriera OTRO
+    // socket sobre la misma sesión. N sockets en un mismo device = tormenta de
+    // 440 conflict permanente, que es lo que termina corrompiendo las sesiones
+    // Signal en Bad MAC. Pasó de verdad (2026-09-04, BeGlam): 3 sockets, ~2400
+    // reconexiones en 4h, cero mensajes entregados.
+    if (conn.sock) { try { conn.sock.end(new Error('superseded')) } catch {} conn.sock = null }
     const sock = makeWASocket({
       version,
       auth: { creds: state.creds, keys: sigKeys },
@@ -1432,6 +1465,10 @@ export async function startBuiltinWhatsApp(companyId) {
 
     conn._stateSince = Date.now()
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      // Socket reemplazado que aún está drenando: sus eventos ya no mandan. Sin
+      // esto, cada socket viejo agenda su PROPIA reconexión al cerrarse y el
+      // conteo de sockets crece en vez de bajar.
+      if (conn.sock !== sock) return
       if (qr) {
         const dataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 1, errorCorrectionLevel: 'M' })
         conn.state = { status: 'qr', qr: dataUrl, phone: null }
@@ -1469,7 +1506,7 @@ export async function startBuiltinWhatsApp(companyId) {
         }
         if (!msg.message) continue
         const remoteJid = msg.key.remoteJid
-        if (remoteJid.endsWith('@g.us')) continue
+        if (!isConversableJid(remoteJid)) continue
 
         let text = msg.message?.conversation
           || msg.message?.extendedTextMessage?.text
@@ -2418,7 +2455,7 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
     const cfg = company.config
     const data = ev.data || ev
     const jid = data?.key?.remoteJid || ''
-    if (!jid || jid.includes('@g.us')) return
+    if (!isConversableJid(jid)) return
     const phone = jid.split('@')[0]
     const visitorId = `wa:${phone}`
 
@@ -2576,7 +2613,14 @@ chatRouter.get('/whatsapp/builtin/qr', requireAdmin, withCompany, async (req, re
   if (conn.state.status === 'open') return res.json({ status: 'open', phone: conn.state.phone })
   if (conn.state.status === 'qr') return res.json({ status: 'qr', qr: conn.state.qr })
 
+  // Una sola vez por petición: el bucle de sondeo de abajo corre cada 500ms y
+  // llamaba a esto en CADA vuelta mientras el estado fuera 'logged_out' →
+  // borraba el authDir y abría un socket nuevo dos veces por segundo, justo
+  // encima del emparejamiento en curso.
+  let didReset = false
   const clearAndRestart = () => {
+    if (didReset) return
+    didReset = true
     if (conn.sock) { try { conn.sock.end(new Error('reset')) } catch {} conn.sock = null }
     const authDir = path.join(waBaseDir, cid)
     if (fs.existsSync(authDir)) fs.rmSync(authDir, { recursive: true, force: true })
