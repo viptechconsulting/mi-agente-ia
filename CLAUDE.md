@@ -65,18 +65,20 @@ Servicio: `mi-agente-ai_mi-agente-ai`. Imagen en producción al 4-sep-2026:
 - El texto del flujo de reserva está unificado en una constante compartida entre el chat
   real y el demo. No duplicarlo otra vez.
 
-## Estado pendiente (al 4-sep-2026)
+## Estado pendiente (al 1-oct-2026)
 
-- **Sin commitear:** `routes/chat.js` modificado y `tests/booking-link.test.js` sin
-  trackear. Eso es el trabajo de "booking link" — está desplegado pero no en git.
-- `recovery.test.js` falla desde antes; el resto pasa (180/181).
-- **Tokens de Square caducados (401)** en BeGlam Studio y Glow MedSpa, conectados el
-  8-jul-2026. Solo se guarda `access_token`, sin `refresh_token`, así que caducan cada
-  30 días y no se renuevan solos. Ya no bloquea agendar (gana `bookingUrl`), pero rompe
-  catálogo y citas existentes. Arreglo de fondo: guardar el `refresh_token` en el OAuth.
-- `GROQ_API_KEY` inválida → no se transcribe ningún audio de WhatsApp, en ninguna empresa.
+- **`GROQ_API_KEY` inválida (401)** → no se transcribe ningún audio de WhatsApp, en
+  ninguna empresa. Necesita una key nueva en el env del servicio; el código está bien.
+  Desde `3b1ea75` eso dispara alerta en vez de morir en los logs.
+- **BeGlam Studio y Glow MedSpa tienen que reconectar Square desde el admin.** Sus
+  conexiones son del 8-jul-2026, de antes de que se guardara el `refresh_token`, así que
+  no se pueden renovar solas. Una vez reconectadas ya no vuelven a caducar.
+  `/api/admin/square/status` expone `can_refresh` para ver quién está así.
 - `square_get_slots` quedó inerte: con `bookingUrl` cargado en las 10 empresas no se
-  activa nunca. Está probada y no estorba; decidir si se borra.
+  activa nunca. Está probada y no estorba; decidir si se borra (preguntar antes).
+- `recovery.test.js` falla desde antes; el resto pasa (186/187).
+- **`origin` tiene un token de GitHub incrustado en la URL** (`.git/config`, en texto
+  plano). Conviene revocarlo y pasar a SSH o a un credential helper.
 
 ## Convenciones
 
