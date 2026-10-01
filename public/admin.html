@@ -4378,7 +4378,10 @@ function loadBuiltinQr(silent) {
  const statusEl = document.getElementById('builtinStatus');
  const img = document.getElementById('builtinQrImg');
  if (!silent) { btn.textContent = 'Generando...'; btn.disabled = true; statusEl.textContent = 'Conectando...'; statusEl.style.color = '#888'; }
- fetch('/api/whatsapp/builtin/qr', { headers: { 'x-admin-password': password } })
+ // x-company-id obligatorio: sin él el servidor cae en la empresa 'default' y
+ // el QR vinculaba el teléfono al WhatsApp de OTRA empresa, pasara lo que pasara
+ // en el selector de arriba.
+ fetch('/api/whatsapp/builtin/qr', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
  .then(r => r.json())
  .then(d => {
   btn.textContent = 'Generar QR'; btn.disabled = false;
@@ -4403,7 +4406,7 @@ function loadBuiltinQr(silent) {
 }
 
 function checkBuiltinStatus() {
- fetch('/api/whatsapp/builtin/status', { headers: { 'x-admin-password': password } })
+ fetch('/api/whatsapp/builtin/status', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
  .then(r => r.json())
  .then(d => {
   const statusEl = document.getElementById('builtinStatus');
@@ -4419,8 +4422,14 @@ function checkBuiltinStatus() {
 function disconnectBuiltin() {
  if (!confirm('Desconectar WhatsApp? Tendras que escanear el QR de nuevo.')) return;
  _clearWaTimers();
- fetch('/api/whatsapp/builtin/disconnect', { method: 'POST', headers: { 'x-admin-password': password } })
- .then(() => { document.getElementById('builtinQrImg').style.display = 'none'; checkBuiltinStatus(); toast('WhatsApp desconectado'); });
+ fetch('/api/whatsapp/builtin/disconnect', { method: 'POST', headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
+ .then(r => r.json())
+ .then(d => {
+  // El servidor rechaza desconectar aquí a una empresa que usa Evolution. Decirlo,
+  // no cantar "desconectado" sobre algo que sigue conectado.
+  if (d.error) { checkBuiltinStatus(); return toast(d.error); }
+  document.getElementById('builtinQrImg').style.display = 'none'; checkBuiltinStatus(); toast('WhatsApp desconectado');
+ });
 }
 
 function genContactQr() {

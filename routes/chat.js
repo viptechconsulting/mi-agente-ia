@@ -2840,8 +2840,46 @@ chatRouter.get('/whatsapp/contact-qr', requireAdmin, async (req, res) => {
   }
 })
 
+// Una empresa migrada a Evolution no tiene socket interno: startBuiltinWhatsApp
+// retorna sin tocar nada, así que el estado se quedaba en 'connecting' PARA
+// SIEMPRE. El panel sondeaba 30 segundos y contestaba "Tardando más de lo
+// esperado. Haz clic de nuevo." en cada clic, sin salida posible — mientras su
+// WhatsApp estaba perfectamente conectado del otro lado.
+//
+// Su estado y su QR viven en Evolution. Se devuelven con la misma forma que el
+// camino interno para que el panel no tenga que distinguir.
+async function estadoWhatsappEvolution(cfg) {
+  const base = cfg.waBaseUrl.replace(/\/$/, '')
+  const cab = { headers: { apikey: cfg.waApiKey } }
+
+  const rIns = await fetch(`${base}/instance/fetchInstances?instanceName=${encodeURIComponent(cfg.waInstance)}`, cab)
+  if (!rIns.ok) throw new Error(`Evolution respondió ${rIns.status}`)
+  const datos = await rIns.json()
+  const inst = Array.isArray(datos) ? datos[0] : datos
+  if (!inst) return { status: 'disconnected', message: `La instancia "${cfg.waInstance}" no existe en Evolution.` }
+
+  if ((inst.connectionStatus || inst?.instance?.state) === 'open') {
+    return { status: 'open', phone: extraerTelefonoWa({ remoteJid: inst.ownerJid }) }
+  }
+
+  // No está conectada: pedirle el QR para vincular.
+  const rCon = await fetch(`${base}/instance/connect/${encodeURIComponent(cfg.waInstance)}`, cab)
+  const con = await rCon.json()
+  const qr = con.base64 || con?.qrcode?.base64 || con?.qr?.base64 || null
+  if (qr) return { status: 'qr', qr }
+  return {
+    status: 'disconnected',
+    message: `Esta empresa usa Evolution API (instancia "${cfg.waInstance}") y ahora mismo no entrega QR. Revisa la instancia en Evolution.`
+  }
+}
+
 chatRouter.get('/whatsapp/builtin/qr', requireAdmin, withCompany, async (req, res) => {
   const cid = req.company.id
+  const cfgEmpresa = loadConfig(cid)
+  if (usesEvolution(cfgEmpresa)) {
+    try { return res.json(await estadoWhatsappEvolution(cfgEmpresa)) }
+    catch (err) { return res.json({ status: 'disconnected', message: `No se pudo consultar Evolution: ${err.message}` }) }
+  }
   const conn = getWaConn(cid)
   if (conn.state.status === 'open') return res.json({ status: 'open', phone: conn.state.phone })
   if (conn.state.status === 'qr') return res.json({ status: 'qr', qr: conn.state.qr })
@@ -2879,13 +2917,23 @@ chatRouter.get('/whatsapp/builtin/qr', requireAdmin, withCompany, async (req, re
   res.json({ status: 'connecting' })
 })
 
-chatRouter.get('/whatsapp/builtin/status', requireAdmin, withCompany, (req, res) => {
+chatRouter.get('/whatsapp/builtin/status', requireAdmin, withCompany, async (req, res) => {
+  const cfgEmpresa = loadConfig(req.company.id)
+  if (usesEvolution(cfgEmpresa)) {
+    try { return res.json(await estadoWhatsappEvolution(cfgEmpresa)) }
+    catch { return res.json({ status: 'disconnected', phone: null }) }
+  }
   const conn = getWaConn(req.company.id)
   res.json({ status: conn.state.status, phone: conn.state.phone })
 })
 
 chatRouter.post('/whatsapp/builtin/disconnect', requireAdmin, withCompany, async (req, res) => {
   const cid = req.company.id
+  // No borrar la sesión interna de una empresa que no la usa: su WhatsApp vive
+  // en Evolution y hay que desconectarlo desde ahí, no fingir aquí que se hizo.
+  if (usesEvolution(loadConfig(cid))) {
+    return res.status(400).json({ error: 'Esta empresa usa Evolution API. Desconecta la instancia desde Evolution.' })
+  }
   const conn = getWaConn(cid)
   if (conn.sock) { try { await conn.sock.logout() } catch {} conn.sock = null }
   const authDir = path.join(waBaseDir, cid)
