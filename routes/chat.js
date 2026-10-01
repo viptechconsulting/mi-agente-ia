@@ -2258,18 +2258,83 @@ export function collectPhones(companyId) {
   return [...phones.values()].sort((a, b) => b.last - a.last)
 }
 
-chatRouter.get('/leads/phones.csv', requireAdmin, withCompany, (req, res) => {
-  const esc = v => '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"'
-  const chLabel = { whatsapp: 'WhatsApp', instagram: 'Instagram', web: 'Chat web' }
-  const fecha = ts => ts ? new Date(ts).toISOString().slice(0, 10) : ''
-  const out = [['Teléfono', 'Nombre', 'Canal', 'Primera vez', 'Última vez'].map(esc).join(',')]
-  for (const p of collectPhones(req.company.id)) {
-    out.push([p.phone, p.name, chLabel[p.channel] || p.channel || '', fecha(p.first), fecha(p.last)].map(esc).join(','))
+// Arma el CSV. Lo usan los dos exports de leads, que antes repetían el escapado
+// cada uno por su lado.
+//
+// El prefijo con comilla simple no es cosmético: lo que escribió el lead entra
+// tal cual en la celda, y Excel ejecuta como fórmula cualquier valor que empiece
+// por = + - @. Un mensaje que diga "=1+1" o algo peor se ejecutaría al abrir el
+// archivo en la máquina de la clienta.
+const EMPIEZA_FORMULA = /^[=@\t\r]/
+// Un "+" o un "-" al principio casi siempre es un teléfono internacional
+// (+17863830513), no una fórmula. Neutralizarlos a ciegas ensuciaba la columna
+// más importante del archivo, así que solo se tocan si lo que sigue no es un
+// número: "+SUM(A1)" sí, "+1 786 383-0513" no.
+const EMPIEZA_SIGNO = /^[+-]/
+const ES_NUMERO = /^[+-][\d\s().-]*$/
+
+export function buildCsv(header, rows) {
+  const esc = v => {
+    // Un lead cada tanto manda el nombre o el mensaje con saltos de línea. El
+    // CSV los admite entre comillas, pero parten la fila en pantalla y dejan la
+    // hoja imposible de ordenar o filtrar: un lead = una fila.
+    let s = (v == null ? '' : String(v)).replace(/\s*[\r\n]+\s*/g, ' ').trim()
+    if (EMPIEZA_FORMULA.test(s) || (EMPIEZA_SIGNO.test(s) && !ES_NUMERO.test(s))) s = "'" + s
+    return '"' + s.replace(/"/g, '""') + '"'
   }
-  const csv = String.fromCharCode(0xFEFF) + out.join('\r\n') // BOM para que Excel respete acentos
+  const líneas = [header.map(esc).join(',')]
+  for (const fila of rows) líneas.push(fila.map(esc).join(','))
+  return String.fromCharCode(0xFEFF) + líneas.join('\r\n') // BOM para que Excel respete acentos
+}
+
+const CANAL_LABEL = { whatsapp: 'WhatsApp', instagram: 'Instagram', sms: 'SMS', web: 'Chat web' }
+const fechaCorta = ts => ts ? new Date(ts).toISOString().slice(0, 10) : ''
+const nombreArchivo = (base, company) =>
+  `${base}-${(company.name || 'empresa').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv`
+
+function enviarCsv(res, filename, csv) {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-  res.setHeader('Content-Disposition', `attachment; filename="telefonos-${(req.company.name || 'empresa').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv"`)
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
   res.send(csv)
+}
+
+chatRouter.get('/leads/phones.csv', requireAdmin, withCompany, (req, res) => {
+  const rows = collectPhones(req.company.id).map(p =>
+    [p.phone, p.name, CANAL_LABEL[p.channel] || p.channel || '', fechaCorta(p.first), fechaCorta(p.last)])
+  const csv = buildCsv(['Teléfono', 'Nombre', 'Canal', 'Primera vez', 'Última vez'], rows)
+  enviarCsv(res, nombreArchivo('telefonos', req.company), csv)
+})
+
+// La tabla de Leads en pantalla, pero descargable y con el mensaje completo.
+// phones.csv solo trae el número: para saber QUIÉN escribió y QUÉ pidió había
+// que abrir el teléfono y buscar la conversación una por una.
+chatRouter.get('/leads.csv', requireAdmin, withCompany, (req, res) => {
+  const leads = db.prepare(`
+    SELECT channel, created_at, updated_at, lead_name, lead_email, lead_phone,
+           (SELECT content FROM messages WHERE conversation_id = conversations.id AND role = 'user' ORDER BY id LIMIT 1) as first_msg
+    FROM conversations
+    WHERE company_id = ?
+      AND (lead_email IS NOT NULL OR lead_phone IS NOT NULL OR lead_name IS NOT NULL)
+    ORDER BY updated_at DESC
+  `).all(req.company.id)
+
+  const rows = leads.map(l => [
+    l.lead_name || '',
+    l.lead_email || '',
+    l.lead_phone || '',
+    CANAL_LABEL[l.channel] || l.channel || '',
+    // Entero, no recortado a 60 como en la tabla — el mensaje es justo lo que se
+    // viene a leer aquí. buildCsv se encarga de aplanar los saltos de línea.
+    l.first_msg || '',
+    fechaCorta(l.created_at),
+    fechaCorta(l.updated_at)
+  ])
+
+  const csv = buildCsv(
+    ['Nombre', 'Email', 'Teléfono', 'Canal', 'Primera consulta', 'Primer contacto', 'Última actividad'],
+    rows
+  )
+  enviarCsv(res, nombreArchivo('leads', req.company), csv)
 })
 
 chatRouter.patch('/leads/:id', requireAdmin, withCompany, (req, res) => {

@@ -1240,7 +1240,8 @@
   <h2 style="margin:0" data-i18n="h2_leads">Leads capturados</h2>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
    <input id="leadSearch" placeholder="Buscar por nombre, email o telefono..." data-i18n-placeholder="leads_search_placeholder" style="width:260px;font-size:13px" oninput="filterLeads()">
-   <button onclick="downloadPhonesCsv()" title="Descargar todos los teléfonos que escribieron al chat" style="font-size:12px;padding:8px 12px;background:#161616;color:var(--gold);border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">⬇ Teléfonos CSV</button>
+   <button onclick="downloadLeadsCsv()" title="Descargar la tabla completa: nombre, contacto, canal y qué escribió cada lead" style="font-size:12px;padding:8px 12px;background:#161616;color:var(--gold);border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">⬇ Leads CSV</button>
+   <button onclick="downloadPhonesCsv()" title="Solo los teléfonos que escribieron al chat, deduplicados" style="font-size:12px;padding:8px 12px;background:#161616;color:var(--muted);border:1px solid #2a2a2a;text-transform:none;letter-spacing:0">⬇ Teléfonos CSV</button>
   </div>
  </div>
  <div id="leadList"><p style="color:#666">Cargando...</p></div>
@@ -4100,16 +4101,18 @@ function uploadPdf() {
 }
 
 // Descarga todos los teléfonos vistos en el chat de la empresa activa.
-function downloadPhonesCsv() {
- fetch('/api/leads/phones.csv', { headers: { 'x-admin-password': password } })
+function descargarCsv(url, nombre) {
+ fetch(url, { headers: { 'x-admin-password': password } })
   .then(r => r.blob())
   .then(b => {
    const u = URL.createObjectURL(b);
    const a = document.createElement('a');
-   a.href = u; a.download = 'telefonos.csv';
+   a.href = u; a.download = nombre;
    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
   });
 }
+function downloadPhonesCsv() { descargarCsv('/api/leads/phones.csv', 'telefonos.csv'); }
+function downloadLeadsCsv()  { descargarCsv('/api/leads.csv', 'leads.csv'); }
 
 let _allLeads = [];
 function loadLeads() {
