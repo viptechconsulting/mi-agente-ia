@@ -693,7 +693,8 @@
  <option value="claude-haiku-4-5-20251001" data-i18n="opt_haiku">Haiku 4.5 (rápido/barato)</option>
  <option value="claude-sonnet-5" data-i18n="opt_sonnet5">Sonnet 5 (balance, el más nuevo)</option>
  <option value="claude-sonnet-4-6" data-i18n="opt_sonnet">Sonnet 4.6 (balance)</option>
- <option value="claude-opus-4-6" data-i18n="opt_opus">Opus 4.6 (máxima calidad)</option>
+ <option value="claude-opus-5" data-i18n="opt_opus5">Opus 5 (máxima calidad)</option>
+ <option value="claude-opus-4-6" data-i18n="opt_opus">Opus 4.6</option>
  </select>
  </div>
  <div>
@@ -2438,7 +2439,7 @@ const T_ADMIN = {
   label_booking:'Link de citas (opcional) — se incluye automaticamente cuando alguien pide una cita',
   label_extra:'Instrucciones adicionales (opcional)', label_model:'Modelo Claude',
   opt_haiku:'Haiku 4.5 (rápido/barato)', opt_sonnet5:'Sonnet 5 (balance, el más nuevo)', opt_sonnet:'Sonnet 4.6 (balance)',
-  opt_opus:'Opus 4.6 (máxima calidad)', label_accent_color:'Color de acento',
+  opt_opus5:'Opus 5 (máxima calidad)', opt_opus:'Opus 4.6', label_accent_color:'Color de acento',
   h2_handoff:'Redireccionamiento a humano', handoff_enabled:'Activado',
   p_handoff:'Si el usuario menciona alguna de estas frases, la IA dejará de responder y alertará al número de WhatsApp configurado para atención manual.',
   label_triggers:'Si el usuario menciona o pregunta…',
@@ -2559,7 +2560,7 @@ const T_ADMIN = {
   label_booking:'Booking link (optional) — included automatically when someone requests an appointment',
   label_extra:'Additional instructions (optional)', label_model:'Claude model',
   opt_haiku:'Haiku 4.5 (fast/cheap)', opt_sonnet5:'Sonnet 5 (balanced, newest)', opt_sonnet:'Sonnet 4.6 (balanced)',
-  opt_opus:'Opus 4.6 (max quality)', label_accent_color:'Accent color',
+  opt_opus5:'Opus 5 (max quality)', opt_opus:'Opus 4.6', label_accent_color:'Accent color',
   h2_handoff:'Human handoff', handoff_enabled:'Enabled',
   p_handoff:'If the user mentions any of these phrases, the AI will stop responding and alert the configured WhatsApp number for manual support.',
   label_triggers:'If the user mentions or asks…',
@@ -5662,7 +5663,7 @@ function updateModelOptions() {
       ? ['claude-haiku-4-5-20251001']
       : plan === 'growth'
         ? ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6']
-        : ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-4-6']
+        : ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-5', 'claude-opus-4-6']
   Array.from(modelSel.options).forEach(opt => {
     opt.disabled = !allowed.includes(opt.value)
     opt.style.color = opt.disabled ? '#666' : ''
