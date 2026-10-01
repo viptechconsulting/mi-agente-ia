@@ -1639,6 +1639,14 @@ export async function startBuiltinWhatsApp(companyId) {
         if (!text?.trim()) continue
         const phone = remoteJid.replace('@s.whatsapp.net', '')
         const visitorId = `wa:${phone}`
+        // WhatsApp pasó a identificar a la gente por LID (12345@lid) en vez de
+        // por número, así que remoteJid ya no sirve como teléfono: la lista de
+        // Leads mostraba "—" en todos los que no lo escribieron a mano. El
+        // número real viene aparte, en senderPn/participantPn.
+        //
+        // El visitor_id NO cambia: es la clave de la conversación y pasarla a
+        // teléfono partiría en dos el historial de todos los que ya escribieron.
+        const telefonoReal = extraerTelefonoWa(msg.key)
 
         // Handle commands sent FROM the business phone (fromMe)
         if (msg.key.fromMe) {
@@ -1688,6 +1696,7 @@ export async function startBuiltinWhatsApp(companyId) {
 
         try {
           const result = await processMessage({ companyId, message: text.trim(), visitorId, channel: 'whatsapp' })
+          if (telefonoReal) guardarTelefonoWa(companyId, visitorId, telefonoReal)
           if (result?.reply) {
             const waText = result.button
               ? `${result.reply}\n\n👉 *${result.button.label}*\n${result.button.url}`
@@ -2203,6 +2212,37 @@ chatRouter.post('/conversations/:id/reply', requireAdmin, withCompany, async (re
 // ============================================================
 // LEADS
 // ============================================================
+// Saca el teléfono real de un mensaje de WhatsApp. Desde que WhatsApp usa LID,
+// key.remoteJid puede ser "123456@lid" y no contiene el número; el número viene
+// en senderPn (chat directo) o participantPn (grupo). Los @lid se descartan
+// explícitamente: colar un LID como si fuera teléfono es peor que no tener nada,
+// porque alguien lo intentaría llamar.
+export function extraerTelefonoWa(key = {}) {
+  const candidatos = [key.senderPn, key.participantPn, key.remoteJid, key.participant]
+  for (const jid of candidatos) {
+    if (!jid || typeof jid !== 'string') continue
+    if (jid.includes('@lid') || jid.includes('@g.us') || jid.includes('broadcast')) continue
+    const digits = jid.split('@')[0].split(':')[0].replace(/\D/g, '')
+    if (digits.length >= 8 && digits.length <= 15) return '+' + digits
+  }
+  return null
+}
+
+// Solo rellena: si la persona ya dio su número en la conversación, ese manda —
+// puede haber escrito uno distinto al que usa en WhatsApp (el del negocio, el
+// de su pareja) y es el que la clienta quiere marcar.
+function guardarTelefonoWa(companyId, visitorId, telefono) {
+  try {
+    db.prepare(`
+      UPDATE conversations SET lead_phone = ?
+      WHERE company_id = ? AND visitor_id = ? AND channel = 'whatsapp'
+        AND (lead_phone IS NULL OR lead_phone = '')
+    `).run(telefono, companyId, visitorId)
+  } catch (err) {
+    console.error(`[WA:${companyId}] No se pudo guardar el teléfono:`, err.message)
+  }
+}
+
 chatRouter.get('/leads', requireAdmin, withCompany, (req, res) => {
   const leads = db.prepare(`
     SELECT id, visitor_id, channel, created_at, updated_at,
@@ -2725,6 +2765,10 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
 
     // Normal inbound → AI
     const result = await processMessage({ companyId: company.id, message: text.trim(), visitorId, channel: 'whatsapp' })
+    // Mismo problema del LID que en el socket propio: el número real viene en
+    // senderPn, no en remoteJid.
+    const telWebhook = extraerTelefonoWa(data?.key)
+    if (telWebhook) guardarTelefonoWa(company.id, visitorId, telWebhook)
     if (result?.reply) {
       const waText = result.button
         ? `${result.reply}\n\n👉 *${result.button.label}*\n${result.button.url}`
