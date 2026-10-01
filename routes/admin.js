@@ -1228,7 +1228,11 @@ adminRouter.get('/square/status', requireAdmin, withCompany, async (req, res) =>
   res.json({
     configured: hasCredentials(),
     connected: !!(cfg.square?.access_token),
-    merchant_name: cfg.square?.merchant_name || null
+    merchant_name: cfg.square?.merchant_name || null,
+    // Sin refresh_token la conexión muere a los 30 días y hay que reconectar a
+    // mano: el admin necesita verlo antes de que el agente empiece a dar 401.
+    can_refresh: !!(cfg.square?.refresh_token),
+    expires_at: cfg.square?.expires_at || null
   })
 })
 
@@ -1249,7 +1253,9 @@ adminRouter.get('/square/callback', async (req, res) => {
     const { exchangeCode } = await import('../services/square.js')
     const tokens = await exchangeCode(code)
     const cfg = loadConfig(cid)
-    cfg.square = { access_token: tokens.access_token, merchant_id: tokens.merchant_id, merchant_name: tokens.merchant_id || 'Square', connected_at: new Date().toISOString() }
+    // refresh_token y expires_at son lo que permite renovar sin que el negocio
+    // vuelva a autorizar a mano. Antes se descartaban y el token moría a los 30 días.
+    cfg.square = { access_token: tokens.access_token, refresh_token: tokens.refresh_token || null, expires_at: tokens.expires_at || null, merchant_id: tokens.merchant_id, merchant_name: tokens.merchant_id || 'Square', connected_at: new Date().toISOString() }
     saveConfig(cid, cfg)
     res.redirect('/admin?msg=square_ok')
   } catch(e) {

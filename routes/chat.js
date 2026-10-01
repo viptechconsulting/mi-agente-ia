@@ -17,7 +17,7 @@ import {
 } from '../db.js'
 import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
 import { matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow, setScriptTrigger, getScriptTrigger } from '../services/keyword-trigger.js'
-import { getServices, searchAvailability, createBooking, getLocations } from '../services/square.js'
+import { getServices, searchAvailability, createBooking, getLocations, getValidAccessToken as getSquareToken } from '../services/square.js'
 import { RESPOND_TO_PATIENT_TOOL, validateAgentResponse } from '../services/medspa-response-schema.js'
 import { buildMedspaPromptModule } from '../services/medspa-prompt.js'
 import { loadState as loadMedspaState, saveState as saveMedspaState, setDoNotContact } from '../services/medspa-state.js'
@@ -943,17 +943,17 @@ export async function processMessage({ companyId, message, conversationId, visit
           discussedProductIds.push(...searchResult.products.map(p => p.id))
           resultContent = JSON.stringify(searchResult)
         } else if (block.name === 'square_get_services') {
-          const token = cfg.square.access_token
+          const token = await getSquareToken(companyId, cfg)
           const services = await getServices(token)
           resultContent = JSON.stringify({ services })
         } else if (block.name === 'square_get_slots') {
-          const slots = await squareGetSlots(cfg.square.access_token, {
+          const slots = await squareGetSlots(await getSquareToken(companyId, cfg), {
             serviceVariationId: block.input.service_variation_id,
             fromDate: block.input.from_date || null
           })
           resultContent = JSON.stringify(slots)
         } else if (block.name === 'square_book_appointment') {
-          const token = cfg.square.access_token
+          const token = await getSquareToken(companyId, cfg)
           const { service_variation_id, service_variation_version, requested_date, requested_time, customer_name, customer_phone, customer_email, note } = block.input
           console.log('[Square] book_appointment:', requested_date, requested_time, customer_name)
           const result = await squareBookAppointment(token, {
@@ -973,7 +973,7 @@ export async function processMessage({ companyId, message, conversationId, visit
           if (!phone) { resultContent = JSON.stringify({ error: 'No se pudo determinar el teléfono del cliente' }) }
           else if (cfg.calendarProvider === 'square') {
             const { getBookings, getCustomers, normalizeBooking } = await import('../services/square.js')
-            const token = cfg.square.access_token
+            const token = await getSquareToken(companyId, cfg)
             const customers = await getCustomers(token)
             const match = customers.find(c => (c.phone_number || '').replace(/\D/g, '').endsWith(phone.slice(-10)))
             const now = new Date().toISOString()
@@ -1007,7 +1007,7 @@ export async function processMessage({ companyId, message, conversationId, visit
           const endISO = new Date(new Date(start_iso).getTime() + duration_minutes * 60000).toISOString()
           if (cfg.calendarProvider === 'square') {
             const { getBookings, searchAvailability } = await import('../services/square.js')
-            const token = cfg.square.access_token
+            const token = await getSquareToken(companyId, cfg)
             const now = new Date().toISOString()
             const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
             const current = (await getBookings(token, now, in90)).find(b => b.id === appointment_id)
@@ -1051,7 +1051,7 @@ export async function processMessage({ companyId, message, conversationId, visit
           try {
             if (cfg.calendarProvider === 'square') {
               const { getBookings, updateBooking } = await import('../services/square.js')
-              const token = cfg.square.access_token
+              const token = await getSquareToken(companyId, cfg)
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
               // appointment_id is trusted from the model's own find_my_appointments call earlier in
@@ -1111,7 +1111,7 @@ export async function processMessage({ companyId, message, conversationId, visit
           try {
             if (cfg.calendarProvider === 'square') {
               const { getBookings, cancelBooking } = await import('../services/square.js')
-              const token = cfg.square.access_token
+              const token = await getSquareToken(companyId, cfg)
               const now = new Date().toISOString()
               const in90 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
               // appointment_id is trusted from the model's own find_my_appointments call earlier in
@@ -1351,6 +1351,22 @@ const FALLBACK_REPLY = {
   'hebreo': 'קיבלנו את הודעתך, נחזור אליך בקרוב. 🙂',
   'italiano': 'Abbiamo ricevuto il tuo messaggio, ti risponderemo presto. 🙂',
   'alemán': 'Wir haben deine Nachricht erhalten und antworten dir in Kürze. 🙂'
+}
+
+// Un audio que no se transcribe puede ser culpa del audio (corrupto, vacío) o
+// nuestra: la key del proveedor caducada o mal puesta. Lo segundo rompe los
+// audios de TODAS las empresas a la vez y antes solo se veía en los logs — la
+// GROQ_API_KEY estuvo inválida semanas sin que nadie se enterara. Eso sí se avisa.
+function alertarSiEsFalloDeKey(err, companyId) {
+  const esFalloDeKey = /Transcribe API (401|403)/.test(err.message)
+    || /Ni GROQ_API_KEY ni OPENAI_API_KEY/.test(err.message)
+  if (!esFalloDeKey) return
+  // kind fijo (sin companyId): el cooldown agrupa, porque el problema es uno
+  // solo y afecta a todas por igual.
+  sendCriticalAlert(
+    'Transcripción de audios caída — revisar GROQ_API_KEY',
+    `Ningún audio de WhatsApp se está transcribiendo, en ninguna empresa.\nPrimera detectada: ${companyId}\nError: ${err.message.slice(0, 200)}`
+  ).catch(() => {})
 }
 
 async function sendCriticalAlert(kind, message) {
@@ -1616,6 +1632,7 @@ export async function startBuiltinWhatsApp(companyId) {
             if (text?.trim()) console.log(`[WA:${companyId}] Nota de voz transcrita: "${text.slice(0, 80)}"`)
           } catch (err) {
             console.error(`[WA:${companyId}] Error transcribiendo audio:`, err.message)
+            alertarSiEsFalloDeKey(err, companyId)
           }
         }
 
@@ -2473,7 +2490,7 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
         for (const block of toolBlocks) {
           let resultContent
           try {
-            const token = cfg.square.access_token
+            const token = await getSquareToken(req.company.id, cfg)
             if (block.name === 'square_get_services') {
               const services = await getServices(token)
               resultContent = JSON.stringify({ services })
@@ -2595,7 +2612,10 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
           text = await transcribeAudioBuffer(buffer, audioMsg.mimetype)
           if (text?.trim()) console.log(`[WA webhook:${company.id}] Nota de voz transcrita: "${text.slice(0, 80)}"`)
         }
-      } catch (err) { console.error(`[WA webhook:${company.id}] Error transcribiendo audio:`, err.message) }
+      } catch (err) {
+        console.error(`[WA webhook:${company.id}] Error transcribiendo audio:`, err.message)
+        alertarSiEsFalloDeKey(err, company.id)
+      }
     }
     if (!text.trim()) {
       // A voice note we couldn't transcribe (no quota, provider error, empty)

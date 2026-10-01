@@ -337,10 +337,10 @@ export async function runAllCampaigns() {
 // ────────────────────────────────────────────────────────────
 export async function runSquareCampaigns(companyId, cfg) {
   if (!cfg.square?.access_token) return
-  const { getCustomers, getBookings, normalizeCustomer, normalizeBooking } = await import('../services/square.js')
+  const { getCustomers, getBookings, normalizeCustomer, normalizeBooking, getValidAccessToken } = await import('../services/square.js')
   const campaigns = cfg.campaigns || {}
   const citas     = cfg.citas || {}
-  const tok = cfg.square.access_token
+  const tok = await getValidAccessToken(companyId, cfg)
 
   // Pull bookings last 180 days
   const start180 = new Date(Date.now() - 180 * 86400000).toISOString()

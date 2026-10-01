@@ -1,4 +1,4 @@
-import { getServerSetting } from '../db.js'
+import { getServerSetting, loadConfig, saveConfig } from '../db.js'
 
 const BASE_URL = process.env.SQUARE_SANDBOX
   ? 'https://connect.squareupsandbox.com'
@@ -50,9 +50,76 @@ export async function exchangeCode(code) {
   const data = await res.json();
   return {
     access_token: data.access_token,
+    refresh_token: data.refresh_token,
     merchant_id: data.merchant_id,
     expires_at: data.expires_at,
   };
+}
+
+// Square devuelve un access_token que caduca a los 30 días. El refresh_token que
+// viene en el mismo intercambio es de larga vida y es lo único que permite
+// renovarlo sin que el negocio vuelva a autorizar a mano. Guardarlo no era
+// opcional: sin él, cada empresa se caía a los 30 días (BeGlam y Glow MedSpa
+// llevaban desde el 8-jul-2026 devolviendo 401).
+export async function refreshAccessToken(refreshToken) {
+  const res = await fetch(`${BASE_URL}/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Square-Version': SQUARE_VERSION,
+    },
+    body: JSON.stringify({
+      client_id: appId(),
+      client_secret: appSecret(),
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Square refreshAccessToken failed ${res.status}: ${err.message || JSON.stringify(err)}`);
+  }
+
+  // { access_token, refresh_token, expires_at (ISO), merchant_id, ... }
+  return res.json();
+}
+
+// Devuelve un access_token válido para la empresa, renovándolo si caducó o está
+// a punto. A diferencia del equivalente de Google Calendar, este PERSISTE él
+// mismo: el refresh_token de Square puede rotar en la respuesta, y si se pierde
+// el nuevo la cadena se rompe y el negocio tiene que reconectar a mano.
+//
+// Margen de 1 día: el token dura 30, así que no hay nada que ganar apurándolo y
+// sí mucho que perder si una renovación falla justo en el borde.
+const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000
+
+export async function getValidAccessToken(companyId, cfg = null) {
+  const config = cfg || loadConfig(companyId)
+  const sq = config.square
+  if (!sq?.access_token) throw new Error('Square no está conectado para esta empresa')
+
+  const expiresAt = sq.expires_at ? Date.parse(sq.expires_at) : NaN
+  const vigente = Number.isFinite(expiresAt) && Date.now() < expiresAt - REFRESH_MARGIN_MS
+  if (vigente) return sq.access_token
+
+  // Conexiones viejas no tienen refresh_token guardado (se descartaba al
+  // conectar). No hay forma de renovarlas: que siga usando el token que tiene
+  // y que el 401 lo diga, en vez de romper aquí una llamada que podría funcionar.
+  if (!sq.refresh_token) return sq.access_token
+
+  const tokens = await refreshAccessToken(sq.refresh_token)
+  const actualizado = {
+    ...sq,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token || sq.refresh_token,
+    expires_at: tokens.expires_at || null,
+    refreshed_at: new Date().toISOString(),
+  }
+  saveConfig(companyId, { square: actualizado })
+  // El cfg que tenga el caller en la mano también queda al día.
+  config.square = actualizado
+  return actualizado.access_token
 }
 
 export async function revokeToken(accessToken) {
