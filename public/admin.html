@@ -5643,6 +5643,10 @@ async function deleteRelation(id) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Vip Tech Consulting es la cuenta propia de la agencia, no un cliente que paga
+// por escalón: ahí cualquier modelo está disponible en cualquier plan.
+const COMPANIES_SIN_LIMITE_DE_MODELO = ['a858eb9c-efd5-4274-b183-4072e8ab3fcd']
+
 // Plan → model options enforcement
 function updateModelOptions() {
   const plan = document.getElementById('plan')?.value || 'starter'
@@ -5652,15 +5656,20 @@ function updateModelOptions() {
   // Starter: only Haiku. Growth: Haiku + Sonnet. Agency: all.
   // Sonnet 5 va en el mismo escalón que Sonnet 4.6: es más nuevo y además más
   // barato ($2/$10 por millón contra $3/$15), así que no justifica subir de plan.
-  const allowed = plan === 'starter'
-    ? ['claude-haiku-4-5-20251001']
-    : plan === 'growth'
-      ? ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6']
-      : ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-4-6']
+  const allowed = COMPANIES_SIN_LIMITE_DE_MODELO.includes(activeCompanyId)
+    ? Array.from(modelSel.options).map(o => o.value)
+    : plan === 'starter'
+      ? ['claude-haiku-4-5-20251001']
+      : plan === 'growth'
+        ? ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6']
+        : ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-opus-4-6']
   Array.from(modelSel.options).forEach(opt => {
     opt.disabled = !allowed.includes(opt.value)
     opt.style.color = opt.disabled ? '#666' : ''
   })
+  // Solo degrada si el modelo elegido quedó bloqueado. Para las empresas sin
+  // límite nunca pasa, así que cambiar de plan no les baja el modelo a Haiku
+  // por detrás.
   if (!allowed.includes(currentVal)) modelSel.value = 'claude-haiku-4-5-20251001'
 }
 
