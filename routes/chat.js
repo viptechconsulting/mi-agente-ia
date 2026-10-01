@@ -126,6 +126,16 @@ const SQUARE_GET_SLOTS_TOOL = {
   }
 }
 
+// El link de reserva GANA sobre la API de citas: si el negocio cargó su
+// calendario público, esa es la vía que quiere — la persona entra, ve los huecos
+// reales y elige. Dictarle horarios desde la API es peor (una llamada más que
+// puede fallar, y la lista queda vieja en cuanto otro reserva). El campo
+// bookingUrl ya existía pero solo se usaba en follow-ups y correos: el agente
+// nunca lo mandaba en plena conversación, así que pedía fecha y hora a mano.
+export function buildBookingLinkPrompt(bookingUrl) {
+  return `\n\nPARA AGENDAR, MANDA EL CALENDARIO — NO PIDAS FECHA NI HORA. Cuando la persona quiera reservar, o ya tengas su nombre y su interés claro, envíale este link para que ELLA elija el horario que le sirva:\n${bookingUrl}\nNUNCA le preguntes "¿qué día y hora te queda mejor?", NUNCA le propongas horarios tú, y NUNCA le digas que ya le agendaste algo: quien reserva es la persona, en el link. Mándalo tal cual, en su propia línea, sin acortarlo ni cambiarlo. Después de mandarlo, ofrécete a resolver cualquier duda antes de que agende.`
+}
+
 // Un solo texto para el flujo de Square: lo usan el chat real y el demo. Estaban
 // duplicados palabra por palabra y se desincronizaban al tocar uno solo.
 const SQUARE_BOOKING_PROMPT = `\n\nTIENES ACCESO AL SISTEMA DE CITAS DE SQUARE. Flujo OBLIGATORIO:
@@ -799,7 +809,15 @@ export async function processMessage({ companyId, message, conversationId, visit
     ? '\n\nTIENES ACCESO AL CATÁLOGO DE PRODUCTOS. Cuando el usuario pregunte por productos, precios, disponibilidad, alternativas o muestre intención de compra, usa la herramienta search_products para buscar en el catálogo. Siempre incluye la URL del producto en tus respuestas. Si un producto está agotado, ofrece alternativas.'
     : ''
 
-  const hasSquare = !!(cfg.square?.access_token)
+  // El link de reserva GANA sobre la API de citas. Si el negocio cargó su
+  // calendario público, esa es la vía que quiere: el cliente entra, ve los
+  // huecos reales y elige. Consultar Square para dictarle horarios es peor
+  // (una llamada más que puede fallar, y la lista se queda vieja en cuanto
+  // otro reserva). La API solo entra cuando NO hay link.
+  const bookingUrl = (cfg.bookingUrl || '').trim()
+  const bookingLinkSystemBlock = bookingUrl ? buildBookingLinkPrompt(bookingUrl) : ''
+
+  const hasSquare = !!(cfg.square?.access_token) && !bookingUrl
   const squareSystemBlock = hasSquare
     ? SQUARE_BOOKING_PROMPT
     : ''
@@ -852,7 +870,7 @@ export async function processMessage({ companyId, message, conversationId, visit
   const callParams = {
     model: cfg.model || 'claude-haiku-4-5-20251001',
     max_tokens: (hasCommercePro || hasSquare || isMedspa || isLynkroLead) ? 800 : 350,
-    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock + leadSystemBlock + triggerScriptBlock,
+    system: buildSystemPrompt(cfg) + knowledgeText + pageCtx + commerceSystemBlock + bookingLinkSystemBlock + squareSystemBlock + appointmentsSystemBlock + medspaSystemBlock + leadSystemBlock + triggerScriptBlock,
     messages: (isMedspa ? windowHistory(history, 20, 16) : history).map(m => ({ role: m.role, content: m.content }))
   }
   if (activeTools.length > 0) callParams.tools = activeTools
@@ -2431,14 +2449,18 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
       const knowledgeText = knowledge.length
         ? `\n\nINFORMACIÓN RELEVANTE:\n${knowledge.map(k => `[${k.title}]\n${k.content}`).join('\n---\n')}`
         : ''
-      const hasSquareDemo = !!(cfg.square?.access_token)
+      // Misma regla que el chat real: si hay link de reserva, se manda el link
+      // y no se toca la API de Square (ver bookingLinkSystemBlock).
+      const bookingUrlDemo = (cfg.bookingUrl || '').trim()
+      const bookingLinkSysDemo = bookingUrlDemo ? buildBookingLinkPrompt(bookingUrlDemo) : ''
+      const hasSquareDemo = !!(cfg.square?.access_token) && !bookingUrlDemo
       const squareSysDemo = hasSquareDemo
         ? SQUARE_BOOKING_PROMPT
         : ''
       const demoCallParams = {
         model: cfg.model || 'claude-haiku-4-5-20251001',
         max_tokens: hasSquareDemo ? 800 : 350,
-        system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO]' + squareSysDemo,
+        system: buildSystemPrompt(cfg) + knowledgeText + '\n\n[MODO DEMO]' + bookingLinkSysDemo + squareSysDemo,
         messages: msgs
       }
       if (hasSquareDemo) demoCallParams.tools = [SQUARE_GET_SERVICES_TOOL, SQUARE_GET_SLOTS_TOOL, SQUARE_BOOK_APPOINTMENT_TOOL]

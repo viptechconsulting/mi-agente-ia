@@ -7,3 +7,6 @@ data/
 
 # Video de presentación Lynkro (68MB) — se despliega vía docker, reemplazable in-place. Ver memoria lynkro-funnel-manual.
 public/lynkro-presentacion.mp4
+
+# Salida generada por graphify
+graphify-out/
