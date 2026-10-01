@@ -12,13 +12,26 @@ const COMPANY = 'test-outbound-co'
 const msgs = id => db.prepare("SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id").all(id)
 
 describe('recordOutboundMessage: registra el saliente del negocio', () => {
-  test('crea shell (human_mode=1) y guarda el saliente como assistant', () => {
+  // Antes el shell nacía con human_mode=1. Como la reactivación automática se
+  // quitó a propósito, escribir primero desde el teléfono del negocio dejaba al
+  // agente mudo en ese chat PARA SIEMPRE, sin que nadie lo pidiera. En los
+  // números que además se usan a mano eso apagaba media cuenta.
+  test('crea shell con la IA ACTIVA y guarda el saliente como assistant', () => {
     const vid = 'wa:' + crypto.randomUUID().slice(0, 10)
     const id = recordOutboundMessage(COMPANY, 'whatsapp', vid, '¿En qué ciudad estás?')
     assert.ok(id)
     const conv = db.prepare('SELECT human_mode FROM conversations WHERE id = ?').get(id)
-    assert.equal(conv.human_mode, 1)
+    assert.equal(conv.human_mode, 0, 'si es 1 el agente nunca responde en ese chat')
     assert.deepEqual(msgs(id), [{ role: 'assistant', content: '¿En qué ciudad estás?' }])
+  })
+
+  test('una pausa puesta a propósito se respeta: el saliente no la levanta', () => {
+    const vid = 'wa:' + crypto.randomUUID().slice(0, 10)
+    const id = recordOutboundMessage(COMPANY, 'whatsapp', vid, 'Primero')
+    db.prepare('UPDATE conversations SET human_mode = 1 WHERE id = ?').run(id) // como el comando `*`
+    const id2 = recordOutboundMessage(COMPANY, 'whatsapp', vid, 'Segundo')
+    assert.equal(id2, id, 'misma conversación')
+    assert.equal(db.prepare('SELECT human_mode FROM conversations WHERE id = ?').get(id).human_mode, 1)
   })
 
   test('reusa la conversación existente y NO duplica el eco idéntico del bot', () => {

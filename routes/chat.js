@@ -2649,8 +2649,15 @@ chatRouter.post('/chat', withCompany, async (req, res) => {
 // ============================================================
 // Registra un mensaje SALIENTE del negocio/humano (WhatsApp fromMe / IG echo) como
 // 'assistant', para que el historial no quede de un solo lado y ni el inbox ni el
-// agente "escriban a ciegas". Crea el shell (human_mode=1) si no existe y deduplica
-// contra el eco del propio bot (Evolution/Meta reenvían lo que ya guardó processMessage).
+// agente "escriban a ciegas". Deduplica contra el eco del propio bot
+// (Evolution/Meta reenvían lo que ya guardó processMessage).
+//
+// El shell nace con la IA ACTIVA. Antes nacía con human_mode=1 y, como la
+// reactivación automática se quitó a propósito, el agente quedaba mudo en ese
+// chat para siempre: escribir primero desde el teléfono del negocio bastaba para
+// apagarlo sin que nadie lo pidiera ni se notara. En los números que además se
+// usan a mano, eso dejaba sin agente a la mitad de las conversaciones.
+// Para pausarla a propósito sigue estando `*` (y `**` la reactiva).
 export function recordOutboundMessage(companyId, channel, visitorId, text) {
   const outText = (text || '').trim()
   if (!outText) return null
@@ -2658,8 +2665,8 @@ export function recordOutboundMessage(companyId, channel, visitorId, text) {
   let conv = db.prepare("SELECT id FROM conversations WHERE visitor_id = ? AND channel = ? AND company_id = ? ORDER BY updated_at DESC LIMIT 1").get(visitorId, channel, companyId)
   if (!conv) {
     conv = { id: crypto.randomUUID() }
-    db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 1)').run(conv.id, visitorId, channel, now, now, companyId)
-    console.log(`[${channel}] Business initiated — human_mode=1 for`, visitorId)
+    db.prepare('INSERT INTO conversations (id, visitor_id, channel, created_at, updated_at, company_id, human_mode) VALUES (?, ?, ?, ?, ?, ?, 0)').run(conv.id, visitorId, channel, now, now, companyId)
+    console.log(`[${channel}] Business initiated — human_mode=0 (IA activa) for`, visitorId)
   }
   const lastA = db.prepare("SELECT content FROM messages WHERE conversation_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(conv.id)
   if (!lastA || lastA.content !== outText) {
