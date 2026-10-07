@@ -1371,9 +1371,14 @@
  siguen llegando a la bandeja, solo que el agente no se mete. Uno por línea, con código de país.
  </p>
  <textarea id="excludedNumbers" rows="6" placeholder="+1 786 383 0513&#10;+58 414 775 0745" style="font-family:monospace;font-size:13px"></textarea>
- <div style="font-size:12px;color:var(--muted);margin:8px 0 14px">
- Atajo desde el teléfono: escribe <code style="color:var(--gold)">me</code> en el chat de ese contacto
- y queda excluido para siempre. Para revertirlo, bórralo de esta lista.
+ <div style="font-size:12px;color:var(--muted);margin:8px 0 14px;line-height:1.9">
+ <b style="color:var(--text)">También desde WhatsApp</b>, escribiendo desde el teléfono del negocio:<br>
+ <code style="color:var(--gold)">me</code> — excluye al contacto de ese chat<br>
+ <code style="color:var(--gold)">me +1786…</code> — excluye ese número sin abrir su chat<br>
+ <code style="color:var(--gold)">me -</code> — saca de la lista al contacto de ese chat<br>
+ <code style="color:var(--gold)">me - +1786…</code> — saca ese número de la lista<br>
+ <code style="color:var(--gold)">me ?</code> — te manda la lista completa<br>
+ Las confirmaciones llegan a tu propio chat de WhatsApp, nunca al del contacto.
  Distinto de <code style="color:var(--gold)">*</code>, que solo pausa esa conversación (<code style="color:var(--gold)">**</code> la reactiva).
  </div>
  <button onclick="save()">Guardar lista</button>

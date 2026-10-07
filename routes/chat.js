@@ -511,6 +511,119 @@ export function estaExcluido(cfg, visitorId, leadPhone) {
   return claves.some(k => excluidos.includes(k))
 }
 
+// Comandos de exclusión que el negocio manda desde su propio WhatsApp:
+//
+//   me              excluye al contacto de ESTE chat
+//   me +1786...     excluye ese número sin abrir su chat
+//   me -            saca de la lista al contacto de este chat
+//   me - +1786...   saca ese número de la lista
+//   me ?            muestra la lista
+//
+// Todo lo que no encaje exactamente devuelve null y sigue su camino como
+// mensaje normal. El guardia importante es que un número tiene que PARECER un
+// número: sin eso, escribirle "me gustaría confirmarte el precio" a un cliente
+// desde el teléfono del negocio habría metido "gustaría confirmarte el precio"
+// en la lista de excluidos.
+const pareceTelefono = v => String(v || '').replace(/\D/g, '').length >= 8
+
+export function parsearComandoExcluidos(texto) {
+  const m = String(texto || '').trim().match(/^me\b[\s:]*(.*)$/is)
+  if (!m) return null
+  const resto = m[1].trim()
+  if (!resto) return { accion: 'excluir', numero: null }
+  if (resto === '?' || /^(lista|list)$/i.test(resto)) return { accion: 'listar', numero: null }
+  const quitar = resto.match(/^-\s*(.*)$/s)
+  if (quitar) {
+    const n = quitar[1].trim()
+    if (!n) return { accion: 'quitar', numero: null }
+    return pareceTelefono(n) ? { accion: 'quitar', numero: n } : null
+  }
+  return pareceTelefono(resto) ? { accion: 'excluir', numero: resto } : null
+}
+
+// Saca el contacto de la lista. Espejo de agregarExcluido.
+export function quitarExcluido(cfg, contacto) {
+  const clave = claveContacto(contacto)
+  if (!clave) return { cfg, clave: null, estaba: false }
+  const actuales = Array.isArray(cfg.excludedNumbers)
+    ? cfg.excludedNumbers
+    : String(cfg.excludedNumbers || '').split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
+  const quedan = actuales.filter(v => claveContacto(v) !== clave)
+  return { cfg: { ...cfg, excludedNumbers: quedan }, clave, estaba: quedan.length !== actuales.length }
+}
+
+// El número del propio negocio, para mandarle ahí las confirmaciones. Se cachea
+// porque en Evolution cuesta una llamada HTTP y no cambia entre mensajes.
+const _numeroNegocio = new Map()
+async function numeroDelNegocio(companyId, cfg) {
+  if (_numeroNegocio.has(companyId)) return _numeroNegocio.get(companyId)
+  let numero = null
+  try {
+    if (usesEvolution(cfg)) {
+      const est = await estadoWhatsappEvolution(cfg)
+      numero = est.status === 'open' ? est.phone : null
+    } else {
+      numero = getWaConn(companyId).state.phone || null
+    }
+  } catch { numero = null }
+  if (numero) _numeroNegocio.set(companyId, numero)
+  return numero
+}
+
+// Las confirmaciones van SIEMPRE al chat del propio negocio, nunca al del
+// contacto: responder "fulano quedó excluido" dentro del chat de tu suegra es
+// exactamente lo que no debe pasar.
+async function avisarAlNegocio(companyId, cfg, texto) {
+  try {
+    const numero = await numeroDelNegocio(companyId, cfg)
+    if (!numero) { console.log(`[excluido:${companyId}] sin número del negocio, no se envía aviso`); return }
+    const digitos = String(numero).replace(/\D/g, '')
+    if (usesEvolution(cfg)) return await sendWhatsApp(cfg, digitos, texto)
+    const conn = getWaConn(companyId)
+    if (conn.sock) await conn.sock.sendMessage(`${digitos}@s.whatsapp.net`, { text: texto })
+  } catch (err) {
+    console.error(`[excluido:${companyId}] no se pudo avisar al negocio:`, err.message)
+  }
+}
+
+// Ejecuta el comando ya parseado. Devuelve true si lo atendió.
+export async function ejecutarComandoExcluidos(companyId, channel, visitorId, telefonoReal, comando) {
+  const cfg = loadConfig(companyId)
+  const objetivo = comando.numero || telefonoReal || visitorId
+
+  if (comando.accion === 'listar') {
+    const lista = Array.isArray(cfg.excludedNumbers) ? cfg.excludedNumbers : listaExcluidos(cfg)
+    const cuerpo = lista.length
+      ? lista.map((n, i) => `${i + 1}. ${n}`).join('\n')
+      : '(vacía — la IA le contesta a todo el mundo)'
+    await avisarAlNegocio(companyId, cfg, `🔕 Contactos excluidos (${lista.length}):\n${cuerpo}\n\nQuitar: "me - <número>"`)
+    return true
+  }
+
+  if (comando.accion === 'quitar') {
+    const { cfg: nuevo, clave, estaba } = quitarExcluido(cfg, objetivo)
+    if (!clave) return true
+    if (estaba) {
+      saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
+      db.prepare('UPDATE conversations SET human_mode = 0 WHERE visitor_id = ? AND company_id = ? AND channel = ?')
+        .run(visitorId, companyId, channel)
+    }
+    console.log(`[excluido:${companyId}] ${objetivo} ${estaba ? 'quitado de la lista' : 'no estaba en la lista'}`)
+    await avisarAlNegocio(companyId, cfg, estaba
+      ? `✅ ${objetivo} ya NO está excluido. La IA vuelve a contestarle.`
+      : `ℹ️ ${objetivo} no estaba en la lista de excluidos.`)
+    return true
+  }
+
+  // excluir
+  const porNumero = !!comando.numero
+  const ok = excluirContactoDesdeChat(companyId, channel, porNumero ? null : visitorId, objetivo)
+  await avisarAlNegocio(companyId, cfg, ok
+    ? `🔕 ${objetivo} quedó excluido. La IA no le va a contestar más.\n\nPara deshacerlo: "me - ${objetivo}"`
+    : `⚠️ No pude excluir a ese contacto: no logré identificar su número.`)
+  return true
+}
+
 // El negocio manda "me" en el chat → ese contacto queda excluido para siempre.
 // Distinto de `*`, que solo pausa esa conversación y `**` deshace: esto va a la
 // lista de la empresa y ya no vuelve solo. Para revertirlo hay que sacarlo de la
@@ -529,10 +642,14 @@ export function excluirContactoDesdeChat(companyId, channel, visitorId, telefono
       return false
     }
     if (!yaEstaba) saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
-    // Además se pausa esta conversación, para que en la bandeja se vea que la
+    // Además se pausa esa conversación, para que en la bandeja se vea que la
     // lleva una persona y no parezca que el agente simplemente dejó de contestar.
-    db.prepare("UPDATE conversations SET human_mode = 1 WHERE visitor_id = ? AND company_id = ? AND channel = ?")
-      .run(visitorId, companyId, channel)
+    // visitorId viene null cuando se excluye por número desde otro chat: ahí no
+    // hay conversación concreta que pausar, y la lista ya hace el trabajo.
+    if (visitorId) {
+      db.prepare("UPDATE conversations SET human_mode = 1 WHERE visitor_id = ? AND company_id = ? AND channel = ?")
+        .run(visitorId, companyId, channel)
+    }
     console.log(`[excluido:${companyId}] ${identificador} (${clave})${yaEstaba ? ' ya estaba en la lista' : ' agregado por "me"'}`)
     return true
   } catch (err) {
@@ -1751,8 +1868,11 @@ export async function startBuiltinWhatsApp(companyId) {
               db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
               console.log(`[WA:${companyId}] human_mode=${mode} para ${visitorId}`)
             }
-          } else if (cmd.toLowerCase() === 'me') {
-            excluirContactoDesdeChat(companyId, 'whatsapp', visitorId, telefonoReal)
+          } else {
+            const comando = parsearComandoExcluidos(cmd)
+            if (comando) {
+              await ejecutarComandoExcluidos(companyId, 'whatsapp', visitorId, telefonoReal, comando)
+            }
           }
           continue // never process fromMe messages through AI
         }
@@ -2804,8 +2924,9 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
         }
         return
       }
-      if (cmd.toLowerCase() === 'me') {
-        excluirContactoDesdeChat(company.id, 'whatsapp', visitorId, extraerTelefonoWa(data.key))
+      const comandoExcl = parsearComandoExcluidos(cmd)
+      if (comandoExcl) {
+        await ejecutarComandoExcluidos(company.id, 'whatsapp', visitorId, extraerTelefonoWa(data.key), comandoExcl)
         return
       }
       // Saliente del negocio/humano (no es comando). Antes se descartaba → el historial

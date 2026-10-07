@@ -5,7 +5,59 @@
 // lista vacía no excluya a nadie — eso dejaría muda toda la cuenta.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { claveContacto, estaExcluido, agregarExcluido, listaExcluidos } from '../routes/chat.js'
+import { claveContacto, estaExcluido, agregarExcluido, listaExcluidos, parsearComandoExcluidos, quitarExcluido } from '../routes/chat.js'
+
+describe('parsearComandoExcluidos: comandos desde el WhatsApp del negocio', () => {
+  test('los cinco comandos', () => {
+    assert.deepEqual(parsearComandoExcluidos('me'), { accion: 'excluir', numero: null })
+    assert.deepEqual(parsearComandoExcluidos('me +1 786 383 0513'), { accion: 'excluir', numero: '+1 786 383 0513' })
+    assert.deepEqual(parsearComandoExcluidos('me -'), { accion: 'quitar', numero: null })
+    assert.deepEqual(parsearComandoExcluidos('me - +17863830513'), { accion: 'quitar', numero: '+17863830513' })
+    assert.deepEqual(parsearComandoExcluidos('me ?'), { accion: 'listar', numero: null })
+  })
+
+  test('mayúsculas y espacios de más dan igual', () => {
+    for (const v of ['ME', '  Me  ', 'Me:']) {
+      assert.deepEqual(parsearComandoExcluidos(v), { accion: 'excluir', numero: null }, v)
+    }
+  })
+
+  // El guardia que de verdad importa: sin esto, escribirle "me gustaría..." a un
+  // cliente desde el teléfono del negocio metía esa frase en la lista de excluidos
+  // y además no llegaba como mensaje.
+  test('una frase que empieza por "me" NO es un comando', () => {
+    for (const v of [
+      'me gustaría confirmarte el precio',
+      'me avisas cuando llegues',
+      'me dijeron que llamaste',
+      'mencioname el modelo',
+      'me - cuéntame luego'
+    ]) {
+      assert.equal(parsearComandoExcluidos(v), null, `"${v}" no puede ser un comando`)
+    }
+  })
+
+  test('lo que no empieza por "me" tampoco', () => {
+    for (const v of ['hola', '*', '**', '', '   ', 'dame el número']) {
+      assert.equal(parsearComandoExcluidos(v), null, `"${v}"`)
+    }
+  })
+})
+
+describe('quitarExcluido', () => {
+  test('quita aunque esté escrito en otro formato', () => {
+    const { cfg, estaba } = quitarExcluido({ excludedNumbers: ['+1 786 383 0513', '584147750745'] }, '17863830513')
+    assert.equal(estaba, true)
+    assert.deepEqual(cfg.excludedNumbers, ['584147750745'])
+    assert.equal(estaExcluido(cfg, 'wa:17863830513'), false)
+  })
+
+  test('quitar algo que no estaba no borra el resto', () => {
+    const { cfg, estaba } = quitarExcluido({ excludedNumbers: ['584147750745'] }, '+19999999999')
+    assert.equal(estaba, false)
+    assert.deepEqual(cfg.excludedNumbers, ['584147750745'])
+  })
+})
 
 describe('claveContacto: normaliza cualquier forma del mismo contacto', () => {
   test('el mismo número escrito de seis formas da la misma clave', () => {
