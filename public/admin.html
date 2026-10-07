@@ -1365,6 +1365,21 @@
  </div>
 
  <div class="card">
+ <h2>Contactos excluidos</h2>
+ <p style="color:#888;font-size:13px;margin:0 0 10px">
+ La IA <b>nunca</b> le contesta a estos números: familia, amigos, proveedores. Sus mensajes
+ siguen llegando a la bandeja, solo que el agente no se mete. Uno por línea, con código de país.
+ </p>
+ <textarea id="excludedNumbers" rows="6" placeholder="+1 786 383 0513&#10;+58 414 775 0745" style="font-family:monospace;font-size:13px"></textarea>
+ <div style="font-size:12px;color:var(--muted);margin:8px 0 14px">
+ Atajo desde el teléfono: escribe <code style="color:var(--gold)">me</code> en el chat de ese contacto
+ y queda excluido para siempre. Para revertirlo, bórralo de esta lista.
+ Distinto de <code style="color:var(--gold)">*</code>, que solo pausa esa conversación (<code style="color:var(--gold)">**</code> la reactiva).
+ </div>
+ <button onclick="save()">Guardar lista</button>
+ </div>
+
+ <div class="card">
  <h2>Conexion via Evolution API (avanzado)</h2>
  <p style="color:#888;font-size:13px;margin:0 0 16px">
  Conecta WhatsApp usando <b>Evolution API</b> (ya corre en tu VPS). Crea una instancia en Evolution y pega los datos aquí.
@@ -2880,6 +2895,9 @@ function render() {
  const el = document.getElementById(k);
  if (el) el.value = config[k] || '';
  });
+ // La lista de excluidos se guarda como array y se edita como texto, uno por línea.
+ const ex = document.getElementById('excludedNumbers');
+ if (ex) ex.value = (Array.isArray(config.excludedNumbers) ? config.excludedNumbers : String(config.excludedNumbers || '').split(/[\n,;]+/)).filter(Boolean).join('\n');
  const t2 = document.getElementById('tone2'); if (t2) t2.value = config.tone || '';
  const ad = document.getElementById('autoDetectLanguage'); if (ad) ad.checked = config.autoDetectLanguage !== false;
  ['notifyOnLead','notifyOnEscalation','smtpSecure','bookingFollowupEnabled'].forEach(k => {
@@ -3343,6 +3361,8 @@ function save() {
  const el = document.getElementById(k);
  if (el) config[k] = el.value;
  });
+ const exN = document.getElementById('excludedNumbers');
+ if (exN) config.excludedNumbers = exN.value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
  const ac2 = document.getElementById('accentColor2');
  if (ac2 && ac2.value) config.accentColor = ac2.value;
  const t2 = document.getElementById('tone2');

@@ -473,6 +473,87 @@ export function usesEvolution(cfg) {
   return !!(cfg && cfg.waBaseUrl && cfg.waInstance && cfg.waApiKey)
 }
 
+// ============================================================
+// CONTACTOS EXCLUIDOS — la IA nunca les contesta
+// ============================================================
+// Familia, amigos y proveedores escriben al mismo número que los clientes. El
+// negocio los apunta en el panel, o manda "me" en el chat para excluirlos sobre
+// la marcha.
+//
+// Un mismo contacto se identifica distinto según el canal y según si WhatsApp
+// mandó el número o un LID, así que todo —lo de la lista y lo que llega— se
+// normaliza con esta misma función antes de comparar.
+export function claveContacto(valor) {
+  let s = String(valor || '').trim().toLowerCase()
+  if (!s) return null
+  s = s.replace(/^(wa|ig|sms):/, '')
+  // Un LID no es un teléfono: no se le pueden sacar "los últimos 10 dígitos"
+  // sin inventar un número. Se guarda y se compara entero.
+  if (s.includes('@lid')) return s
+  s = s.split('@')[0].split(':')[0]
+  const digitos = s.replace(/\D/g, '')
+  if (digitos.length >= 8) return digitos.length > 10 ? digitos.slice(-10) : digitos
+  return s || null
+}
+
+export function listaExcluidos(cfg) {
+  const bruto = cfg?.excludedNumbers
+  const filas = Array.isArray(bruto) ? bruto : String(bruto || '').split(/[\n,;]+/)
+  return filas.map(claveContacto).filter(Boolean)
+}
+
+// leadPhone entra además del visitorId porque en WhatsApp con LID el visitorId
+// no contiene el número: el único sitio donde está es lead_phone.
+export function estaExcluido(cfg, visitorId, leadPhone) {
+  const excluidos = listaExcluidos(cfg)
+  if (!excluidos.length) return false
+  const claves = [claveContacto(visitorId), claveContacto(leadPhone)].filter(Boolean)
+  return claves.some(k => excluidos.includes(k))
+}
+
+// El negocio manda "me" en el chat → ese contacto queda excluido para siempre.
+// Distinto de `*`, que solo pausa esa conversación y `**` deshace: esto va a la
+// lista de la empresa y ya no vuelve solo. Para revertirlo hay que sacarlo de la
+// lista en el panel, a propósito.
+//
+// Se guarda el teléfono real si se conoce; si WhatsApp solo dio un LID, se
+// guarda el LID, que es lo único que identifica a ese contacto. Peor sería no
+// excluir a nadie.
+export function excluirContactoDesdeChat(companyId, channel, visitorId, telefonoReal) {
+  try {
+    const cfg = loadConfig(companyId)
+    const identificador = telefonoReal || visitorId
+    const { cfg: nuevo, clave, yaEstaba } = agregarExcluido(cfg, identificador)
+    if (!clave) {
+      console.log(`[excluido:${companyId}] "me" ignorado: no se pudo identificar a ${visitorId}`)
+      return false
+    }
+    if (!yaEstaba) saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
+    // Además se pausa esta conversación, para que en la bandeja se vea que la
+    // lleva una persona y no parezca que el agente simplemente dejó de contestar.
+    db.prepare("UPDATE conversations SET human_mode = 1 WHERE visitor_id = ? AND company_id = ? AND channel = ?")
+      .run(visitorId, companyId, channel)
+    console.log(`[excluido:${companyId}] ${identificador} (${clave})${yaEstaba ? ' ya estaba en la lista' : ' agregado por "me"'}`)
+    return true
+  } catch (err) {
+    console.error(`[excluido:${companyId}] no se pudo excluir ${visitorId}:`, err.message)
+    return false
+  }
+}
+
+// Devuelve la config con el contacto agregado a la lista, sin duplicar. No
+// guarda: el caller decide cuándo persistir.
+export function agregarExcluido(cfg, contacto) {
+  const clave = claveContacto(contacto)
+  if (!clave) return { cfg, clave: null, yaEstaba: false }
+  const actuales = Array.isArray(cfg.excludedNumbers)
+    ? cfg.excludedNumbers
+    : String(cfg.excludedNumbers || '').split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
+  const yaEstaba = actuales.some(v => claveContacto(v) === clave)
+  if (yaEstaba) return { cfg, clave, yaEstaba: true }
+  return { cfg: { ...cfg, excludedNumbers: [...actuales, String(contacto).trim()] }, clave, yaEstaba: false }
+}
+
 // A JID we should actually hold a conversation with. Statuses/stories
 // (status@broadcast), channels (@newsletter) and groups (@g.us) arrive on the
 // exact same message stream as real DMs — replying to one answers into the
@@ -713,6 +794,18 @@ export async function processMessage({ companyId, message, conversationId, visit
       db.prepare('UPDATE conversations SET human_mode = 0 WHERE id = ?').run(convId)
       conv.human_mode = 0
     }
+  }
+
+  // Contacto excluido — la IA no contesta nunca. Va antes que todo lo demás
+  // (triggers, flujos, LLM) y aquí porque es el único punto por el que pasan
+  // WhatsApp, SMS, Instagram y el chat web: ponerlo en un webhook dejaría los
+  // otros canales contestándole igual.
+  //
+  // El mensaje SÍ se guarda (ya quedó arriba): el negocio tiene que poder leer
+  // a su familia en la bandeja, solo que el agente no se mete.
+  if (estaExcluido(cfg, visitorId, conv.lead_phone)) {
+    console.log(`[excluido:${companyId}] ${visitorId} — la IA no responde`)
+    return { reply: null, conversationId: convId }
   }
 
   // Human takeover — skip AI
@@ -1658,6 +1751,8 @@ export async function startBuiltinWhatsApp(companyId) {
               db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
               console.log(`[WA:${companyId}] human_mode=${mode} para ${visitorId}`)
             }
+          } else if (cmd.toLowerCase() === 'me') {
+            excluirContactoDesdeChat(companyId, 'whatsapp', visitorId, telefonoReal)
           }
           continue // never process fromMe messages through AI
         }
@@ -2707,6 +2802,10 @@ chatRouter.post('/whatsapp/webhook', async (req, res) => {
           db.prepare('UPDATE conversations SET human_mode = ? WHERE id = ?').run(mode, conv.id)
           console.log(`[WA webhook:${company.id}] human_mode=${mode} para ${visitorId}`)
         }
+        return
+      }
+      if (cmd.toLowerCase() === 'me') {
+        excluirContactoDesdeChat(company.id, 'whatsapp', visitorId, extraerTelefonoWa(data.key))
         return
       }
       // Saliente del negocio/humano (no es comando). Antes se descartaba → el historial
