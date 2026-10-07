@@ -1381,7 +1381,10 @@
  Las confirmaciones llegan a tu propio chat de WhatsApp, nunca al del contacto.
  Distinto de <code style="color:var(--gold)">*</code>, que solo pausa esa conversación (<code style="color:var(--gold)">**</code> la reactiva).
  </div>
- <button onclick="save()">Guardar lista</button>
+ <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+  <button onclick="guardarExcluidos()">Guardar lista</button>
+  <button class="secondary" onclick="refrescarExcluidos()" title="Trae los números que agregaste con &quot;me&quot; desde el teléfono" style="font-size:12px;padding:8px 12px;text-transform:none;letter-spacing:0">↻ Actualizar</button>
+ </div>
  </div>
 
  <div class="card">
@@ -3366,8 +3369,9 @@ function save() {
  const el = document.getElementById(k);
  if (el) config[k] = el.value;
  });
- const exN = document.getElementById('excludedNumbers');
- if (exN) config.excludedNumbers = exN.value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+ // excludedNumbers NO se manda aquí a propósito: tiene su propio botón. El
+ // teléfono puede agregar números con "me" mientras el panel está abierto, y si
+ // este Guardar arrastrara el textarea viejo los borraría sin avisar.
  const ac2 = document.getElementById('accentColor2');
  if (ac2 && ac2.value) config.accentColor = ac2.value;
  const t2 = document.getElementById('tone2');
@@ -3393,11 +3397,33 @@ function save() {
  .then(c => { config = c; toast('Guardado '); });
 }
 
+// Guarda SOLO la lista de excluidos. El servidor hace merge, así que no toca
+// ningún otro campo, y así este botón no pisa lo que haya cambiado en otra parte.
+function guardarExcluidos() {
+ const el = document.getElementById('excludedNumbers');
+ if (!el) return;
+ const numeros = el.value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+ api('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ excludedNumbers: numeros }) })
+  .then(c => { config = c; el.value = (c.excludedNumbers || []).join('\n'); toast(`Guardado · ${numeros.length} excluido${numeros.length === 1 ? '' : 's'}`); });
+}
+
+// Relee la lista del servidor: los números que agregaste con "me" desde el
+// teléfono entraron por detrás y el panel no se entera solo.
+function refrescarExcluidos() {
+ const el = document.getElementById('excludedNumbers');
+ if (!el) return;
+ api('/api/config').then(c => {
+  config = c;
+  el.value = (Array.isArray(c.excludedNumbers) ? c.excludedNumbers : String(c.excludedNumbers || '').split(/[\n,;]+/)).filter(Boolean).join('\n');
+ });
+}
+
 function tab(name) {
  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
  document.querySelector(`.nav-item[data-tab="${name}"]`)?.classList.add('active');
  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
  document.getElementById('tab-'+name).classList.add('active');
+ if (name === 'whatsapp') refrescarExcluidos();
  if (name === 'convs') loadConvs();
  if (name === 'leads') loadLeads();
  if (name === 'knowledge') loadDocs();
