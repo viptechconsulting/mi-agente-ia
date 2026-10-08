@@ -13,7 +13,8 @@ import { verifyTwilioSignature } from '../services/twilio.js'
 import { requireAdmin, withCompany, signState, verifyState } from '../middleware/auth.js'
 import {
   db, loadConfig, saveConfig, buildSystemPrompt,
-  listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance
+  listCompanies, getCompany, getCompanyByToken, findCompanyByWaInstance,
+  getServerSetting, setServerSetting
 } from '../db.js'
 import { SEARCH_PRODUCTS_TOOL, buildSearchResponse } from '../services/recommendations.js'
 import { matchKeywordTrigger, getActiveTriggerFlow, startTriggerFlow, advanceTriggerFlow, clearTriggerFlow, setScriptTrigger, getScriptTrigger } from '../services/keyword-trigger.js'
@@ -502,10 +503,36 @@ export function listaExcluidos(cfg) {
   return filas.map(claveContacto).filter(Boolean)
 }
 
+// Lista global: aplica a TODAS las empresas. Existe porque la lista por empresa
+// no resolvía el caso real — la misma persona le escribe a varios negocios del
+// mismo dueño, y había que repetir el número en cada panel para que callara.
+// Vive en server_config, no en la config de una empresa, justamente porque no
+// es de ninguna.
+export const CLAVE_EXCLUIDOS_GLOBAL = 'excluded_numbers_global'
+
+export function leerExcluidosGlobal() {
+  try {
+    const bruto = getServerSetting(CLAVE_EXCLUIDOS_GLOBAL)
+    if (!bruto) return []
+    const datos = typeof bruto === 'string' && bruto.trim().startsWith('[') ? JSON.parse(bruto) : bruto
+    const filas = Array.isArray(datos) ? datos : String(datos).split(/[\n,;]+/)
+    return filas.map(s => String(s).trim()).filter(Boolean)
+  } catch { return [] }
+}
+
+export function guardarExcluidosGlobal(numeros) {
+  const limpios = (Array.isArray(numeros) ? numeros : String(numeros || '').split(/[\n,;]+/))
+    .map(s => String(s).trim()).filter(Boolean)
+  setServerSetting(CLAVE_EXCLUIDOS_GLOBAL, JSON.stringify(limpios))
+  return limpios
+}
+
 // leadPhone entra además del visitorId porque en WhatsApp con LID el visitorId
 // no contiene el número: el único sitio donde está es lead_phone.
-export function estaExcluido(cfg, visitorId, leadPhone) {
-  const excluidos = listaExcluidos(cfg)
+export function estaExcluido(cfg, visitorId, leadPhone, globalExtra) {
+  const globales = (globalExtra !== undefined ? globalExtra : leerExcluidosGlobal())
+    .map(claveContacto).filter(Boolean)
+  const excluidos = listaExcluidos(cfg).concat(globales)
   if (!excluidos.length) return false
   const claves = [claveContacto(visitorId), claveContacto(leadPhone)].filter(Boolean)
   return claves.some(k => excluidos.includes(k))
@@ -603,13 +630,20 @@ export async function ejecutarComandoExcluidos(companyId, channel, visitorId, te
   if (comando.accion === 'quitar') {
     const { cfg: nuevo, clave, estaba } = quitarExcluido(cfg, objetivo)
     if (!clave) return true
-    if (estaba) {
-      saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
+    // Hay que sacarlo de las dos listas: si queda en la global, "me -" no surte
+    // efecto y parece que el comando está roto.
+    const globales = leerExcluidosGlobal()
+    const quedanGlobales = globales.filter(v => claveContacto(v) !== clave)
+    const estabaGlobal = quedanGlobales.length !== globales.length
+    if (estabaGlobal) guardarExcluidosGlobal(quedanGlobales)
+    if (estaba) saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
+    if (estaba || estabaGlobal) {
       db.prepare('UPDATE conversations SET human_mode = 0 WHERE visitor_id = ? AND company_id = ? AND channel = ?')
         .run(visitorId, companyId, channel)
     }
-    console.log(`[excluido:${companyId}] ${objetivo} ${estaba ? 'quitado de la lista' : 'no estaba en la lista'}`)
-    await avisarAlNegocio(companyId, cfg, estaba
+    const salio = estaba || estabaGlobal
+    console.log(`[excluido:${companyId}] ${objetivo} ${salio ? 'quitado de la lista' : 'no estaba en la lista'}`)
+    await avisarAlNegocio(companyId, cfg, salio
       ? `✅ ${objetivo} ya NO está excluido. La IA vuelve a contestarle.`
       : `ℹ️ ${objetivo} no estaba en la lista de excluidos.`)
     return true
@@ -640,6 +674,13 @@ export function excluirContactoDesdeChat(companyId, channel, visitorId, telefono
     if (!clave) {
       console.log(`[excluido:${companyId}] "me" ignorado: no se pudo identificar a ${visitorId}`)
       return false
+    }
+    // Va también a la lista global: la misma persona le escribe a varios de tus
+    // negocios, y excluirla solo aquí la dejaba contestada en los demás — que es
+    // justo lo que se intenta evitar.
+    const globales = leerExcluidosGlobal()
+    if (!globales.some(v => claveContacto(v) === clave)) {
+      guardarExcluidosGlobal([...globales, String(identificador).trim()])
     }
     if (!yaEstaba) saveConfig(companyId, { excludedNumbers: nuevo.excludedNumbers })
     // Además se pausa esa conversación, para que en la bandeja se vea que la

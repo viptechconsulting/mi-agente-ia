@@ -400,6 +400,19 @@ adminRouter.delete('/users/:id', requireSuperAdmin, (req, res) => {
 adminRouter.get('/config', requireAdmin, withCompany, (req, res) => res.json(req.company.config))
 adminRouter.post('/config', requireAdmin, withCompany, (req, res) => res.json(saveConfig(req.company.id, req.body)))
 
+// Lista de excluidos que aplica a TODAS las empresas. Vive fuera de la config de
+// cualquiera de ellas porque no es de ninguna, y solo la toca el admin principal:
+// un número aquí silencia al contacto en toda la plataforma.
+adminRouter.get('/excluidos-globales', requireAdmin, async (req, res) => {
+  const { leerExcluidosGlobal } = await import('./chat.js')
+  res.json({ numeros: leerExcluidosGlobal() })
+})
+
+adminRouter.post('/excluidos-globales', requireAdmin, requireSuperAdmin, async (req, res) => {
+  const { guardarExcluidosGlobal } = await import('./chat.js')
+  res.json({ numeros: guardarExcluidosGlobal(req.body?.numeros) })
+})
+
 // ============================================================
 // UPLOADS (per-company asset folder)
 // ============================================================

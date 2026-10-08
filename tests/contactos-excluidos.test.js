@@ -44,6 +44,38 @@ describe('parsearComandoExcluidos: comandos desde el WhatsApp del negocio', () =
   })
 })
 
+// La lista por empresa no resolvía el caso real: la misma persona le escribe a
+// varios negocios del mismo dueño, y había que repetir el número en cada panel.
+// El parámetro extra deja probar la mezcla sin tocar server_config.
+describe('lista global: aplica a todas las empresas', () => {
+  const GLOBAL = ['+1 (407) 738-0033', '+1 (786) 351-1573']
+
+  test('excluye aunque la empresa no lo tenga en su lista', () => {
+    assert.equal(estaExcluido({}, 'wa:14077380033', null, GLOBAL), true)
+    assert.equal(estaExcluido({ excludedNumbers: [] }, 'wa:17863511573', null, GLOBAL), true)
+  })
+
+  test('el formato del panel, con paréntesis y guiones, también casa', () => {
+    // Es exactamente como los pegó el usuario.
+    assert.equal(estaExcluido({}, 'wa:14079283405', null, ['+1 (407) 928-3405']), true)
+  })
+
+  test('con LID usa el lead_phone también contra la global', () => {
+    assert.equal(estaExcluido({}, 'wa:30133608030276@lid', '+14077380033', GLOBAL), true)
+  })
+
+  test('la de la empresa y la global se suman, no se pisan', () => {
+    const cfg = { excludedNumbers: ['+13213306708'] }
+    assert.equal(estaExcluido(cfg, 'wa:13213306708', null, GLOBAL), true, 'de la empresa')
+    assert.equal(estaExcluido(cfg, 'wa:14077380033', null, GLOBAL), true, 'de la global')
+    assert.equal(estaExcluido(cfg, 'wa:19999999999', null, GLOBAL), false, 'de ninguna')
+  })
+
+  test('las dos vacías no excluyen a NADIE', () => {
+    assert.equal(estaExcluido({}, 'wa:17863511573', null, []), false)
+  })
+})
+
 describe('quitarExcluido', () => {
   test('quita aunque esté escrito en otro formato', () => {
     const { cfg, estaba } = quitarExcluido({ excludedNumbers: ['+1 786 383 0513', '584147750745'] }, '17863830513')

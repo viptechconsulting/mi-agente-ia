@@ -1385,6 +1385,20 @@
   <button onclick="guardarExcluidos()">Guardar lista</button>
   <button class="secondary" onclick="refrescarExcluidos()" title="Trae los números que agregaste con &quot;me&quot; desde el teléfono" style="font-size:12px;padding:8px 12px;text-transform:none;letter-spacing:0">↻ Actualizar</button>
  </div>
+
+ <div style="border-top:1px solid var(--border);margin:22px 0 0;padding-top:18px">
+  <h3 style="margin:0 0 6px;font-size:15px">Excluidos en <u>todas</u> tus empresas</h3>
+  <p style="color:#888;font-size:13px;margin:0 0 10px">
+  Un número aquí queda excluido en <b>todas</b> las empresas del panel, no solo en esta.
+  Es para tu familia y tus conocidos, que le escriben a más de uno de tus negocios.
+  Lo que agregues con <code style="color:var(--gold)">me</code> desde el teléfono entra aquí automáticamente.
+  </p>
+  <textarea id="excludedNumbersGlobal" rows="6" placeholder="+1 (407) 738-0033&#10;+1 (786) 351-1573" style="font-family:monospace;font-size:13px"></textarea>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px">
+   <button onclick="guardarExcluidosGlobales()">Guardar lista global</button>
+   <button class="secondary" onclick="refrescarExcluidosGlobales()" style="font-size:12px;padding:8px 12px;text-transform:none;letter-spacing:0">↻ Actualizar</button>
+  </div>
+ </div>
  </div>
 
  <div class="card">
@@ -3418,12 +3432,30 @@ function refrescarExcluidos() {
  });
 }
 
+function guardarExcluidosGlobales() {
+ const el = document.getElementById('excludedNumbersGlobal');
+ if (!el) return;
+ const numeros = el.value.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+ api('/api/excluidos-globales', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ numeros }) })
+  .then(d => {
+   if (d.error) return toast('Error: ' + d.error);
+   el.value = (d.numeros || []).join('\n');
+   toast(`Guardado · ${(d.numeros||[]).length} excluido${(d.numeros||[]).length === 1 ? '' : 's'} en todas las empresas`);
+  });
+}
+
+function refrescarExcluidosGlobales() {
+ const el = document.getElementById('excludedNumbersGlobal');
+ if (!el) return;
+ api('/api/excluidos-globales').then(d => { if (!d.error) el.value = (d.numeros || []).join('\n'); });
+}
+
 function tab(name) {
  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
  document.querySelector(`.nav-item[data-tab="${name}"]`)?.classList.add('active');
  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
  document.getElementById('tab-'+name).classList.add('active');
- if (name === 'whatsapp') refrescarExcluidos();
+ if (name === 'whatsapp') { refrescarExcluidos(); refrescarExcluidosGlobales(); }
  if (name === 'convs') loadConvs();
  if (name === 'leads') loadLeads();
  if (name === 'knowledge') loadDocs();
