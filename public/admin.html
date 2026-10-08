@@ -4423,6 +4423,27 @@ function disconnectInstagram() {
  });
 }
 
+// Lee la respuesta como texto y luego la parsea, en vez de r.json() a secas.
+// El endpoint del QR mantiene la conexión abierta hasta 30s esperando a que
+// Baileys genere el código: si justo en esa ventana se reinicia el servidor o
+// el proxy corta, llega un cuerpo que no es JSON y r.json() reventaba con
+// "Unexpected non-whitespace character after JSON at position 4", que al cliente
+// no le dice nada y encima parece un fallo suyo. Ahora lee "reintenta" y el
+// cuerpo real queda en la consola para poder diagnosticarlo.
+function fetchJsonWa(url, opts) {
+ return fetch(url, opts).then(async r => {
+  const texto = await r.text();
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    console.error('[WA] respuesta no-JSON de', url, '| HTTP', r.status, '| cuerpo:', texto.slice(0, 300));
+    const err = new Error('El servidor respondió algo inesperado. Reintenta en unos segundos.');
+    err.noJson = true;
+    throw err;
+  }
+ });
+}
+
 function loadBuiltinQr(silent) {
  _clearWaTimers();
  const btn = document.getElementById('btnBuiltinQr');
@@ -4432,8 +4453,7 @@ function loadBuiltinQr(silent) {
  // x-company-id obligatorio: sin él el servidor cae en la empresa 'default' y
  // el QR vinculaba el teléfono al WhatsApp de OTRA empresa, pasara lo que pasara
  // en el selector de arriba.
- fetch('/api/whatsapp/builtin/qr', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
- .then(r => r.json())
+ fetchJsonWa('/api/whatsapp/builtin/qr', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
  .then(d => {
   btn.textContent = 'Generar QR'; btn.disabled = false;
   if (d.status === 'qr') {
@@ -4458,12 +4478,18 @@ function loadBuiltinQr(silent) {
    statusEl.style.color = '#e55';
   }
  })
- .catch(e => { btn.textContent = 'Generar QR'; btn.disabled = false; statusEl.textContent = 'Error: ' + e.message; statusEl.style.color = '#e55'; });
+ .catch(e => {
+  btn.textContent = 'Generar QR'; btn.disabled = false;
+  // Un corte a mitad del QR no es culpa de nadie y se arregla reintentando:
+  // se reintenta solo una vez, en vez de dejar al cliente con un error seco.
+  statusEl.textContent = e.noJson ? e.message : 'Error: ' + e.message;
+  statusEl.style.color = '#e55';
+  if (e.noJson && !silent) setTimeout(() => loadBuiltinQr(true), 3000);
+ });
 }
 
 function checkBuiltinStatus() {
- fetch('/api/whatsapp/builtin/status', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
- .then(r => r.json())
+ fetchJsonWa('/api/whatsapp/builtin/status', { headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
  .then(d => {
   const statusEl = document.getElementById('builtinStatus');
   const labels = { open: 'Conectado', disconnected: 'Desconectado', qr: 'Esperando escaneo', connecting: 'Conectando...', waiting: 'Sin iniciar', logged_out: 'Sesion cerrada' };
@@ -4472,20 +4498,21 @@ function checkBuiltinStatus() {
   statusEl.style.color = colors[d.status] || '#aaa';
   document.getElementById('btnDisconnect').style.display = d.status === 'open' ? 'inline-block' : 'none';
   if (d.status !== 'qr') { document.getElementById('builtinQrImg').style.display = 'none'; _clearWaTimers(); }
- });
+ })
+ .catch(() => {}); // sondeo de fondo: si falla una vuelta, la siguiente lo arregla
 }
 
 function disconnectBuiltin() {
  if (!confirm('Desconectar WhatsApp? Tendras que escanear el QR de nuevo.')) return;
  _clearWaTimers();
- fetch('/api/whatsapp/builtin/disconnect', { method: 'POST', headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
- .then(r => r.json())
+ fetchJsonWa('/api/whatsapp/builtin/disconnect', { method: 'POST', headers: { 'x-admin-password': password, 'x-company-id': activeCompanyId } })
  .then(d => {
   // El servidor rechaza desconectar aquí a una empresa que usa Evolution. Decirlo,
   // no cantar "desconectado" sobre algo que sigue conectado.
   if (d.error) { checkBuiltinStatus(); return toast(d.error); }
   document.getElementById('builtinQrImg').style.display = 'none'; checkBuiltinStatus(); toast('WhatsApp desconectado');
- });
+ })
+ .catch(e => toast(e.noJson ? e.message : 'Error: ' + e.message));
 }
 
 function genContactQr() {
