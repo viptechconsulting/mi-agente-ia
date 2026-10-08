@@ -3025,7 +3025,7 @@ chatRouter.post('/whatsapp/qr', requireAdmin, withCompany, async (req, res) => {
       headers: { 'apikey': waApiKey }
     })
     const data = await r.json()
-    const qr = data.base64 || data?.qrcode?.base64 || data?.qr?.base64 || null
+    const qr = await qrComoImagen(data)
     const state = data.state || data?.instance?.state || null
     res.json({ qr, state })
   } catch (err) {
@@ -3067,6 +3067,41 @@ chatRouter.get('/whatsapp/contact-qr', requireAdmin, async (req, res) => {
   }
 })
 
+// Evolution entrega el QR de formas distintas según la versión y el momento: a
+// veces un data URL listo para pintar, a veces el PNG en base64 pelado (sin el
+// prefijo "data:image/png;base64,"), y a veces solo `code`, que NO es una imagen
+// sino la cadena cruda de emparejamiento ("2@ref,clave,identidad,secreto").
+//
+// Esa cadena metida en un <img> es lo que el cliente ve como texto en pantalla y
+// reporta como error. Aquí se normaliza todo a una imagen de verdad: si hace
+// falta, el QR lo dibujamos nosotros a partir de la cadena. Lo que nunca sale de
+// aquí es un string crudo — antes que eso, null, y el panel dice qué pasó.
+export async function qrComoImagen(respuesta) {
+  const directo = respuestaBase64(respuesta)
+  if (directo) return directo
+  const crudo = respuesta?.code || respuesta?.qrcode?.code || null
+  if (typeof crudo === 'string' && crudo.trim()) {
+    try {
+      return await QRCode.toDataURL(crudo.trim(), { width: 300, margin: 1, errorCorrectionLevel: 'M' })
+    } catch (err) {
+      console.error('[qr] no se pudo dibujar el QR desde code:', err.message)
+    }
+  }
+  return null
+}
+
+function respuestaBase64(respuesta) {
+  const v = respuesta?.base64 || respuesta?.qrcode?.base64 || respuesta?.qr?.base64
+  if (typeof v !== 'string' || !v.trim()) return null
+  const s = v.trim()
+  if (s.startsWith('data:image')) return s
+  // PNG en base64 sin prefijo. La cadena de emparejamiento lleva comas y "@",
+  // que no existen en base64: así no se confunde una con la otra.
+  const limpio = s.replace(/\s+/g, '')
+  if (limpio.length > 100 && /^[A-Za-z0-9+/]+={0,2}$/.test(limpio)) return 'data:image/png;base64,' + limpio
+  return null
+}
+
 // Una empresa migrada a Evolution no tiene socket interno: startBuiltinWhatsApp
 // retorna sin tocar nada, así que el estado se quedaba en 'connecting' PARA
 // SIEMPRE. El panel sondeaba 30 segundos y contestaba "Tardando más de lo
@@ -3092,7 +3127,7 @@ async function estadoWhatsappEvolution(cfg) {
   // No está conectada: pedirle el QR para vincular.
   const rCon = await fetch(`${base}/instance/connect/${encodeURIComponent(cfg.waInstance)}`, cab)
   const con = await rCon.json()
-  const qr = con.base64 || con?.qrcode?.base64 || con?.qr?.base64 || null
+  const qr = await qrComoImagen(con)
   if (qr) return { status: 'qr', qr }
   return {
     status: 'disconnected',

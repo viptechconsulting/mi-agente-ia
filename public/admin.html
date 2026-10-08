@@ -4437,6 +4437,11 @@ function loadBuiltinQr(silent) {
  .then(d => {
   btn.textContent = 'Generar QR'; btn.disabled = false;
   if (d.status === 'qr') {
+   if (!String(d.qr || '').startsWith('data:image')) {
+    statusEl.textContent = 'El QR llegó en un formato que no se puede mostrar. Reintenta en unos segundos.';
+    statusEl.style.color = '#e55';
+    return;
+   }
    img.src = d.qr; img.style.display = 'block';
    statusEl.textContent = 'WhatsApp → Configuracion → Dispositivos vinculados → Vincular dispositivo';
    statusEl.style.color = 'var(--gold)';
@@ -4551,6 +4556,9 @@ function loadWaQr() {
    return toast('WhatsApp ya esta conectado');
   }
   if (!d.qr) return toast('No se pudo obtener el QR. Verifica que la instancia exista en Evolution.');
+  // Solo una imagen. Si llegara la cadena cruda de emparejamiento, el cliente
+  // vería ese texto en pantalla y lo reportaría como error.
+  if (!String(d.qr).startsWith('data:image')) return toast('El QR llegó en un formato que no se puede mostrar. Reintenta en unos segundos.');
   document.getElementById('waQrImg').src = d.qr;
   wrap.style.display = 'flex';
   if (d.state) showWaStatus(d.state);
